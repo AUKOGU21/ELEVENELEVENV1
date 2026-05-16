@@ -1,0 +1,10 @@
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS outcome_type text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS primary_uncertainty text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS tipping_factor text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS tipping_factor_other text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS size_bought text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS fit_result text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS fit_result_note text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS size_recommendation text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS outcome_detail text;
+ALTER TABLE outcomes ADD COLUMN IF NOT EXISTS outcome_detail_other text;

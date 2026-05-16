@@ -1,0 +1,2083 @@
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import heroEditorial from "@/assets/hero-editorial.png";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, ThumbsUp, Check, ExternalLink, SlidersHorizontal, Search, X, User, Info, ChevronDown, ChevronUp, Camera, ArrowRight, Bookmark, MoreHorizontal, MessageCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { computeMatchScore } from "@/lib/matching";
+import { SILHOUETTE_OPTIONS } from "@/components/onboarding/OnboardingData";
+import { DialInFitModal, shouldShowFitPrompt, markFitPromptShown } from "@/components/DialInFitModal";
+import OutcomeModal from "@/components/OutcomeModal";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ResponseRow {
+  id: string;
+  recommendation: "buy" | "do_not_buy" | "need_more_info";
+  reasoning: string;
+  photo_url: string | null;
+  match_score: number | null;
+  helpfulness_votes: number;
+  user_id: string;
+  profiles: { display_name: string | null } | null;
+}
+
+interface OutcomeRow {
+  did_purchase: boolean | null;
+  outcome_type: string | null;
+  primary_uncertainty: string | null;
+  tipping_factor: string | null;
+  tipping_factor_other: string | null;
+  size_bought: string | null;
+  fit_result: string | null;
+  fit_result_note: string | null;
+  size_recommendation: string | null;
+  outcome_detail: string | null;
+  outcome_detail_other: string | null;
+}
+
+interface DecisionRow {
+  id: string;
+  product_name: string | null;
+  brand_name: string | null;
+  product_image_url: string | null;
+  product_image_url_2: string | null;
+  product_url: string | null;
+  price_note: string | null;
+  sizes_note: string | null;
+  context_note: string | null;
+  confidence_score: number;
+  uncertainty_text: string | null;
+  status: string;
+  user_id: string;
+  created_at: string;
+  matchScore?: number | null;
+  responses: ResponseRow[];
+  outcomes: OutcomeRow[] | null;
+  profiles: {
+    display_name: string | null;
+    avatar_url: string | null;
+    height_range: string | null;
+    silhouette_preference: string[] | null;
+    style_aesthetics: string[] | null;
+    top_size: string | null;
+    bottom_size: string | null;
+    fit_preference: string | null;
+    fit_details: Record<string, string> | null;
+    age: number | null;
+    city: string | null;
+  } | null;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CONTEXT_OPTIONS = [
+  "I own this exact item",
+  "I've bought from this brand before",
+  "I haven't bought, but I'm familiar with the brand",
+  "No experience with this brand",
+];
+
+const CATEGORY_OPTIONS = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Shoes", "Accessories", "Bags"];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const timeAgo = (dateStr: string) => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const formatName = (displayName: string | null) => {
+  if (!displayName) return "Anonymous";
+  const parts = displayName.trim().split(" ");
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[1][0]}.`;
+};
+
+const getInitials = (displayName: string | null) => {
+  if (!displayName) return "?";
+  const parts = displayName.trim().split(" ");
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+};
+
+const recommendationLabel = (rec: string) => {
+  if (rec === "buy") return "Would buy";
+  if (rec === "do_not_buy") return "Wouldn't buy";
+  return "Depends";
+};
+
+const recommendationColor = (rec: string) => {
+  if (rec === "buy") return "text-emerald-400";
+  if (rec === "do_not_buy") return "text-rose-400";
+  return "text-amber-400";
+};
+
+// ─── Outcome card helpers ──────────────────────────────────────────────────────
+
+type Sentiment = "happy" | "neutral" | "regret" | null;
+
+interface OutcomeDisplay {
+  headline: string;
+  sentiment: Sentiment;
+  contextLines: string[];
+  writeIns: string[];
+  sizeBought: string | null;
+}
+
+function buildOutcomeDisplay(outcome: OutcomeRow | null, status: string): OutcomeDisplay {
+  const didBuy = status === "purchased";
+  const primary = outcome?.primary_uncertainty ?? null;
+
+  // ── Didn't buy ──────────────────────────────────────────────────────────────
+  if (!didBuy) {
+    const contextLines: string[] = [];
+    if (outcome?.tipping_factor && outcome.tipping_factor !== "Something else") {
+      contextLines.push(outcome.tipping_factor);
+    }
+    const writeIns = outcome?.tipping_factor_other ? [outcome.tipping_factor_other] : [];
+    return { headline: "Didn't buy it", sentiment: null, contextLines, writeIns, sizeBought: null };
+  }
+
+  // ── Bought — no outcome data yet ────────────────────────────────────────────
+  if (!outcome) {
+    return { headline: "Bought it", sentiment: null, contextLines: [], writeIns: [], sizeBought: null };
+  }
+
+  // ── Flow 1: Between sizes / Will it fit right ────────────────────────────────
+  if (primary === "Between sizes" || primary === "Will it fit right") {
+    let sentiment: Sentiment = "happy";
+    if (outcome.fit_result === "Not at all what I expected" || outcome.size_recommendation === "Don't buy") {
+      sentiment = "regret";
+    } else if (outcome.fit_result === "OK fit, but not perfect") {
+      sentiment = "neutral";
+    }
+    const contextLines: string[] = [];
+    if (outcome.fit_result) contextLines.push(outcome.fit_result);
+    if (outcome.size_recommendation) contextLines.push(`Recommends: ${outcome.size_recommendation}`);
+    const writeIns = [outcome.fit_result_note, outcome.tipping_factor_other].filter(Boolean) as string[];
+    return { headline: "Bought it", sentiment, contextLines, writeIns, sizeBought: outcome.size_bought ?? null };
+  }
+
+  // ── Flow 2: Will it flatter me ───────────────────────────────────────────────
+  if (primary === "Will it flatter me") {
+    const detailMap: Record<string, { sentiment: Sentiment; text: string }> = {
+      "Better than expected": { sentiment: "happy", text: "It looked and felt better than expected" },
+      "As expected":          { sentiment: "neutral", text: "It looked and felt as expected" },
+      "Nothing like I imagined": { sentiment: "regret", text: "It looked and felt nothing like I imagined" },
+    };
+    const match = outcome.outcome_detail ? detailMap[outcome.outcome_detail] : null;
+    const writeIns = [outcome.outcome_detail_other, outcome.tipping_factor_other].filter(Boolean) as string[];
+    return {
+      headline: "Bought it",
+      sentiment: match?.sentiment ?? null,
+      contextLines: match ? [match.text] : [],
+      writeIns,
+      sizeBought: null,
+    };
+  }
+
+  // ── Flow 3: Hard to tell from photos ─────────────────────────────────────────
+  if (primary === "Hard to tell from photos") {
+    const detailMap: Record<string, { sentiment: Sentiment; text: string }> = {
+      "Yes, matched my expectations": { sentiment: "happy",   text: "It matched my expectations" },
+      "Somewhat":                      { sentiment: "neutral", text: "It somewhat matched my expectations" },
+      "Not at all":                    { sentiment: "regret",  text: "" }, // regret badge says it all
+    };
+    const match = outcome.outcome_detail ? detailMap[outcome.outcome_detail] : null;
+    const contextLines = match?.text ? [match.text] : [];
+    const writeIns = [outcome.outcome_detail_other, outcome.tipping_factor_other].filter(Boolean) as string[];
+    return { headline: "Bought it", sentiment: match?.sentiment ?? null, contextLines, writeIns, sizeBought: null };
+  }
+
+  // ── Flow 4: Worth the price ──────────────────────────────────────────────────
+  if (primary === "Worth the price") {
+    let sentiment: Sentiment = null;
+    let contextText: string | null = null;
+    if (outcome.outcome_detail === "Yes") {
+      sentiment = "happy";
+      contextText = "Yes, it was worth it";
+    } else if (outcome.outcome_detail === "No") {
+      sentiment = "regret";
+      contextText = "No, it wasn't worth it";
+    }
+    // "Other" → no sentence, only write-in text
+    const writeIns = [outcome.outcome_detail_other, outcome.tipping_factor_other].filter(Boolean) as string[];
+    return {
+      headline: "Bought it",
+      sentiment,
+      contextLines: contextText ? [contextText] : [],
+      writeIns,
+      sizeBought: null,
+    };
+  }
+
+  // ── Flow 5: Quality concerns ─────────────────────────────────────────────────
+  if (primary === "Quality concerns") {
+    const detailMap: Record<string, Sentiment> = {
+      "Yes, loved the quality":  "happy",
+      "Quality was okay":        "neutral",
+      "No, I was disappointed":  "regret",
+    };
+    const sentiment = outcome.outcome_detail ? (detailMap[outcome.outcome_detail] ?? null) : null;
+    const contextLines = outcome.outcome_detail ? [outcome.outcome_detail] : [];
+    const writeIns = [outcome.outcome_detail_other, outcome.tipping_factor_other].filter(Boolean) as string[];
+    return { headline: "Bought it", sentiment, contextLines, writeIns, sizeBought: null };
+  }
+
+  // ── Flow 6: Not sure about the color ─────────────────────────────────────────
+  if (primary === "Not sure about the color") {
+    const detailMap: Record<string, { sentiment: Sentiment; text: string }> = {
+      "Yes, loved it":       { sentiment: "happy",   text: "I loved the color IRL" },
+      "It was okay":         { sentiment: "neutral",  text: "The color was OK IRL" },
+      "No, not as expected": { sentiment: "regret",   text: "The color was not what I expected at all" },
+    };
+    const match = outcome.outcome_detail ? detailMap[outcome.outcome_detail] : null;
+    const writeIns = [outcome.outcome_detail_other, outcome.tipping_factor_other].filter(Boolean) as string[];
+    return {
+      headline: "Bought it",
+      sentiment: match?.sentiment ?? null,
+      contextLines: match ? [match.text] : [],
+      writeIns,
+      sizeBought: null,
+    };
+  }
+
+  // ── Flow 7: Other ────────────────────────────────────────────────────────────
+  const writeIns = [outcome.tipping_factor_other].filter(Boolean) as string[];
+  return { headline: "Bought it", sentiment: null, contextLines: [], writeIns, sizeBought: null };
+}
+
+const SENTIMENT_STYLE: Record<NonNullable<Sentiment>, { color: string; bg: string; border: string; label: string }> = {
+  happy:   { color: "#6B8C6B", bg: "rgba(107,140,107,0.10)", border: "rgba(107,140,107,0.28)", label: "Happy with my purchase" },
+  neutral: { color: "#C49E64", bg: "rgba(196,158,100,0.10)", border: "rgba(196,158,100,0.28)", label: "Mixed on it" },
+  regret:  { color: "#7A4040", bg: "rgba(122,64,64,0.10)",   border: "rgba(122,64,64,0.28)",   label: "Regret my purchase" },
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+const Feed = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ── Data state
+  const [decisions, setDecisions] = useState<DecisionRow[]>([]);
+  const [myDecisions, setMyDecisions] = useState<DecisionRow[]>([]);
+  const [activeTab, setActiveTab] = useState<"feed" | "mine">("feed");
+  const [loading, setLoading] = useState(true);
+
+  // ── Filters
+  const [filterBrand, setFilterBrand] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterStatus, setFilterStatus] = useState<"all" | "open">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "discussed" | "needs_input">("newest");
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  // ── Weigh-in flow
+  const [weighingIn, setWeighingIn] = useState<string | null>(null);
+  const [weighInStep, setWeighInStep] = useState<"context" | "vote" | "take" | "done">("context");
+  const [showFitModal, setShowFitModal] = useState(false);
+  const [fitModalVariant, setFitModalVariant] = useState<"weigh_in" | "post_decision">("weigh_in");
+  const [context, setContext] = useState<string | null>(null);
+  const [vote, setVote] = useState<"buy" | "do_not_buy" | "need_more_info" | null>(null);
+  const [take, setTake] = useState("");
+  const [takePhoto, setTakePhoto] = useState<File | null>(null);
+  const [takePhotoPreview, setTakePhotoPreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const takePhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Modals & overlays
+  const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [loggedOutcomeIds, setLoggedOutcomeIds] = useState<Set<string>>(new Set());
+  const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // ── User meta
+  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
+
+  // ── Vote state
+  const [userVotes, setUserVotes] = useState<Record<string, "helpful" | "not_helpful">>({});
+  const [voteCounts, setVoteCounts] = useState<Record<string, { helpful: number; not_helpful: number }>>({});
+
+  // ── Save / hide state
+  const [savedDecisionIds, setSavedDecisionIds] = useState<Set<string>>(new Set());
+  const [hiddenDecisionIds, setHiddenDecisionIds] = useState<Set<string>>(new Set());
+  const [undoHiddenId, setUndoHiddenId] = useState<string | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const weighInCompletedRef = useRef(false);
+
+  // ─── Effects ────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetchDecisions();
+
+    const channel = supabase
+      .channel("feed-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "decisions" }, () => fetchDecisions())
+      .on("postgres_changes", { event: "*", schema: "public", table: "responses" }, () => fetchDecisions())
+      .on("postgres_changes", { event: "*", schema: "public", table: "outcomes" }, () => fetchDecisions())
+      .subscribe();
+
+    // Show fit modal after posting a decision (navigated here with state)
+    const variant = (location.state as any)?.fitPromptVariant;
+    if (variant) {
+      window.history.replaceState({}, "");
+      const t = setTimeout(() => {
+        setFitModalVariant("post_decision");
+        setShowFitModal(true);
+      }, 4000);
+      return () => { supabase.removeChannel(channel); clearTimeout(t); };
+    }
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setSavedDecisionIds(new Set()); setHiddenDecisionIds(new Set()); return; }
+    const loadSaveHide = async () => {
+      const [{ data: saved }, { data: hidden }] = await Promise.all([
+        supabase.from("saved_decisions").select("decision_id").eq("user_id", user.id),
+        supabase.from("hidden_decisions").select("decision_id").eq("user_id", user.id),
+      ]);
+      if (saved) setSavedDecisionIds(new Set(saved.map((r: any) => r.decision_id)));
+      if (hidden) setHiddenDecisionIds(new Set(hidden.map((r: any) => r.decision_id)));
+    };
+    loadSaveHide();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setUserVotes({}); return; }
+    const loadUserVotes = async () => {
+      const { data } = await supabase
+        .from("response_votes")
+        .select("response_id, vote_type")
+        .eq("voter_id", user.id);
+      if (data) {
+        const map: Record<string, "helpful" | "not_helpful"> = {};
+        data.forEach((v) => { map[v.response_id] = v.vote_type; });
+        setUserVotes(map);
+      }
+    };
+    loadUserVotes();
+  }, [user]);
+
+  // ─── Data fetch ──────────────────────────────────────────────────────────────
+
+  const fetchDecisions = async () => {
+    setLoading(true);
+
+    // No outcomes join here — we fetch outcomes separately below to avoid
+    // PostgREST FK detection issues causing the join to silently return null.
+    const query = `
+      id, product_name, brand_name, product_image_url, product_image_url_2, product_url,
+      price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
+      profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
+      responses (
+        id, recommendation, reasoning, photo_url, match_score,
+        helpfulness_votes, user_id,
+        profiles ( display_name )
+      )
+    `;
+
+    const [{ data: feedData }, profileResult] = await Promise.all([
+      supabase
+        .from("decisions")
+        .select(query)
+        .eq("is_public", true)
+        .is("deleted_at", null)
+        .neq("status", "outcome_logged")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      user
+        ? supabase.from("profiles").select("*").eq("id", user.id).single()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    const myProfileData = (profileResult as any).data ?? null;
+    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url });
+
+    const local = JSON.parse(localStorage.getItem("eleven_decisions") || "[]");
+    const localFormatted: DecisionRow[] = local.map((d: any) => ({
+      id: d.id,
+      product_name: d.product?.name ?? null,
+      brand_name: d.product?.brand ?? null,
+      product_image_url: d.product?.image ?? null,
+      product_image_url_2: null,
+      confidence_score: d.confidence ?? 5,
+      uncertainty_text: d.uncertainties?.join(", ") ?? null,
+      status: "open",
+      user_id: "local",
+      created_at: new Date().toISOString(),
+      responses: [],
+      outcomes: null,
+      profiles: null,
+    }));
+
+    if (feedData) {
+      let rows = feedData as unknown as DecisionRow[];
+
+      // ── Fetch outcomes ───────────────────────────────────────────────────────
+      const allDecisionIds = rows.map((r) => r.id);
+      if (allDecisionIds.length > 0) {
+        const { data: outcomesData } = await supabase
+          .from("outcomes")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other")
+          .in("decision_id", allDecisionIds)
+          .order("created_at", { ascending: false });
+
+        if (outcomesData && outcomesData.length > 0) {
+          const outcomeMap: Record<string, OutcomeRow> = {};
+          outcomesData.forEach((o: any) => { outcomeMap[o.decision_id] = o; });
+          rows = rows.map((d) => ({
+            ...d,
+            outcomes: outcomeMap[d.id] ? [outcomeMap[d.id]] : null,
+          }));
+        }
+      }
+
+      if (myProfileData) {
+        rows = rows.map((d) => ({
+          ...d,
+          matchScore: d.user_id === user?.id || !d.profiles
+            ? null
+            : computeMatchScore(myProfileData, d.profiles as any).total,
+        }));
+        rows.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
+      }
+
+      setDecisions(user ? rows : [...localFormatted, ...rows]);
+
+      const allResponseIds = rows.flatMap((d) => d.responses?.map((r) => r.id) ?? []);
+      if (allResponseIds.length > 0) {
+        const { data: allVotes } = await supabase
+          .from("response_votes")
+          .select("response_id, vote_type")
+          .in("response_id", allResponseIds);
+
+        if (allVotes) {
+          const counts: Record<string, { helpful: number; not_helpful: number }> = {};
+          allVotes.forEach((v) => {
+            if (!counts[v.response_id]) counts[v.response_id] = { helpful: 0, not_helpful: 0 };
+            if (v.vote_type === "helpful") counts[v.response_id].helpful++;
+            else counts[v.response_id].not_helpful++;
+          });
+          setVoteCounts(counts);
+        }
+
+        if (user) {
+          const { data: myVoteData } = await supabase
+            .from("response_votes")
+            .select("response_id, vote_type")
+            .eq("voter_id", user.id)
+            .in("response_id", allResponseIds);
+          if (myVoteData) {
+            const map: Record<string, "helpful" | "not_helpful"> = {};
+            myVoteData.forEach((v) => { map[v.response_id] = v.vote_type; });
+            setUserVotes(map);
+          }
+        }
+      }
+    }
+
+    if (user) {
+      const { data: myData } = await supabase
+        .from("decisions")
+        .select(query)
+        .eq("user_id", user.id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+
+      if (myData) {
+        let myRows = myData as unknown as DecisionRow[];
+
+        // Fetch outcomes for my decisions too
+        const myDecisionIds = myRows.map((r) => r.id);
+        if (myDecisionIds.length > 0) {
+          const { data: myOutcomesData } = await supabase
+            .from("outcomes")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other")
+            .in("decision_id", myDecisionIds)
+            .order("created_at", { ascending: false });
+
+          if (myOutcomesData && myOutcomesData.length > 0) {
+            const myOutcomeMap: Record<string, OutcomeRow> = {};
+            myOutcomesData.forEach((o: any) => { myOutcomeMap[o.decision_id] = o; });
+            myRows = myRows.map((d) => ({
+              ...d,
+              outcomes: myOutcomeMap[d.id] ? [myOutcomeMap[d.id]] : null,
+            }));
+          }
+        }
+
+        setMyDecisions(myRows);
+      }
+    } else {
+      setMyDecisions(localFormatted);
+    }
+
+    setLoading(false);
+  };
+
+  // ─── Actions ────────────────────────────────────────────────────────────────
+
+  const startWeighIn = (id: string) => {
+    setWeighingIn(id);
+    setWeighInStep("context");
+    setContext(null);
+    setVote(null);
+    setTake("");
+  };
+
+  const closeWeighIn = () => {
+    const wasCompleted = weighInCompletedRef.current;
+    weighInCompletedRef.current = false;
+    setWeighingIn(null);
+    setWeighInStep("context");
+    setContext(null);
+    setVote(null);
+    setTake("");
+    if (wasCompleted && user && shouldShowFitPrompt(user.id)) {
+      markFitPromptShown(user.id);
+      setTimeout(() => {
+        setFitModalVariant("weigh_in");
+        setShowFitModal(true);
+      }, 3500);
+    }
+  };
+
+  const submitWeighIn = async () => {
+    if (!user || !weighingIn || !vote || !take.trim()) return;
+    setSubmitting(true);
+
+    const decision = decisions.find((d) => d.id === weighingIn);
+    let matchScore: number | null = null;
+    let matchBreakdown = null;
+
+    if (decision) {
+      const [{ data: responderProfile }, { data: posterProfile }] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("profiles").select("*").eq("id", decision.user_id).single(),
+      ]);
+
+      if (responderProfile && posterProfile) {
+        const result = computeMatchScore(posterProfile, responderProfile);
+        matchScore = result.total;
+        matchBreakdown = result;
+      }
+    }
+
+    // Upload response photo if attached
+    let responsePhotoUrl: string | null = null;
+    if (takePhoto) {
+      const path = `response-photos/${user.id}/${Date.now()}.jpg`;
+      const { data: upData } = await supabase.storage.from("product-images").upload(path, takePhoto, { upsert: true, contentType: "image/jpeg" });
+      if (upData) {
+        const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(upData.path);
+        responsePhotoUrl = urlData.publicUrl;
+      }
+    }
+
+    await supabase.from("responses").insert({
+      decision_id: weighingIn,
+      user_id: user.id,
+      recommendation: vote,
+      reasoning: take.trim(),
+      personal_experience: context,
+      match_score: matchScore,
+      match_breakdown: matchBreakdown,
+      ...(responsePhotoUrl ? { photo_url: responsePhotoUrl } : {}),
+    });
+
+    await fetchDecisions();
+    setSubmitting(false);
+    setTakePhoto(null);
+    setTakePhotoPreview(null);
+    weighInCompletedRef.current = true;
+    setWeighInStep("done");
+  };
+
+  const handleHelpfulVote = async (responseId: string, voteType: "helpful" | "not_helpful") => {
+    if (!user) return;
+
+    const currentVote = userVotes[responseId];
+    const isToggleOff = currentVote === voteType;
+
+    const newUserVotes = { ...userVotes };
+    const newVoteCounts = {
+      ...voteCounts,
+      [responseId]: { ...(voteCounts[responseId] ?? { helpful: 0, not_helpful: 0 }) },
+    };
+
+    if (isToggleOff) {
+      delete newUserVotes[responseId];
+      newVoteCounts[responseId][voteType] = Math.max(0, (newVoteCounts[responseId][voteType] ?? 1) - 1);
+    } else {
+      if (currentVote) {
+        newVoteCounts[responseId][currentVote] = Math.max(0, (newVoteCounts[responseId][currentVote] ?? 1) - 1);
+      }
+      newUserVotes[responseId] = voteType;
+      newVoteCounts[responseId][voteType] = (newVoteCounts[responseId][voteType] ?? 0) + 1;
+    }
+
+    setUserVotes(newUserVotes);
+    setVoteCounts(newVoteCounts);
+
+    if (isToggleOff) {
+      await supabase
+        .from("response_votes")
+        .delete()
+        .eq("response_id", responseId)
+        .eq("voter_id", user.id);
+    } else {
+      await supabase.from("response_votes").upsert(
+        { response_id: responseId, voter_id: user.id, vote_type: voteType },
+        { onConflict: "response_id,voter_id" }
+      );
+    }
+
+    const { count } = await supabase
+      .from("response_votes")
+      .select("*", { count: "exact", head: true })
+      .eq("response_id", responseId)
+      .eq("vote_type", "helpful");
+    await supabase
+      .from("responses")
+      .update({ helpfulness_votes: count ?? 0 })
+      .eq("id", responseId);
+  };
+
+  const handleDelete = async (decisionId: string) => {
+    if (!user) return;
+    const { error } = await supabase.rpc("delete_own_decision", { decision_id: decisionId });
+    if (error) { alert("Could not delete: " + error.message); return; }
+    // Immediately remove from both lists so it vanishes from feed + mine tab
+    setDecisions(prev => prev.filter(d => d.id !== decisionId));
+    setMyDecisions(prev => prev.filter(d => d.id !== decisionId));
+    fetchDecisions();
+  };
+
+  const handleOutcome = async (decisionId: string, outcome: string) => {
+    if (!user) return;
+    const didPurchase = outcome === "Bought it";
+    await supabase.from("outcomes").upsert(
+      { decision_id: decisionId, user_id: user.id, did_purchase: didPurchase },
+      { onConflict: "decision_id" }
+    );
+    if (didPurchase) {
+      await supabase.from("decisions").update({ status: "purchased" }).eq("id", decisionId);
+    }
+    setTrackingId(null);
+    await fetchDecisions();
+  };
+
+  const toggleSave = async (decisionId: string) => {
+    if (!user) { navigate("/signin"); return; }
+    const isSaved = savedDecisionIds.has(decisionId);
+    const next = new Set(savedDecisionIds);
+    if (isSaved) {
+      next.delete(decisionId);
+      setSavedDecisionIds(next);
+      await supabase.from("saved_decisions").delete().eq("user_id", user.id).eq("decision_id", decisionId);
+    } else {
+      next.add(decisionId);
+      setSavedDecisionIds(next);
+      await supabase.from("saved_decisions").upsert({ user_id: user.id, decision_id: decisionId }, { onConflict: "user_id,decision_id" });
+    }
+  };
+
+  const hideDecision = async (decisionId: string) => {
+    if (!user) return;
+    const next = new Set(hiddenDecisionIds);
+    next.add(decisionId);
+    setHiddenDecisionIds(next);
+    setUndoHiddenId(decisionId);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => setUndoHiddenId(null), 4500);
+    await supabase.from("hidden_decisions").upsert({ user_id: user.id, decision_id: decisionId }, { onConflict: "user_id,decision_id" });
+  };
+
+  const undoHide = async (decisionId: string) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    const next = new Set(hiddenDecisionIds);
+    next.delete(decisionId);
+    setHiddenDecisionIds(next);
+    setUndoHiddenId(null);
+    await supabase.from("hidden_decisions").delete().eq("user_id", user!.id).eq("decision_id", decisionId);
+  };
+
+  // ─── Derived list ────────────────────────────────────────────────────────────
+
+  const getFilteredDecisions = (list: DecisionRow[]) => {
+    let filtered = list;
+
+    if (filterBrand.trim()) {
+      filtered = filtered.filter((d) =>
+        (d.brand_name ?? "").toLowerCase().includes(filterBrand.toLowerCase()) ||
+        (d.product_name ?? "").toLowerCase().includes(filterBrand.toLowerCase())
+      );
+    }
+
+    if (filterCategory !== "All") {
+      filtered = filtered.filter((d) => {
+        const cat = (d.product_category ?? "").toLowerCase();
+        const name = (d.product_name ?? "").toLowerCase();
+        const target = filterCategory.toLowerCase();
+        if (cat.includes(target)) return true;
+        const synonyms: Record<string, string[]> = {
+          tops: ["top", "shirt", "blouse", "tank", "tee", "sweater", "sweatshirt", "hoodie", "crop", "knit", "cami"],
+          bottoms: ["bottom", "jean", "denim", "pant", "trouser", "short", "skirt", "legging"],
+          dresses: ["dress", "gown", "maxi", "midi", "mini", "romper", "jumpsuit"],
+          outerwear: ["jacket", "coat", "blazer", "cardigan", "vest", "parka", "trench"],
+          shoes: ["shoe", "boot", "sneaker", "heel", "sandal", "loafer", "flat", "pump", "mule"],
+          bags: ["bag", "purse", "handbag", "tote", "clutch", "backpack", "crossbody"],
+          accessories: ["accessory", "belt", "scarf", "hat", "jewelry", "earring", "necklace", "bracelet", "ring"],
+        };
+        return (synonyms[target] ?? [target]).some(s => cat.includes(s) || name.includes(s));
+      });
+    }
+
+    if (filterStatus === "open") {
+      filtered = filtered.filter((d) => !d.status || d.status === "open");
+    }
+
+    // Sort
+    if (sortBy === "discussed") {
+      filtered = [...filtered].sort((a, b) => (b.responses?.length ?? 0) - (a.responses?.length ?? 0));
+    } else if (sortBy === "needs_input") {
+      filtered = [...filtered].sort((a, b) => {
+        const aScore = (a.confidence_score ?? 5) - (a.responses?.length ?? 0) * 0.5;
+        const bScore = (b.confidence_score ?? 5) - (b.responses?.length ?? 0) * 0.5;
+        return aScore - bScore; // lowest confidence + fewest responses first
+      });
+    }
+    // "newest" is default from DB order
+
+    return filtered;
+  };
+
+  const displayList = getFilteredDecisions(activeTab === "feed" ? decisions : myDecisions)
+    .filter(d => !hiddenDecisionIds.has(d.id));
+
+  // ─── Render helpers ───────────────────────────────────────────────────────────
+
+  const avatarContent = (avatarUrl: string | null, displayName: string | null) =>
+    avatarUrl
+      ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+      : <span>{getInitials(displayName)}</span>;
+
+  // ─── Main render ──────────────────────────────────────────────────────────────
+
+  return (
+    <div className="fixed inset-0 overflow-hidden flex justify-center">
+
+      {/* ── Full-bleed editorial background — mirrors + light beams show on sides ── */}
+      <img
+        src={heroEditorial}
+        aria-hidden
+        alt=""
+        className="absolute inset-0 w-full h-full pointer-events-none select-none"
+        style={{ objectFit: "cover", objectPosition: "60% center", filter: "brightness(1.08) saturate(0.85)" }}
+      />
+      {/* Centre overlay so cards remain readable; sides stay fully exposed */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(to right, rgba(240,236,230,0.18) 0%, rgba(240,236,230,0.62) 22%, rgba(240,236,230,0.72) 38%, rgba(240,236,230,0.72) 62%, rgba(240,236,230,0.62) 78%, rgba(240,236,230,0.18) 100%)",
+        }}
+      />
+
+
+      {/* ── Floating header ───────────────────────────────────────────────────── */}
+      <header
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-10 py-4"
+        style={{ background: "rgba(235,230,222,0.96)", backdropFilter: "blur(12px)" }}
+      >
+        {/* Left: Logo */}
+        <div className="flex-1 flex items-center">
+          <button
+            onClick={() => navigate("/")}
+            className="font-sans uppercase select-none"
+            style={{ letterSpacing: "0.32em", fontSize: 18, color: "#1C1712" }}
+          >
+            <span style={{ fontWeight: 700 }}>ELEVEN</span>
+            <span style={{ fontWeight: 300 }}>ELEVEN</span>
+          </button>
+        </div>
+
+        {/* Center: Feed | Mine toggle */}
+        <div
+          className="flex items-center rounded-full px-1 py-1 gap-1"
+          style={{ background: "rgba(28,23,18,0.07)" }}
+        >
+          <button
+            onClick={() => setActiveTab("feed")}
+            className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
+            style={
+              activeTab === "feed"
+                ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
+                : { color: "rgba(28,23,18,0.45)" }
+            }
+          >
+            Feed
+          </button>
+          <button
+            onClick={() => setActiveTab("mine")}
+            className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
+            style={
+              activeTab === "mine"
+                ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
+                : { color: "rgba(28,23,18,0.45)" }
+            }
+          >
+            Mine {myDecisions.length > 0 && `(${myDecisions.length})`}
+          </button>
+        </div>
+
+        {/* Right controls */}
+        <div className="flex-1 flex items-center justify-end gap-2">
+          {/* Filter icon */}
+          <button
+            onClick={() => setFilterOpen((v) => !v)}
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+            style={{
+              background: filterOpen || filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest"
+                ? "#1C1712"
+                : "rgba(28,23,18,0.08)",
+              color: filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest"
+                ? "#FDFAF6"
+                : "rgba(28,23,18,0.50)",
+            }}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Post button */}
+          <button
+            onClick={() => navigate(user ? "/post" : "/signin")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all"
+            style={{
+              border: "1.5px solid #C49E64",
+              color: "#3A3530",
+              background: "rgba(196,158,100,0.08)",
+              boxShadow: "0 0 10px rgba(196,158,100,0.35), 0 0 20px rgba(196,158,100,0.15)",
+            }}
+          >
+            <Plus className="w-3 h-3" />
+            Post
+          </button>
+
+          {/* Profile avatar */}
+          {user ? (
+            <button
+              onClick={() => navigate("/profile")}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-semibold text-white overflow-hidden shrink-0"
+              style={{ background: "#3A3530" }}
+            >
+              {avatarContent(myProfile?.avatar_url ?? null, myProfile?.display_name ?? null)}
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate("/signin")}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.08)", color: "rgba(28,23,18,0.45)" }}
+            >
+              <User className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* ── Filter dropdown ───────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {filterOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="fixed top-16 left-0 right-0 z-40 px-4 flex justify-center"
+          >
+            <div className="w-full max-w-[1160px]">
+              <div
+                className="rounded-2xl p-4 shadow-2xl"
+                style={{ background: "rgba(240,236,230,0.97)", border: "1px solid rgba(255,255,255,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}
+              >
+                {/* Brand / item search */}
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "rgba(28,23,18,0.35)" }} />
+                  <input
+                    type="text"
+                    value={filterBrand}
+                    onChange={(e) => setFilterBrand(e.target.value)}
+                    placeholder="Search brand or item name"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-lg focus:outline-none"
+                    style={{ background: "rgba(28,23,18,0.06)", color: "#1C1712", border: "1px solid rgba(28,23,18,0.10)" }}
+                  />
+                </div>
+
+                {/* Category */}
+                <p className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Category</p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {CATEGORY_OPTIONS.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setFilterCategory(cat)}
+                      className="px-3 py-1.5 rounded-full text-lg font-medium transition-all"
+                      style={
+                        filterCategory === cat
+                          ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
+                          : { background: "rgba(28,23,18,0.06)", color: "rgba(28,23,18,0.55)", border: "1px solid rgba(28,23,18,0.10)" }
+                      }
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Status */}
+                <p className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Status</p>
+                <div className="flex gap-2 mb-4">
+                  {(["all", "open"] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setFilterStatus(s)}
+                      className="px-3 py-1.5 rounded-full text-lg font-medium transition-all"
+                      style={
+                        filterStatus === s
+                          ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
+                          : { background: "rgba(28,23,18,0.06)", color: "rgba(28,23,18,0.55)", border: "1px solid rgba(28,23,18,0.10)" }
+                      }
+                    >
+                      {s === "all" ? "All" : "Open only"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sort */}
+                <p className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Sort by</p>
+                <div className="flex gap-2 mb-3">
+                  {([
+                    { value: "newest", label: "Newest" },
+                    { value: "discussed", label: "Most discussed" },
+                    { value: "needs_input", label: "Needs input" },
+                  ] as const).map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => setSortBy(value)}
+                      className="px-3 py-1.5 rounded-full text-lg font-medium transition-all"
+                      style={
+                        sortBy === value
+                          ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
+                          : { background: "rgba(28,23,18,0.06)", color: "rgba(28,23,18,0.55)", border: "1px solid rgba(28,23,18,0.10)" }
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {(filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest") && (
+                  <button
+                    onClick={() => { setFilterBrand(""); setFilterCategory("All"); setFilterStatus("all"); setSortBy("newest"); }}
+                    className="text-lg flex items-center gap-1 mt-1"
+                    style={{ color: "rgba(28,23,18,0.40)" }}
+                  >
+                    <X className="w-3 h-3" /> Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Feed scroll container ─────────────────────────────────────────────── */}
+      <div
+        ref={scrollRef}
+        className="w-full max-w-[1160px]"
+        style={{
+          overflowY: "scroll",
+          paddingTop: 72,
+          paddingBottom: 40,
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
+        onClick={() => filterOpen && setFilterOpen(false)}
+      >
+        {loading ? (
+          <div className="flex items-center justify-center" style={{ minHeight: "60vh" }}>
+            <div className="space-y-3 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto animate-pulse" style={{ background: "rgba(245,239,234,0.20)" }} />
+              <p className="text-lg tracking-[0.2em] uppercase" style={{ color: "#1C1712" }}>Loading decisions</p>
+            </div>
+          </div>
+        ) : displayList.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-8 text-center" style={{ minHeight: "60vh" }}>
+            <p className="font-sans text-3xl leading-tight mb-3" style={{ color: "#1C1712" }}>
+              {filterBrand || filterCategory !== "All" || filterStatus !== "all"
+                ? "No results"
+                : activeTab === "mine" ? "Nothing here yet" : "Nothing posted yet"}
+            </p>
+            <p className="text-lg mb-8" style={{ color: "rgba(28,23,18,0.45)" }}>
+              {filterBrand || filterCategory !== "All" || filterStatus !== "all"
+                ? "Try clearing the filters."
+                : activeTab === "mine"
+                  ? "Post something you're considering and get input from your mirrors."
+                  : "Be the first to post something you're considering."}
+            </p>
+            {!filterBrand && filterCategory === "All" && filterStatus === "all" && (
+              <button
+                onClick={() => navigate(user ? "/post" : "/signin")}
+                className="px-8 py-3 text-lg tracking-[0.18em] uppercase font-medium transition-all"
+                style={{ borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)" }}
+              >
+                {user ? "Post a decision" : "Sign in to post"}
+              </button>
+            )}
+          </div>
+        ) : (
+          displayList.map((decision) => (
+            <DecisionCard
+              key={decision.id}
+              decision={decision}
+              user={user}
+              voteCounts={voteCounts}
+              userVotes={userVotes}
+              setLightboxUrl={setLightboxUrl}
+              setTrackingId={setTrackingId}
+              startWeighIn={startWeighIn}
+              handleDelete={handleDelete}
+              handleHelpfulVote={handleHelpfulVote}
+              activeTab={activeTab}
+              onSignIn={() => navigate("/signin")}
+              isSaved={savedDecisionIds.has(decision.id)}
+              onSave={() => toggleSave(decision.id)}
+              onHide={() => hideDecision(decision.id)}
+              navigate={navigate}
+              loggedOutcomeIds={loggedOutcomeIds}
+            />
+          ))
+        )}
+      </div>
+
+      {/* ── Weigh-in bottom sheet ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {weighingIn && (
+          <>
+            {/* Scrim */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50"
+              style={{ background: "rgba(0,0,0,0.6)" }}
+              onClick={closeWeighIn}
+            />
+            {/* Sheet */}
+            <motion.div
+              initial={{ y: 360 }}
+              animate={{ y: 0 }}
+              exit={{ y: 360 }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="fixed bottom-0 left-0 right-0 rounded-t-3xl px-6 pt-6 pb-10"
+              style={{ background: "#F5EFEA", zIndex: 60 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Drag handle */}
+              <div className="w-12 h-1 rounded-full mx-auto mb-6" style={{ background: "rgba(0,0,0,0.15)" }} />
+
+              {/* Cancel */}
+              <button
+                onClick={closeWeighIn}
+                className="absolute top-6 right-6 text-lg tracking-widest uppercase"
+                style={{ color: "#8C7A70" }}
+              >
+                Cancel
+              </button>
+
+              {/* Step: context */}
+              {weighInStep === "context" && (
+                <div>
+                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>Your context</p>
+                  <p className="text-lg mb-5" style={{ color: "#8C7A70" }}>What's your relationship with this item or brand?</p>
+                  <div className="space-y-2">
+                    {CONTEXT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => { setContext(opt); setWeighInStep("vote"); }}
+                        className="w-full text-left px-4 py-3.5 rounded-xl text-lg transition-all"
+                        style={{
+                          background: "rgba(0,0,0,0.04)",
+                          border: "1px solid rgba(0,0,0,0.08)",
+                          color: "#1A1A1A",
+                        }}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step: vote */}
+              {weighInStep === "vote" && (
+                <div>
+                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>Your verdict</p>
+                  <p className="text-lg mb-5" style={{ color: "#8C7A70" }}>Would you buy this?</p>
+                  <div className="flex gap-2">
+                    {(["buy", "do_not_buy", "need_more_info"] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => { setVote(v); setWeighInStep("take"); }}
+                        className="flex-1 py-3.5 rounded-full text-lg font-medium transition-all"
+                        style={{
+                          background: vote === v ? "#3A3530" : "rgba(0,0,0,0.04)",
+                          border: `1px solid ${vote === v ? "#3A3530" : "rgba(0,0,0,0.08)"}`,
+                          color: vote === v ? "#F5EFEA" : "#5A4A42",
+                        }}
+                      >
+                        {v === "buy" ? "Yes" : v === "do_not_buy" ? "No" : "Depends"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step: take */}
+              {weighInStep === "take" && (
+                <div>
+                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>Your take</p>
+                  <p className="text-lg mb-4" style={{ color: "#8C7A70" }}>
+                    Think out loud — what would you tell someone like you?
+                  </p>
+                  <textarea
+                    value={take}
+                    onChange={(e) => setTake(e.target.value)}
+                    placeholder="Share your honest take..."
+                    rows={4}
+                    className="w-full rounded-xl px-4 py-3 text-lg resize-none focus:outline-none mb-3"
+                    style={{
+                      background: "rgba(0,0,0,0.04)",
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      color: "#1A1A1A",
+                    }}
+                  />
+
+                  {/* Photo attachment */}
+                  <div style={{ marginBottom: 16 }}>
+                    <input ref={takePhotoInputRef} type="file" accept="image/*" style={{ display: "none" }}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setTakePhoto(file);
+                        const reader = new FileReader();
+                        reader.onload = () => setTakePhotoPreview(reader.result as string);
+                        reader.readAsDataURL(file);
+                        e.target.value = "";
+                      }} />
+
+                    {takePhotoPreview ? (
+                      <div style={{ position: "relative", display: "inline-block" }}>
+                        <img src={takePhotoPreview} alt="attachment" style={{ height: 90, width: 72, objectFit: "cover", borderRadius: 10, display: "block" }} />
+                        <button onClick={() => { setTakePhoto(null); setTakePhotoPreview(null); }}
+                          style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "#1A1A1A", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <X style={{ width: 10, height: 10, color: "white" }} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => takePhotoInputRef.current?.click()}
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", color: "#5A4A42", fontSize: 18 }}>
+                        <Camera style={{ width: 14, height: 14 }} />
+                        Add a photo
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={submitWeighIn}
+                    disabled={take.trim().length === 0 || submitting}
+                    className="w-full py-3.5 text-lg tracking-[0.2em] uppercase font-medium transition-all disabled:opacity-30"
+                    style={{ borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", cursor: "pointer" }}
+                  >
+                    {submitting ? "Submitting..." : "Submit"}
+                  </button>
+                </div>
+              )}
+
+              {/* Step: done */}
+              {weighInStep === "done" && (
+                <div className="text-center py-6 space-y-3">
+                  <p className="font-sans text-2xl" style={{ color: "#1A1A1A" }}>You've weighed in</p>
+                  <p className="text-lg" style={{ color: "#5A4A42" }}>Your take has been added to the conversation.</p>
+                  <button
+                    onClick={closeWeighIn}
+                    className="mt-4 px-8 py-3 rounded-full text-lg tracking-widest uppercase"
+                    style={{ background: "rgba(0,0,0,0.06)", color: "#5A4A42" }}
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <OutcomeModal
+        open={trackingId !== null}
+        onClose={() => setTrackingId(null)}
+        decision={decisions.find(d => d.id === trackingId) ?? myDecisions.find(d => d.id === trackingId) ?? { id: trackingId ?? '', uncertainty_text: null }}
+        onComplete={(outcome) => {
+          if (outcome !== "still_deciding" && trackingId) {
+            const id = trackingId;
+            const newStatus = outcome === "bought_it" ? "purchased" : "closed";
+            setLoggedOutcomeIds(prev => { const next = new Set(prev); next.add(id); return next; });
+
+            // 1. Immediately flip status in local state — card switches to outcome
+            //    view right away without waiting for any network round-trip.
+            setDecisions(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d));
+            setMyDecisions(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d));
+
+            // 2. Fetch the outcome row directly and patch it in — no join needed.
+            //    Don't call fetchDecisions() here: it sets loading=true which hides
+            //    all cards and can race against the realtime subscription, causing
+            //    the local status update to get wiped by stale DB data.
+            //    Retry up to 3× with 800 ms gaps in case the DB write hasn't
+            //    propagated yet when the first read fires.
+            const fetchOutcomeWithRetry = async (retries = 4, delayMs = 600) => {
+              for (let attempt = 0; attempt < retries; attempt++) {
+                if (attempt > 0) await new Promise(r => setTimeout(r, delayMs));
+                // Use limit(1) + order instead of .single() — .single() throws
+                // if there are multiple rows for the same decision_id.
+                const { data: rows } = await supabase
+                  .from("outcomes")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other")
+                  .eq("decision_id", id)
+                  .order("created_at", { ascending: false })
+                  .limit(1);
+                const data = rows?.[0] ?? null;
+                if (data) {
+                  const patch = (d: DecisionRow) =>
+                    d.id === id ? { ...d, status: newStatus, outcomes: [data as OutcomeRow] } : d;
+                  setDecisions(prev => prev.map(patch));
+                  setMyDecisions(prev => prev.map(patch));
+                  return; // success — stop retrying
+                }
+              }
+            };
+            fetchOutcomeWithRetry();
+          }
+          // Realtime subscription on the decisions table fires when status changes
+          // and triggers fetchDecisions() automatically — no manual call needed.
+        }}
+      />
+
+      {/* ── Lightbox ──────────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.92)" }}
+            onClick={() => setLightboxUrl(null)}
+          >
+            <motion.img
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              src={lightboxUrl}
+              alt="Product"
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightboxUrl(null)}
+              className="absolute top-5 right-5 text-lg tracking-[0.2em] uppercase"
+              style={{ color: "rgba(255,255,255,0.55)" }}
+            >
+              Close ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Undo hide toast ───────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {undoHiddenId && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.22 }}
+            style={{
+              position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+              background: "#1C1712", borderRadius: 100,
+              display: "flex", alignItems: "center", gap: 14,
+              padding: "12px 20px", zIndex: 80,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
+            }}
+          >
+            <span style={{ fontSize: 19, color: "rgba(253,250,246,0.80)" }}>Post hidden</span>
+            <button
+              onClick={() => undoHide(undoHiddenId)}
+              style={{ fontSize: 19, fontWeight: 700, color: "#C49E64", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+            >
+              Undo
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} />
+    </div>
+  );
+};
+
+// ─── DecisionCard ─────────────────────────────────────────────────────────────
+
+interface CardProps {
+  decision: DecisionRow;
+  user: any;
+  voteCounts: Record<string, { helpful: number; not_helpful: number }>;
+  userVotes: Record<string, "helpful" | "not_helpful">;
+  setLightboxUrl: (url: string | null) => void;
+  setTrackingId: (id: string | null) => void;
+  startWeighIn: (id: string) => void;
+  handleDelete: (id: string) => void;
+  handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
+  activeTab: "feed" | "mine";
+  onSignIn: () => void;
+  isSaved: boolean;
+  onSave: () => void;
+  onHide: () => void;
+  navigate: (path: string) => void;
+  loggedOutcomeIds: Set<string>;
+}
+
+const DecisionCard = ({
+  decision,
+  user,
+  voteCounts,
+  userVotes,
+  setLightboxUrl,
+  setTrackingId,
+  startWeighIn,
+  handleDelete,
+  handleHelpfulVote,
+  activeTab,
+  onSignIn,
+  isSaved,
+  onSave,
+  onHide,
+  navigate,
+  loggedOutcomeIds,
+}: CardProps) => {
+  const [showAllResponses, setShowAllResponses] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isOwn = user?.id === decision.user_id;
+  const confidence = decision.confidence_score ?? 0;
+  const PREVIEW_COUNT = 2;
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  const sortedResponses = [...(decision.responses ?? [])]
+    .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
+
+  const posterName = formatName(decision.profiles?.display_name ?? null);
+  const posterMeta = [
+    decision.profiles?.age,
+    decision.profiles?.city?.split(",")[0],
+  ].filter(Boolean).join(", ");
+
+  return (
+    <div
+      style={{
+        background: "#F5EFEA",
+        borderRadius: 20,
+        boxShadow: "0 6px 24px rgba(0,0,0,0.08)",
+        overflow: "visible",
+        marginBottom: 20,
+        position: "relative",
+      }}
+    >
+      {/* ── User header row — ABOVE the image ─────────────────────────────────── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "14px 16px 12px",
+        borderRadius: "20px 20px 0 0",
+      }}>
+        {/* Avatar */}
+        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+          {decision.profiles?.avatar_url
+            ? <img src={decision.profiles.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <span>{getInitials(decision.profiles?.display_name ?? null)}</span>
+          }
+        </div>
+
+        {/* Name + meta + profile toggle */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Name */}
+          <p style={{ fontSize: 19, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 3 }}>
+            {posterName}
+          </p>
+          {/* Age, city · match badge */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
+            <span style={{ fontSize: 19, color: "#8C7A70" }}>
+              {posterMeta}
+            </span>
+            {decision.matchScore != null && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0,
+                fontSize: 18, fontWeight: 700, color: "#FDFAF6",
+                background: "linear-gradient(135deg, #C4A47A 0%, #B8956A 50%, #A07848 100%)",
+                border: "1px solid rgba(220,185,130,0.55)",
+                borderRadius: 100, padding: "2px 7px",
+                letterSpacing: "0.03em",
+                boxShadow: "0 0 6px rgba(184,149,106,0.40), inset 0 1px 0 rgba(255,255,255,0.20)",
+              }}>
+                ✦ {Math.round(decision.matchScore)}%
+              </span>
+            )}
+          </div>
+          {/* Profile toggle */}
+          <button
+            onClick={() => setProfileOpen(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 3, color: "#8C7A70", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            <span style={{ fontSize: 19 }}>{isOwn ? "Your profile" : "See her profile"}</span>
+            {profileOpen ? <ChevronUp style={{ width: 14, height: 14 }} /> : <ChevronDown style={{ width: 14, height: 14 }} />}
+          </button>
+        </div>
+
+        {/* Date + Save (bookmark) */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 19, color: "#8C7A70" }}>{timeAgo(decision.created_at)}</span>
+          <button
+            onClick={onSave}
+            title={isSaved ? "Unsave" : "Save"}
+            style={{
+              width: 32, height: 32, borderRadius: "50%",
+              border: "1px solid rgba(0,0,0,0.10)",
+              background: isSaved ? "rgba(196,158,100,0.12)" : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", flexShrink: 0,
+            }}
+          >
+          <Bookmark
+            style={{
+              width: 14, height: 14,
+              color: isSaved ? "#C49E64" : "#8C7A70",
+              fill: isSaved ? "#C49E64" : "none",
+            }}
+          />
+          </button>
+        </div>
+
+        {/* 3-dot menu */}
+        <div style={{ position: "relative", flexShrink: 0 }} ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            style={{
+              width: 32, height: 32, borderRadius: "50%",
+              border: "1px solid rgba(0,0,0,0.10)",
+              background: "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <MoreHorizontal style={{ width: 14, height: 14, color: "#8C7A70" }} />
+          </button>
+          {menuOpen && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 6px)", right: 0,
+              background: "#F5EFEA", borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.10)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+              minWidth: 160, zIndex: 10, overflow: "hidden",
+            }}>
+              {!isOwn && (
+                <button
+                  onClick={() => { setMenuOpen(false); onHide(); }}
+                  style={{
+                    width: "100%", textAlign: "left",
+                    padding: "12px 16px", background: "none", border: "none",
+                    fontSize: 19, color: "#1A1A1A", cursor: "pointer",
+                  }}
+                >
+                  Hide this post
+                </button>
+              )}
+              {isOwn && activeTab === "mine" && (
+                <button
+                  onClick={() => { setMenuOpen(false); if (confirm("Remove this decision?")) handleDelete(decision.id); }}
+                  style={{
+                    width: "100%", textAlign: "left",
+                    padding: "12px 16px", background: "none", border: "none",
+                    fontSize: 19, color: "#c0392b", cursor: "pointer",
+                  }}
+                >
+                  Delete post
+                </button>
+              )}
+              {isOwn && decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
+                <button
+                  onClick={() => { setMenuOpen(false); setTrackingId(decision.id); }}
+                  style={{
+                    width: "100%", textAlign: "left",
+                    padding: "12px 16px", background: "none", border: "none",
+                    fontSize: 19, color: "#1A1A1A", cursor: "pointer",
+                    borderTop: "1px solid rgba(0,0,0,0.06)",
+                  }}
+                >
+                  Log outcome
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Profile dropdown ─────────────────────────────────────────────────── */}
+      {profileOpen && decision.profiles && (() => {
+        const silLabel = decision.profiles.silhouette_preference?.[0] ?? null;
+        const silMatch = silLabel ? SILHOUETTE_OPTIONS.find(o => o.label === silLabel) : null;
+        const statRows = [
+          decision.profiles.height_range && ["Height", decision.profiles.height_range],
+          decision.profiles.top_size && ["Top size", decision.profiles.top_size],
+          decision.profiles.bottom_size && ["Bottom size", decision.profiles.bottom_size],
+          decision.profiles.fit_preference && ["Fit preference", decision.profiles.fit_preference],
+        ].filter(Boolean) as [string, string][];
+
+        return (
+          <div style={{ background: "rgba(0,0,0,0.04)", margin: "0 16px 0", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(0,0,0,0.06)" }}>
+            {silMatch && (
+              <div style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+                <div style={{ width: 90, flexShrink: 0, overflow: "hidden" }}>
+                  <img src={silMatch.image} alt={silMatch.label} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
+                </div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 14px" }}>
+                  <span style={{ fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 4 }}>Silhouette</span>
+                  <span style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", lineHeight: 1.3, marginBottom: 3 }}>{silMatch.label}</span>
+                  <span style={{ fontSize: 19, color: "#5A4A42", lineHeight: 1.4 }}>{silMatch.desc}</span>
+                </div>
+              </div>
+            )}
+            <div style={{ padding: "0 14px" }}>
+              {statRows.map(([label, value], i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: i < statRows.length - 1 ? "1px solid rgba(0,0,0,0.05)" : "none" }}>
+                  <span style={{ fontSize: 13, color: "#8C7A70", textTransform: "uppercase", letterSpacing: "0.15em" }}>{label}</span>
+                  <span style={{ fontSize: 19, color: "#5A4A42", fontWeight: 500 }}>{value}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: "10px 14px", borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+              <button
+                onClick={() => navigate(isOwn ? "/profile" : `/profile/${decision.user_id}`)}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, color: "#5A4A42" }}
+              >
+                <span style={{ fontSize: 19, fontWeight: 600 }}>View full profile</span>
+                <ArrowRight style={{ width: 11, height: 11 }} />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Body: image left + data right ────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "stretch", borderRadius: "0 0 20px 20px", overflow: "hidden" }}>
+
+        {/* ── Left: product image column — stretches to match right panel height ── */}
+        {decision.product_image_url && (
+          <div style={{ width: "42%", flexShrink: 0, background: "#EDE8E2" }}>
+            {decision.product_image_url_2 ? (
+              <>
+                <img
+                  src={decision.product_image_url}
+                  alt={decision.product_name ?? "Product"}
+                  style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }}
+                  onClick={() => setLightboxUrl(decision.product_image_url!)}
+                />
+                <img
+                  src={decision.product_image_url_2}
+                  alt={decision.product_name ?? "Product"}
+                  style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in", borderTop: "2px solid #F5EFEA" }}
+
+                  onClick={() => setLightboxUrl(decision.product_image_url_2!)}
+                />
+              </>
+            ) : (
+              <img
+                src={decision.product_image_url}
+                alt={decision.product_name ?? "Product"}
+                style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }}
+                onClick={() => setLightboxUrl(decision.product_image_url!)}
+              />
+            )}
+            {decision.product_url && (
+              <a
+                href={decision.product_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#5A4A42", textDecoration: "none" }}
+              >
+                <ExternalLink style={{ width: 11, height: 11 }} /> View
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* ── Right: all card data ── */}
+        <div style={{ flex: 1, minWidth: 0, padding: "20px 22px 24px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 0, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(4px)" }}>
+
+          {/* Brand + product name */}
+          {(decision.brand_name || decision.product_name) && (
+            <div style={{ marginBottom: 4 }}>
+              {decision.brand_name && (
+                <p style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
+                  {decision.brand_name}
+                </p>
+              )}
+              {decision.product_name && (
+                <p style={{ fontSize: 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8C7A70" }}>
+                  {decision.product_name}
+                </p>
+              )}
+              {!decision.product_image_url && decision.product_url && (
+                <a href={decision.product_url} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 15, color: "#5A4A42", textDecoration: "none", marginTop: 4 }}>
+                  <ExternalLink style={{ width: 11, height: 11 }} /> View
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginTop: 14, marginBottom: 16 }} />
+
+          {/* ── OUTCOME CARD (purchased / closed) ── */}
+          {(decision.status === "purchased" || decision.status === "closed") ? (() => {
+            const { headline, sentiment, contextLines, writeIns, sizeBought } = buildOutcomeDisplay(
+              decision.outcomes?.[0] ?? null,
+              decision.status,
+            );
+            const sentimentStyle = sentiment ? SENTIMENT_STYLE[sentiment] : null;
+
+            return (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                {/* Label */}
+                <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
+                  Outcome
+                </p>
+
+                {/* Headline — replaced by "Purchased size + bubble" when size is present */}
+                {sizeBought ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                    <p style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, letterSpacing: "-0.01em", margin: 0 }}>
+                      Purchased size
+                    </p>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: "50%",
+                      border: "1.5px solid rgba(0,0,0,0.18)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 14, fontWeight: 700, color: "#1A1A1A",
+                      background: "rgba(0,0,0,0.03)",
+                      textTransform: "uppercase",
+                      flexShrink: 0,
+                    }}>
+                      {sizeBought}
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, marginBottom: 12, letterSpacing: "-0.01em" }}>
+                    {headline}
+                  </p>
+                )}
+
+                {/* Sentiment badge */}
+                {sentimentStyle && (
+                  <div style={{ marginBottom: contextLines.length || writeIns.length ? 14 : 0 }}>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center",
+                      fontSize: 13, fontWeight: 600,
+                      color: sentimentStyle.color,
+                      background: sentimentStyle.bg,
+                      border: `1px solid ${sentimentStyle.border}`,
+                      borderRadius: 100, padding: "4px 12px",
+                    }}>
+                      {sentimentStyle.label}
+                    </span>
+                  </div>
+                )}
+
+                {/* Context lines + write-ins with dividers between each */}
+                {[
+                  ...contextLines.map((line) => ({ type: "line" as const, text: line })),
+                  ...writeIns.map((text) => ({ type: "quote" as const, text })),
+                ].map((item, i) => (
+                  <div key={i}>
+                    {i > 0 && <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginTop: 10, marginBottom: 10 }} />}
+                    {item.type === "line" ? (
+                      <p style={{ fontSize: 15, color: "#5A4A42", lineHeight: 1.5, margin: 0 }}>
+                        {item.text.startsWith("Recommends:") ? (
+                          <><strong>Recommends:</strong>{item.text.slice("Recommends:".length)}</>
+                        ) : item.text}
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: 15, fontStyle: "italic", color: "#5A4A42", lineHeight: 1.55, margin: 0 }}>
+                        "{item.text}"
+                      </p>
+                    )}
+                  </div>
+                ))}
+
+                {/* Responses — still visible on closed cards for reference */}
+                {sortedResponses.length > 0 && (
+                  <>
+                    <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginTop: 16, marginBottom: 16 }} />
+                    <div style={{ marginBottom: 8 }}>
+                      <p style={{ fontSize: 13, letterSpacing: "0.25em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 14, display: "flex", alignItems: "center", gap: 5 }}>
+                        What women like you said <Info style={{ width: 13, height: 13, flexShrink: 0 }} />
+                      </p>
+                      {!showAllResponses && (
+                        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                          {sortedResponses.slice(0, PREVIEW_COUNT).map((resp) => {
+                            const isBuy = resp.recommendation === "buy";
+                            const isNoBuy = resp.recommendation === "do_not_buy";
+                            return (
+                              <div key={resp.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,0,0.04)", borderRadius: 100, padding: "7px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                                <span style={{ fontSize: 16, fontWeight: 500, color: "#5A4A42" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+                                <span style={{ fontSize: 15, fontWeight: 600, color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
+                                  · {recommendationLabel(resp.recommendation)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setShowAllResponses(v => !v)}
+                        style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showAllResponses ? 12 : 0 }}
+                      >
+                        <MessageCircle style={{ width: 17, height: 17, color: "#3A3530" }} />
+                        <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", textDecoration: "underline", textDecorationColor: "rgba(0,0,0,0.2)", textUnderlineOffset: 3 }}>
+                          {showAllResponses ? "Collapse" : `View ${sortedResponses.length} response${sortedResponses.length !== 1 ? "s" : ""}`}
+                        </span>
+                        <ArrowRight style={{ width: 15, height: 15, color: "#3A3530", transform: showAllResponses ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
+                      </button>
+
+                      {showAllResponses && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                          {sortedResponses.map((resp) => {
+                            const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
+                            const isOwnResp = resp.user_id === user?.id;
+                            const myVote = userVotes[resp.id];
+                            const isBuy = resp.recommendation === "buy";
+                            const isNoBuy = resp.recommendation === "do_not_buy";
+                            return (
+                              <div key={resp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 14, padding: "12px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                                  <div>
+                                    <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+                                    {resp.match_score != null && (
+                                      <span style={{ marginLeft: 8, fontSize: 17, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
+                                    )}
+                                  </div>
+                                  <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 15, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
+                                    {recommendationLabel(resp.recommendation)}
+                                  </div>
+                                </div>
+                                <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
+                                {resp.photo_url && (
+                                  <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
+                                    style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
+                                )}
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                  <button
+                                    onClick={() => !isOwnResp && user && handleHelpfulVote(resp.id, "helpful")}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: 6,
+                                      padding: "5px 13px", borderRadius: 100,
+                                      border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
+                                      background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
+                                      color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
+                                      cursor: isOwnResp || !user ? "default" : "pointer",
+                                      fontSize: 15, fontWeight: 600,
+                                      transition: "all 0.15s",
+                                      opacity: isOwnResp ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
+                                    <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
+                                  </button>
+                                  {myVote === "helpful" && counts.helpful > 1 && (
+                                    <span style={{ fontSize: 15, color: "#8C7A70" }}>
+                                      You and {counts.helpful - 1} {counts.helpful - 1 === 1 ? "other" : "others"} found this helpful
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* CTA row — delete button for own cards only */}
+                <div style={{ marginTop: "auto", paddingTop: 16, display: "flex", alignItems: "center" }}>
+                  {isOwn && activeTab === "mine" && (
+                    <button
+                      onClick={() => { if (confirm("Remove this decision?")) handleDelete(decision.id); }}
+                      style={{ padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 15, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })() : (
+            <>
+              {/* DECISION + CONFIDENCE side by side */}
+              <div style={{ display: "flex", gap: 12, padding: "10px 0" }}>
+                {/* Decision block — one card per uncertainty */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
+                    Decisions / Considerations
+                  </p>
+                  {(() => {
+                    const uncertainties = decision.uncertainty_text
+                      ? decision.uncertainty_text.split(", ").map((u: string) => u.trim()).filter(Boolean)
+                      : [];
+
+                    // Build context map: label (lowercase) → detail
+                    const contextMap: Record<string, string> = {};
+                    if (decision.context_note) {
+                      decision.context_note.split(" · ").forEach((note: string) => {
+                        const idx = note.indexOf(": ");
+                        if (idx > -1) {
+                          contextMap[note.slice(0, idx).trim().toLowerCase()] = note.slice(idx + 2).trim();
+                        }
+                      });
+                    }
+
+                    return uncertainties.map((u: string, i: number) => {
+                      const ul = u.toLowerCase();
+                      const isBetweenSizes = ul.includes("between sizes");
+                      const isWorthPrice = ul.includes("worth the price");
+                      const matchKey = Object.keys(contextMap).find(k => ul.includes(k) || k.includes(ul));
+                      const detail = matchKey ? contextMap[matchKey] : null;
+                      const hasDetail = (isBetweenSizes && decision.sizes_note) || (isWorthPrice && decision.price_note) || detail;
+
+                      return (
+                        <div key={i} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "12px 14px", marginBottom: i < uncertainties.length - 1 ? 8 : 0 }}>
+                          <p style={{ fontSize: 17, fontWeight: 700, color: "#1A1A1A", marginBottom: hasDetail ? 6 : 0 }}>{u}</p>
+                          {isBetweenSizes && decision.sizes_note && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                              <span style={{ fontSize: 15, color: "#8C7A70" }}>Deciding between</span>
+                              {decision.sizes_note.split(",").map((s: string) => (
+                                <span key={s} style={{ fontSize: 15, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.12)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "2px 10px" }}>
+                                  {s.trim()}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {isWorthPrice && decision.price_note && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 15, color: "#8C7A70" }}>Listed at</span>
+                              <span style={{ fontSize: 15, fontWeight: 700, color: "#3A3530" }}>
+                                {decision.price_note.startsWith("$") ? decision.price_note : `$${decision.price_note}`}
+                              </span>
+                            </div>
+                          )}
+                          {detail && (
+                            <p style={{ fontSize: 15, lineHeight: 1.5, color: "#5A4A42" }}>"{detail}"</p>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Confidence block */}
+                <div style={{ width: 110, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                  <p style={{ fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 4, textAlign: "center" }}>
+                    Confidence
+                  </p>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginBottom: 6 }}>
+                    <span style={{ fontSize: 38, fontWeight: 700, color: "#3A3530", lineHeight: 1 }}>{confidence}</span>
+                    <span style={{ fontSize: 16, fontWeight: 500, color: "#8C7A70", lineHeight: 1 }}>/10</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 2, marginBottom: 5 }}>
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} style={{ width: 5, height: 18, borderRadius: 3, background: i < confidence ? "#3A3530" : "rgba(0,0,0,0.10)" }} />
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, color: confidence <= 3 ? "#c0392b" : confidence <= 6 ? "#d97706" : "#16a34a" }}>
+                    {confidence <= 3 ? "Low" : confidence <= 6 ? "Medium" : "High"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginBottom: 16 }} />
+
+              {/* Responses section */}
+              {sortedResponses.length > 0 ? (
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 13, letterSpacing: "0.25em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 14, display: "flex", alignItems: "center", gap: 5 }}>
+                    What women like you are saying <Info style={{ width: 13, height: 13, flexShrink: 0 }} />
+                  </p>
+                  {!showAllResponses && (
+                    <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+                      {sortedResponses.slice(0, PREVIEW_COUNT).map((resp) => {
+                        const isBuy = resp.recommendation === "buy";
+                        const isNoBuy = resp.recommendation === "do_not_buy";
+                        return (
+                          <div key={resp.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,0,0.04)", borderRadius: 100, padding: "7px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                            <span style={{ fontSize: 16, fontWeight: 500, color: "#5A4A42" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+                            <span style={{ fontSize: 15, fontWeight: 600, color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
+                              · {recommendationLabel(resp.recommendation)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowAllResponses(v => !v)}
+                    style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showAllResponses ? 12 : 0 }}
+                  >
+                    <MessageCircle style={{ width: 17, height: 17, color: "#3A3530" }} />
+                    <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", textDecoration: "underline", textDecorationColor: "rgba(0,0,0,0.2)", textUnderlineOffset: 3 }}>
+                      {showAllResponses ? "Collapse" : `View ${sortedResponses.length} response${sortedResponses.length !== 1 ? "s" : ""}`}
+                    </span>
+                    <ArrowRight style={{ width: 15, height: 15, color: "#3A3530", transform: showAllResponses ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
+                  </button>
+
+                  {showAllResponses && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                      {sortedResponses.map((resp) => {
+                        const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
+                        const isOwnResp = resp.user_id === user?.id;
+                        const myVote = userVotes[resp.id];
+                        const isBuy = resp.recommendation === "buy";
+                        const isNoBuy = resp.recommendation === "do_not_buy";
+                        return (
+                          <div key={resp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 14, padding: "12px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                              <div>
+                                <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+                                {resp.match_score != null && (
+                                  <span style={{ marginLeft: 8, fontSize: 17, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
+                                )}
+                              </div>
+                              <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 15, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
+                                {recommendationLabel(resp.recommendation)}
+                              </div>
+                            </div>
+                            <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
+                            {resp.photo_url && (
+                              <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
+                                style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
+                            )}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                              <button
+                                onClick={() => !isOwnResp && user && handleHelpfulVote(resp.id, "helpful")}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 6,
+                                  padding: "5px 13px", borderRadius: 100,
+                                  border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
+                                  background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
+                                  color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
+                                  cursor: isOwnResp || !user ? "default" : "pointer",
+                                  fontSize: 15, fontWeight: 600,
+                                  transition: "all 0.15s",
+                                  opacity: isOwnResp ? 0.5 : 1,
+                                }}
+                              >
+                                {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
+                                <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
+                              </button>
+                              {myVote === "helpful" && counts.helpful > 1 && (
+                                <span style={{ fontSize: 15, color: "#8C7A70" }}>
+                                  You and {counts.helpful - 1} {counts.helpful - 1 === 1 ? "other" : "others"} found this helpful
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* CTA row */}
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: "auto", paddingTop: 12 }}>
+                {!user ? (
+                  <>
+                    <button onClick={onSignIn} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      Weigh in →
+                    </button>
+                    <span style={{ fontSize: 14, color: "#8C7A70", lineHeight: 1.4 }}>Share your take to help others like you.</span>
+                  </>
+                ) : isOwn ? (
+                  <>
+                    {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
+                      <button onClick={() => setTrackingId(decision.id)} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 15, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer" }}>
+                        Log outcome
+                      </button>
+                    )}
+                    {activeTab === "mine" && (
+                      <button
+                        onClick={() => { if (confirm("Remove this decision?")) handleDelete(decision.id); }}
+                        style={{ marginLeft: "auto", padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 15, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => startWeighIn(decision.id)} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      Weigh in →
+                    </button>
+                    <span style={{ fontSize: 14, color: "#8C7A70", lineHeight: 1.4 }}>Share your take to help others like you.</span>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Feed;

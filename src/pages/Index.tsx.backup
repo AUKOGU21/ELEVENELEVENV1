@@ -1,0 +1,172 @@
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import heroImage from "@/assets/hero-mirror.jpg";
+import logoWordmark from "@/assets/logo-wordmark.png";
+import logoSymbol from "@/assets/logo-symbol.png";
+
+const Index = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Nav */}
+      <nav className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 md:px-12 py-6">
+        <img src={logoWordmark} alt="ELEVENELEVEN" className="h-20 md:h-24 w-auto" />
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate("/feed")}
+            className="text-hero-foreground/70 hover:text-hero-foreground text-xs tracking-widest uppercase transition-colors"
+          >
+            Feed
+          </button>
+          <button
+            onClick={() => navigate("/signin")}
+            className="pill-button border-hero-foreground/40 text-hero-foreground hover:bg-hero-foreground/10 text-xs tracking-widest uppercase"
+          >
+            Sign in
+          </button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative h-screen overflow-hidden bg-hero">
+        <img
+          src={heroImage}
+          alt="Mirror reflection — fashion editorial"
+          width={1920}
+          height={1080}
+          className="absolute inset-0 w-full h-full object-cover opacity-80"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-hero/80 via-hero/30 to-transparent" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-6">
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="font-editorial text-4xl md:text-6xl lg:text-7xl tracking-tight whitespace-nowrap"
+            style={{ textShadow: "0 0 40px rgba(212,166,160,0.8), 0 0 80px rgba(212,166,160,0.4)" }}
+          >
+            <span style={{ color: "#D4A6A0" }}>stop guessing. </span>
+            <span style={{ color: "#D4A6A0" }}>shop with context.</span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+            className="mt-6 text-base md:text-lg max-w-xl font-light"
+            style={{ color: "rgba(245,236,216,0.65)" }}
+          >
+            See real outcomes from women who share your style, fit, and preferences — before you buy.
+          </motion.p>
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.8 }}
+            onClick={() => navigate("/signin?mode=signup")}
+            className="mt-10 px-10 py-4 bg-primary text-primary-foreground rounded-full text-sm tracking-widest uppercase font-medium hover:bg-primary/90 transition-colors"
+          >
+            Get matched
+          </motion.button>
+        </div>
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
+          <div className="w-2 h-2 rounded-full bg-hero-foreground" />
+          <div className="w-32 h-px bg-hero-foreground/40" />
+          <span className="text-hero-foreground/50 text-xs tracking-wider">1 / 1</span>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-24 md:py-32 px-6 md:px-12">
+        <div className="max-w-5xl mx-auto">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="font-editorial text-4xl md:text-6xl font-light text-foreground mb-16 md:mb-24"
+          >
+            How it works
+          </motion.h2>
+          <div className="grid md:grid-cols-3 gap-8 md:gap-16">
+            {[
+              {
+                num: "01",
+                title: "Build your profile",
+                desc: "Share your size, style preferences, and how you like clothing to feel.",
+              },
+              {
+                num: "02",
+                title: "Post what you're considering",
+                desc: "Link a product, add your confidence score, and share what you're unsure about.",
+              },
+              {
+                num: "03",
+                title: "See what works for people like you",
+                desc: "Get matched with your mirrors — women who share your shape, taste, and fit reality.",
+              },
+            ].map((step, i) => (
+              <motion.div
+                key={step.num}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.15 }}
+                className="space-y-4"
+              >
+                <span className="text-accent text-sm tracking-widest font-medium">{step.num}</span>
+                <h3 className="font-editorial text-2xl md:text-3xl font-light text-foreground">
+                  {step.title}
+                </h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Bottom CTA */}
+      <section className="py-24 md:py-32 bg-secondary text-secondary-foreground relative overflow-hidden">
+        {/* Symbol watermark */}
+        <img
+          src={logoSymbol}
+          alt=""
+          aria-hidden
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/4 h-64 w-auto opacity-5 pointer-events-none"
+          style={{ filter: "invert(1)" }}
+        />
+        <div className="max-w-3xl mx-auto text-center px-6 relative z-10">
+          <h2 className="font-editorial text-4xl md:text-6xl font-light mb-6">
+            Context before purchase.
+          </h2>
+          <p className="text-secondary-foreground/70 text-base mb-10 font-light">
+            Powered by people like you.
+          </p>
+          <button
+            onClick={() => navigate("/signin?mode=signup")}
+            className="px-10 py-4 bg-primary text-primary-foreground rounded-full text-sm tracking-widest uppercase font-medium hover:bg-primary/90 transition-colors"
+          >
+            Get matched
+          </button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-10 px-6 md:px-12 border-t border-border">
+        <div className="max-w-5xl mx-auto flex flex-col items-center gap-4">
+          <img
+            src={logoSymbol}
+            alt="ELEVENELEVEN"
+            className="h-14 w-auto opacity-20"
+            style={{ filter: "brightness(0)" }}
+          />
+          <span className="text-xs text-muted-foreground tracking-widest">© 2026 ELEVENELEVEN</span>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default Index;

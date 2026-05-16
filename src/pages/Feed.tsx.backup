@@ -1,0 +1,1066 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, MessageCircle, ThumbsUp, ThumbsDown, ExternalLink, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { computeMatchScore } from "@/lib/matching";
+import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
+
+interface ResponseRow {
+  id: string;
+  recommendation: "buy" | "do_not_buy" | "need_more_info";
+  reasoning: string;
+  match_score: number | null;
+  helpfulness_votes: number;
+  user_id: string;
+  profiles: { display_name: string | null } | null;
+}
+
+interface DecisionRow {
+  id: string;
+  product_name: string | null;
+  brand_name: string | null;
+  product_image_url: string | null;
+  product_url: string | null;
+  price_note: string | null;
+  sizes_note: string | null;
+  context_note: string | null;
+  confidence_score: number;
+  uncertainty_text: string | null;
+  status: string;
+  user_id: string;
+  created_at: string;
+  matchScore?: number | null;
+  responses: ResponseRow[];
+  profiles: {
+    display_name: string | null;
+    avatar_url: string | null;
+    height_range: string | null;
+    silhouette_preference: string[] | null;
+    style_aesthetics: string[] | null;
+    top_size: string | null;
+    bottom_size: string | null;
+    fit_preference: string | null;
+    fit_details: Record<string, string> | null;
+    age: number | null;
+    city: string | null;
+  } | null;
+}
+
+const CONTEXT_OPTIONS = [
+  "I've bought this exact item",
+  "I've bought from this brand before",
+  "I've never purchased but I know this brand well",
+  "No prior context — just my take",
+];
+
+const CATEGORY_OPTIONS = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Shoes", "Accessories", "Bags"];
+
+// Simple relative time helper
+const timeAgo = (dateStr: string) => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const Feed = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [decisions, setDecisions] = useState<DecisionRow[]>([]);
+  const [myDecisions, setMyDecisions] = useState<DecisionRow[]>([]);
+  const [activeTab, setActiveTab] = useState<"feed" | "mine">("feed");
+  const [loading, setLoading] = useState(true);
+
+  // Filters
+  const [filterBrand, setFilterBrand] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
+
+  // Weigh-in flow
+  const [weighingIn, setWeighingIn] = useState<string | null>(null);
+  const [weighInStep, setWeighInStep] = useState<"context" | "vote" | "take" | "done">("context");
+  const [context, setContext] = useState<string | null>(null);
+  const [vote, setVote] = useState<"buy" | "do_not_buy" | "need_more_info" | null>(null);
+  const [take, setTake] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
+
+  // Vote state
+  const [userVotes, setUserVotes] = useState<Record<string, "helpful" | "not_helpful">>({});
+  const [voteCounts, setVoteCounts] = useState<Record<string, { helpful: number; not_helpful: number }>>({});
+
+  useEffect(() => {
+    fetchDecisions();
+
+    // Real-time: refresh feed when decisions or responses change
+    const channel = supabase
+      .channel("feed-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "decisions" }, () => fetchDecisions())
+      .on("postgres_changes", { event: "*", schema: "public", table: "responses" }, () => fetchDecisions())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // Load user's existing votes when user changes
+  useEffect(() => {
+    if (!user) {
+      setUserVotes({});
+      return;
+    }
+    const loadUserVotes = async () => {
+      const { data } = await supabase
+        .from("response_votes")
+        .select("response_id, vote_type")
+        .eq("voter_id", user.id);
+      if (data) {
+        const map: Record<string, "helpful" | "not_helpful"> = {};
+        data.forEach((v) => { map[v.response_id] = v.vote_type; });
+        setUserVotes(map);
+      }
+    };
+    loadUserVotes();
+  }, [user]);
+
+  const fetchDecisions = async () => {
+    setLoading(true);
+
+    const query = `
+      id, product_name, brand_name, product_image_url, product_url,
+      price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
+      profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
+      responses (
+        id, recommendation, reasoning, match_score,
+        helpfulness_votes, user_id,
+        profiles ( display_name )
+      )
+    `;
+
+    // Fetch decisions + current user's profile in parallel
+    const [{ data: feedData }, profileResult] = await Promise.all([
+      supabase
+        .from("decisions")
+        .select(query)
+        .eq("is_public", true)
+        .is("deleted_at", null)
+        .neq("status", "outcome_logged")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      user
+        ? supabase.from("profiles").select("*").eq("id", user.id).single()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    const myProfileData = (profileResult as any).data ?? null;
+    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url });
+
+    // Merge localStorage decisions for unauthenticated users
+    const local = JSON.parse(localStorage.getItem("eleven_decisions") || "[]");
+    const localFormatted: DecisionRow[] = local.map((d: any) => ({
+      id: d.id,
+      product_name: d.product?.name ?? null,
+      brand_name: d.product?.brand ?? null,
+      product_image_url: d.product?.image ?? null,
+      confidence_score: d.confidence ?? 5,
+      uncertainty_text: d.uncertainties?.join(", ") ?? null,
+      status: "open",
+      user_id: "local",
+      created_at: new Date().toISOString(),
+      responses: [],
+      profiles: null,
+    }));
+
+    if (feedData) {
+      let rows = feedData as unknown as DecisionRow[];
+
+      // Compute match scores and sort by relevance for authenticated users
+      if (myProfileData) {
+        rows = rows.map((d) => ({
+          ...d,
+          matchScore: d.user_id === user?.id
+            ? null // own posts — no match % shown
+            : computeMatchScore(myProfileData, d.profiles as any).total,
+        }));
+        // Highest match first; own posts and unscored go to end
+        rows.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
+      }
+
+      setDecisions(user ? rows : [...localFormatted, ...rows]);
+
+      // Fetch vote counts for all responses in these decisions
+      const allResponseIds = rows.flatMap((d) => d.responses?.map((r) => r.id) ?? []);
+      if (allResponseIds.length > 0) {
+        const { data: allVotes } = await supabase
+          .from("response_votes")
+          .select("response_id, vote_type")
+          .in("response_id", allResponseIds);
+
+        if (allVotes) {
+          const counts: Record<string, { helpful: number; not_helpful: number }> = {};
+          allVotes.forEach((v) => {
+            if (!counts[v.response_id]) counts[v.response_id] = { helpful: 0, not_helpful: 0 };
+            if (v.vote_type === "helpful") counts[v.response_id].helpful++;
+            else counts[v.response_id].not_helpful++;
+          });
+          setVoteCounts(counts);
+        }
+
+        // Also refresh user's votes
+        if (user) {
+          const { data: myVoteData } = await supabase
+            .from("response_votes")
+            .select("response_id, vote_type")
+            .eq("voter_id", user.id)
+            .in("response_id", allResponseIds);
+          if (myVoteData) {
+            const map: Record<string, "helpful" | "not_helpful"> = {};
+            myVoteData.forEach((v) => { map[v.response_id] = v.vote_type; });
+            setUserVotes(map);
+          }
+        }
+      }
+    }
+
+    // Mine tab — always just the current user's own decisions
+    if (user) {
+      const { data: myData } = await supabase
+        .from("decisions")
+        .select(query)
+        .eq("user_id", user.id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+
+      if (myData) {
+        setMyDecisions(myData as unknown as DecisionRow[]);
+      }
+    } else {
+      setMyDecisions(localFormatted);
+    }
+
+    setLoading(false);
+  };
+
+  const startWeighIn = (id: string) => {
+    setWeighingIn(id);
+    setWeighInStep("context");
+    setContext(null);
+    setVote(null);
+    setTake("");
+  };
+
+  const submitWeighIn = async () => {
+    if (!user || !weighingIn || !vote || !take.trim()) return;
+    setSubmitting(true);
+
+    // Find the decision poster's profile to compute match score
+    const decision = decisions.find((d) => d.id === weighingIn);
+    let matchScore: number | null = null;
+    let matchBreakdown = null;
+
+    if (decision) {
+      const [{ data: responderProfile }, { data: posterProfile }] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("profiles").select("*").eq("id", decision.user_id).single(),
+      ]);
+
+      if (responderProfile && posterProfile) {
+        const result = computeMatchScore(posterProfile, responderProfile);
+        matchScore = result.total;
+        matchBreakdown = result;
+      }
+    }
+
+    await supabase.from("responses").insert({
+      decision_id: weighingIn,
+      user_id: user.id,
+      recommendation: vote,
+      reasoning: take.trim(),
+      personal_experience: context,
+      match_score: matchScore,
+      match_breakdown: matchBreakdown,
+    });
+
+    await fetchDecisions();
+    setSubmitting(false);
+    setWeighInStep("done");
+  };
+
+  const handleHelpfulVote = async (responseId: string, voteType: "helpful" | "not_helpful") => {
+    if (!user) return;
+
+    const currentVote = userVotes[responseId];
+    const isToggleOff = currentVote === voteType;
+
+    // Optimistic update
+    const newUserVotes = { ...userVotes };
+    const newVoteCounts = {
+      ...voteCounts,
+      [responseId]: { ...(voteCounts[responseId] ?? { helpful: 0, not_helpful: 0 }) },
+    };
+
+    if (isToggleOff) {
+      // Remove vote
+      delete newUserVotes[responseId];
+      newVoteCounts[responseId][voteType] = Math.max(0, (newVoteCounts[responseId][voteType] ?? 1) - 1);
+    } else {
+      // Remove old vote count if switching
+      if (currentVote) {
+        newVoteCounts[responseId][currentVote] = Math.max(0, (newVoteCounts[responseId][currentVote] ?? 1) - 1);
+      }
+      newUserVotes[responseId] = voteType;
+      newVoteCounts[responseId][voteType] = (newVoteCounts[responseId][voteType] ?? 0) + 1;
+    }
+
+    setUserVotes(newUserVotes);
+    setVoteCounts(newVoteCounts);
+
+    if (isToggleOff) {
+      // Delete the vote
+      await supabase
+        .from("response_votes")
+        .delete()
+        .eq("response_id", responseId)
+        .eq("voter_id", user.id);
+    } else {
+      // Upsert the vote
+      await supabase.from("response_votes").upsert(
+        { response_id: responseId, voter_id: user.id, vote_type: voteType },
+        { onConflict: "response_id,voter_id" }
+      );
+    }
+
+    // Recount helpful votes and sync back to responses.helpfulness_votes
+    const { count } = await supabase
+      .from("response_votes")
+      .select("*", { count: "exact", head: true })
+      .eq("response_id", responseId)
+      .eq("vote_type", "helpful");
+    await supabase
+      .from("responses")
+      .update({ helpfulness_votes: count ?? 0 })
+      .eq("id", responseId);
+
+    // Refresh to sync server state
+    await fetchDecisions();
+  };
+
+  const handleDelete = async (decisionId: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("decisions")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", decisionId)
+      .eq("user_id", user.id);
+    if (error) {
+      alert("Could not delete: " + error.message);
+      return;
+    }
+    await fetchDecisions();
+  };
+
+  const handleOutcome = async (decisionId: string, outcome: string) => {
+    if (!user) return;
+    const didPurchase = outcome === "Bought it";
+    await supabase.from("outcomes").upsert(
+      { decision_id: decisionId, user_id: user.id, did_purchase: didPurchase },
+      { onConflict: "decision_id" }
+    );
+    if (didPurchase) {
+      await supabase.from("decisions").update({ status: "purchased" }).eq("id", decisionId);
+    }
+    setTrackingId(null);
+    await fetchDecisions();
+  };
+
+  const getBadge = (votes: number) => {
+    if (votes >= 50) return "Top Voice ✓";
+    if (votes >= 25) return "Trusted Voice";
+    if (votes >= 5) return "Contributor";
+    return null;
+  };
+
+  const formatName = (displayName: string | null) => {
+    if (!displayName) return "Anonymous";
+    const parts = displayName.trim().split(" ");
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[1][0]}.`;
+  };
+
+  const getInitials = (displayName: string | null) => {
+    if (!displayName) return "?";
+    const parts = displayName.trim().split(" ");
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  };
+
+  const recommendationLabel = (rec: string) => {
+    if (rec === "buy") return "Would buy";
+    if (rec === "do_not_buy") return "Wouldn't buy";
+    return "Depends";
+  };
+
+  const recommendationColor = (rec: string) => {
+    if (rec === "buy") return "text-emerald-600";
+    if (rec === "do_not_buy") return "text-rose-500";
+    return "text-amber-600";
+  };
+
+  const recommendationBg = (rec: string) => {
+    if (rec === "buy") return "bg-emerald-50 text-emerald-700";
+    if (rec === "do_not_buy") return "bg-rose-50 text-rose-600";
+    return "bg-amber-50 text-amber-700";
+  };
+
+  // Client-side filtered list
+  const getFilteredDecisions = (list: DecisionRow[]) => {
+    let filtered = list;
+    if (filterBrand.trim()) {
+      filtered = filtered.filter((d) =>
+        (d.brand_name ?? "").toLowerCase().includes(filterBrand.toLowerCase())
+      );
+    }
+    // TODO: category requires DB column — currently matching against product_name as a proxy
+    if (filterCategory !== "All") {
+      filtered = filtered.filter((d) =>
+        (d.product_name ?? "").toLowerCase().includes(filterCategory.toLowerCase())
+      );
+    }
+    return filtered;
+  };
+
+  const displayList = getFilteredDecisions(activeTab === "feed" ? decisions : myDecisions);
+
+  return (
+    <div className="min-h-screen bg-[#FAFAF8]">
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <motion.img
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              src={lightboxUrl}
+              alt="Product"
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightboxUrl(null)}
+              className="absolute top-5 right-5 text-white/70 hover:text-white text-xs tracking-[0.2em] uppercase"
+            >
+              Close ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 md:px-12 py-5 bg-white border-b border-[#E8E4E0]">
+        <span
+          className="font-editorial text-lg tracking-[0.2em] text-foreground cursor-pointer"
+          onClick={() => navigate("/")}
+        >
+          ELEVENELEVEN
+        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(user ? "/post" : "/signin")}
+            className="pill-button text-xs tracking-widest uppercase flex items-center gap-2"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {user ? "Post a decision" : "Sign in to post"}
+          </button>
+          {user && (
+            <button
+              onClick={() => navigate("/profile")}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-white shrink-0 hover:opacity-80 transition-opacity overflow-hidden"
+              style={{ backgroundColor: "#8B2035" }}
+            >
+              {myProfile?.avatar_url
+                ? <img src={myProfile.avatar_url} alt="you" className="w-full h-full object-cover" />
+                : (myProfile?.display_name?.trim() || user.email || "?")[0].toUpperCase()
+              }
+            </button>
+          )}
+        </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 md:py-12">
+
+        {/* Tabs — minimal underline style */}
+        <div className="flex gap-8 mb-8">
+          <button
+            onClick={() => setActiveTab("feed")}
+            className={`pb-2.5 text-sm font-medium tracking-wide transition-colors ${
+              activeTab === "feed"
+                ? "text-foreground border-b-2 border-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Feed
+          </button>
+          <button
+            onClick={() => setActiveTab("mine")}
+            className={`pb-2.5 text-sm font-medium tracking-wide transition-colors ${
+              activeTab === "mine"
+                ? "text-foreground border-b-2 border-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            My decisions {myDecisions.length > 0 && `(${myDecisions.length})`}
+          </button>
+        </div>
+
+        {activeTab === "feed" && (
+          <motion.h1
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="font-editorial text-3xl md:text-4xl font-light text-foreground mb-8 leading-tight"
+          >
+            What women are deciding right now
+          </motion.h1>
+        )}
+
+        {/* Filter bar */}
+        <div className="flex gap-3 mb-8 flex-wrap">
+          {/* Brand filter */}
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={filterBrand}
+              onChange={(e) => setFilterBrand(e.target.value)}
+              placeholder="Filter by brand"
+              className="w-full pl-8 pr-4 py-2 rounded-full border border-[#E8E4E0] bg-white text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
+            />
+          </div>
+          {/* Category filter */}
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="px-4 py-2 rounded-full border border-[#E8E4E0] bg-white text-xs text-foreground focus:outline-none focus:border-foreground/30 transition-colors cursor-pointer appearance-none pr-8"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
+          >
+            {CATEGORY_OPTIONS.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+
+        {loading ? (
+          <div className="space-y-5">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-2xl border border-[#E8E4E0] bg-white h-64 animate-pulse" />
+            ))}
+          </div>
+        ) : displayList.length === 0 ? (
+          <div className="text-center py-20">
+            <p className="font-editorial text-2xl font-light text-foreground mb-3">
+              {filterBrand || filterCategory !== "All"
+                ? "No results for these filters"
+                : activeTab === "mine" ? "No decisions posted yet" : "No decisions yet"}
+            </p>
+            <p className="text-muted-foreground text-sm mb-8">
+              {filterBrand || filterCategory !== "All"
+                ? "Try clearing the filters above."
+                : activeTab === "mine"
+                  ? "Post something you're considering and get input from your mirrors."
+                  : "Be the first to post something you're considering."}
+            </p>
+            {!filterBrand && filterCategory === "All" && (
+              <button
+                onClick={() => navigate(user ? "/post" : "/signin")}
+                className="px-8 py-3 rounded-full bg-primary text-primary-foreground text-xs tracking-[0.15em] uppercase font-medium hover:bg-primary/90 transition-colors"
+              >
+                {user ? "Post a decision" : "Sign in to post a decision"}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {displayList.map((decision, i) => (
+              <motion.div
+                key={decision.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="rounded-2xl border border-[#E8E4E0] bg-white shadow-sm overflow-hidden"
+              >
+                {/* Product image — full width, tappable to enlarge */}
+                {decision.product_image_url ? (
+                  <div className="relative">
+                    <img
+                      src={decision.product_image_url}
+                      alt={decision.product_name ?? "Product"}
+                      className="w-full h-72 object-cover object-top bg-muted cursor-zoom-in"
+                      onClick={() => setLightboxUrl(decision.product_image_url!)}
+                    />
+
+                    {/* Match % badge — TOP-LEFT overlay on image */}
+                    {decision.matchScore != null && (
+                      <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm pointer-events-none">
+                        <span className="text-sm font-semibold" style={{ color: "#C4A47A" }}>
+                          {Math.round(decision.matchScore)}% match
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="absolute bottom-2 left-2 bg-black/40 backdrop-blur-sm text-white/80 text-xs px-2 py-1 rounded-full pointer-events-none">
+                      Tap to expand
+                    </div>
+                    {decision.product_url && (
+                      <a
+                        href={decision.product_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute top-3 right-3 bg-white/85 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground hover:bg-white transition-colors shadow-sm"
+                      >
+                        <ExternalLink className="w-3 h-3" /> View product
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  /* No image: show match % as a pill at top of card */
+                  decision.matchScore != null && (
+                    <div className="px-5 pt-5 pb-0">
+                      <span className="inline-block px-3 py-1.5 rounded-full text-sm font-semibold" style={{ backgroundColor: "#1a1a1a", color: "#C4A47A" }}>
+                        {Math.round(decision.matchScore)}% match
+                      </span>
+                    </div>
+                  )
+                )}
+
+                {/* Product info */}
+                <div className="px-5 pt-5 pb-3">
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-editorial text-xl text-foreground leading-snug">
+                        {decision.product_name ?? "Unnamed product"}
+                      </p>
+                      <p className="text-xs tracking-[0.15em] uppercase text-muted-foreground mt-1">
+                        {decision.brand_name ?? "Unknown brand"}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {decision.price_note && (
+                        <span className="text-sm font-medium text-foreground">{decision.price_note}</span>
+                      )}
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>{decision.responses?.length ?? 0}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Poster profile bar — expandable */}
+                  <div className="mt-4 mb-4">
+                    <button
+                      onClick={() => setExpandedProfile(expandedProfile === decision.id ? null : decision.id)}
+                      className="flex items-center gap-2.5 w-full text-left group"
+                    >
+                      {/* Avatar — smaller */}
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0 overflow-hidden"
+                        style={{ backgroundColor: "#8B2035" }}
+                      >
+                        {decision.profiles?.avatar_url
+                          ? <img src={decision.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                          : getInitials(decision.profiles?.display_name ?? null)
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground font-medium">
+                          {[
+                            formatName(decision.profiles?.display_name ?? null),
+                            decision.profiles?.age,
+                            decision.profiles?.city?.split(",")[0],
+                          ].filter(Boolean).join(", ")}
+                        </p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5 group-hover:text-muted-foreground transition-colors">
+                          {expandedProfile === decision.id ? "Hide profile" : "See her profile →"}
+                        </p>
+                      </div>
+                      {/* Date — right aligned */}
+                      <span className="text-xs text-muted-foreground/50 shrink-0 mr-1">
+                        {timeAgo(decision.created_at)}
+                      </span>
+                      {expandedProfile === decision.id
+                        ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      }
+                    </button>
+
+                    <AnimatePresence>
+                      {expandedProfile === decision.id && decision.profiles && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-3 pl-[46px] space-y-4">
+
+                            {/* Silhouette + height + body nuances row */}
+                            {decision.profiles.silhouette_preference?.[0] && (() => {
+                              const sil = SILHOUETTE_OPTIONS.find(s => s.label === decision.profiles!.silhouette_preference![0]);
+                              if (!sil) return null;
+
+                              const fitDetails = decision.profiles.fit_details as Record<string, string> | null;
+                              const outliers = fitDetails
+                                ? Object.entries(fitDetails).filter(([k, v]) =>
+                                    v && k !== "Overall fit" &&
+                                    !v.toLowerCase().includes("average") &&
+                                    !v.toLowerCase().includes("proportional")
+                                  ).map(([, v]) => v)
+                                : [];
+
+                              return (
+                                <div className="flex gap-3 items-start">
+                                  <div className="shrink-0 rounded-xl overflow-hidden bg-muted" style={{ width: 56, height: 88 }}>
+                                    <img
+                                      src={sil.image}
+                                      alt={sil.label}
+                                      className="w-full h-full object-cover object-top"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0 pt-0.5 space-y-1.5">
+                                    <p className="text-xs font-semibold text-foreground leading-tight">{sil.label}</p>
+                                    {decision.profiles.height_range && (
+                                      <p className="text-xs text-muted-foreground">
+                                        <span className="text-foreground font-medium">{decision.profiles.height_range}</span>
+                                      </p>
+                                    )}
+                                    {outliers.length > 0 && (
+                                      <div className="flex flex-wrap gap-1">
+                                        {outliers.map((v) => (
+                                          <span key={v} className="text-xs px-2 py-0.5 rounded-full bg-[#F5F3F0] text-foreground leading-tight">{v}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Sizing + fit preference */}
+                            {(decision.profiles.top_size || decision.profiles.bottom_size || decision.profiles.fit_preference) && (
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                {decision.profiles.top_size && <span>Top <span className="text-foreground font-medium">{decision.profiles.top_size}</span></span>}
+                                {decision.profiles.bottom_size && <span>Bottom <span className="text-foreground font-medium">{decision.profiles.bottom_size}</span></span>}
+                                {decision.profiles.fit_preference && <span>Prefers <span className="text-foreground font-medium">{decision.profiles.fit_preference}</span></span>}
+                              </div>
+                            )}
+
+                            {/* Style aesthetics */}
+                            {(decision.profiles.style_aesthetics?.length ?? 0) > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {decision.profiles.style_aesthetics!.map((label) => {
+                                  const style = STYLE_OPTIONS.find(s => s.label === label);
+                                  return style ? (
+                                    <div key={label} className="flex items-center gap-2">
+                                      <div className="w-10 h-10 rounded-full overflow-hidden bg-muted shrink-0">
+                                        <img src={style.image} alt={style.label} className="w-full h-full object-cover object-top" />
+                                      </div>
+                                      <span className="text-xs text-foreground font-medium">{style.label}</span>
+                                    </div>
+                                  ) : null;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Uncertainty section — left border accent style */}
+                  {decision.uncertainty_text && (
+                    <div className="border-l-2 border-primary pl-4 mb-4">
+                      <p className="text-sm text-foreground font-medium leading-relaxed">
+                        {decision.uncertainty_text.split(", ").join(" · ")}
+                      </p>
+                      {(decision.sizes_note || decision.context_note) && (
+                        <div className="mt-2 space-y-1">
+                          {decision.sizes_note && (
+                            <p className="text-xs text-muted-foreground">
+                              Deciding between: <span className="text-foreground">{decision.sizes_note}</span>
+                            </p>
+                          )}
+                          {decision.context_note && (
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {decision.context_note.includes(": ") ? decision.context_note.split(": ").slice(1).join(": ") : decision.context_note}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Confidence — minimal */}
+                  <p className="text-xs text-muted-foreground mb-0.5">
+                    Confidence: <span className="text-foreground font-medium">{decision.confidence_score}/10</span>
+                  </p>
+                </div>
+
+                {/* Responses */}
+                {decision.responses?.length > 0 && (
+                  <div className="px-5 pb-3 space-y-2">
+                    {[...decision.responses]
+                      .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
+                      .slice(0, 2)
+                      .map((resp) => {
+                        const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
+                        const myVote = userVotes[resp.id];
+                        const isOwnResponse = resp.user_id === user?.id;
+
+                        return (
+                          <div key={resp.id} className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#FAFAF8] border border-[#F0ECE8]">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <span className="text-xs font-medium text-foreground">
+                                  {formatName(resp.profiles?.display_name ?? null)}
+                                </span>
+                                {resp.match_score != null && (
+                                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#F5F0EB]" style={{ color: "#8B2035" }}>
+                                    {Math.round(resp.match_score)}%
+                                  </span>
+                                )}
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${recommendationBg(resp.recommendation)}`}>
+                                  {recommendationLabel(resp.recommendation)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                                {resp.reasoning}
+                              </p>
+                              {/* Vote counts */}
+                              {(counts.helpful > 0 || counts.not_helpful > 0) && (
+                                <div className="flex items-center gap-3 mt-1.5">
+                                  {counts.helpful > 0 && (
+                                    <span className="text-xs text-muted-foreground/60 flex items-center gap-1">
+                                      <ThumbsUp className="w-3 h-3" />
+                                      {counts.helpful}
+                                    </span>
+                                  )}
+                                  {counts.not_helpful > 0 && (
+                                    <span className="text-xs text-muted-foreground/60 flex items-center gap-1">
+                                      <ThumbsDown className="w-3 h-3" />
+                                      {counts.not_helpful}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Vote buttons — hide for own responses */}
+                            {user && !isOwnResponse && (
+                              <div className="flex flex-col gap-1 shrink-0 pt-0.5">
+                                <button
+                                  onClick={() => handleHelpfulVote(resp.id, "helpful")}
+                                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${
+                                    myVote === "helpful"
+                                      ? "bg-primary/10 text-primary"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                  }`}
+                                  title="Helpful"
+                                >
+                                  <ThumbsUp className="w-3 h-3" />
+                                  {counts.helpful > 0 && <span>{counts.helpful}</span>}
+                                </button>
+                                <button
+                                  onClick={() => handleHelpfulVote(resp.id, "not_helpful")}
+                                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${
+                                    myVote === "not_helpful"
+                                      ? "bg-rose-50 text-rose-500"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                  }`}
+                                  title="Not helpful"
+                                >
+                                  <ThumbsDown className="w-3 h-3" />
+                                  {counts.not_helpful > 0 && <span>{counts.not_helpful}</span>}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="px-5 pb-5">
+                  {weighingIn === decision.id ? (
+                    <div className="space-y-4">
+                      {weighInStep === "context" && (
+                        <div>
+                          <p className="text-sm font-medium text-foreground mb-3">
+                            What's your context with this?
+                          </p>
+                          <div className="space-y-2">
+                            {CONTEXT_OPTIONS.map((opt) => (
+                              <button
+                                key={opt}
+                                onClick={() => { setContext(opt); setWeighInStep("vote"); }}
+                                className="w-full text-left px-4 py-3 rounded-xl border border-[#E8E4E0] text-sm text-foreground hover:border-foreground/30 hover:bg-[#FAFAF8] transition-all"
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {weighInStep === "vote" && (
+                        <div>
+                          <p className="text-sm font-medium text-foreground mb-3">Would you buy this?</p>
+                          <div className="flex gap-2">
+                            {(["buy", "do_not_buy", "need_more_info"] as const).map((v) => (
+                              <button
+                                key={v}
+                                onClick={() => { setVote(v); setWeighInStep("take"); }}
+                                className={`flex-1 py-3 rounded-full border text-sm font-medium transition-all ${
+                                  vote === v
+                                    ? "bg-foreground text-background border-foreground"
+                                    : "border-[#E8E4E0] text-foreground hover:border-foreground/30 hover:bg-[#FAFAF8]"
+                                }`}
+                              >
+                                {v === "buy" ? "Yes" : v === "do_not_buy" ? "No" : "Depends"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {weighInStep === "take" && (
+                        <div>
+                          <p className="text-sm font-medium text-foreground mb-1">What's your take?</p>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Think out loud — what would you tell someone like you?
+                          </p>
+                          <textarea
+                            value={take}
+                            onChange={(e) => setTake(e.target.value)}
+                            placeholder="Share your honest take..."
+                            rows={3}
+                            className="w-full rounded-xl border border-[#E8E4E0] bg-[#FAFAF8] px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 resize-none mb-3"
+                          />
+                          <button
+                            onClick={submitWeighIn}
+                            disabled={take.trim().length === 0 || submitting}
+                            className="w-full py-3 rounded-full bg-foreground text-background text-xs tracking-[0.15em] uppercase font-medium disabled:opacity-30 hover:bg-foreground/85 transition-all"
+                          >
+                            {submitting ? "Submitting..." : "Submit"}
+                          </button>
+                        </div>
+                      )}
+                      {weighInStep === "done" && (
+                        <div className="text-center py-3 space-y-2">
+                          <p className="text-sm text-foreground font-medium">Thanks for weighing in ✓</p>
+                          <button
+                            onClick={() => setWeighingIn(null)}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {user && decision.user_id !== user.id && (
+                        <button
+                          onClick={() => startWeighIn(decision.id)}
+                          className="flex-1 py-3 rounded-full bg-foreground text-background text-xs tracking-[0.15em] uppercase font-medium hover:bg-foreground/85 transition-all"
+                        >
+                          Weigh in
+                        </button>
+                      )}
+                      {user && decision.user_id === user.id && (
+                        <>
+                          {activeTab === "mine" && decision.status === "open" && (
+                            <button
+                              onClick={() => setTrackingId(decision.id)}
+                              className="flex-1 py-3 rounded-full border border-[#E8E4E0] text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
+                            >
+                              Log outcome
+                            </button>
+                          )}
+                          {activeTab === "mine" && (
+                            <button
+                              onClick={() => {
+                                if (confirm("Remove this decision?")) handleDelete(decision.id);
+                              }}
+                              className="px-4 py-3 rounded-full border border-[#E8E4E0] text-xs text-muted-foreground hover:text-red-500 hover:border-red-200 transition-all"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {!user && (
+                        <button
+                          onClick={() => navigate("/signin")}
+                          className="flex-1 py-3 rounded-full bg-foreground text-background text-xs tracking-[0.15em] uppercase font-medium hover:bg-foreground/85 transition-all"
+                        >
+                          Sign in to weigh in
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Outcome modal */}
+      {trackingId && (
+        <div className="fixed inset-0 bg-[#FAFAF8]/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white border border-[#E8E4E0] rounded-2xl p-6 max-w-sm w-full shadow-lg"
+          >
+            <h3 className="font-editorial text-2xl font-light text-foreground mb-2">
+              What did you end up doing?
+            </h3>
+            <div className="space-y-2 mt-4">
+              {["Bought it", "Didn't buy", "Still deciding"].map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => handleOutcome(trackingId, opt)}
+                  className="w-full py-3 rounded-full border border-[#E8E4E0] text-sm font-medium text-foreground hover:bg-[#FAFAF8] hover:border-foreground/20 transition-all"
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setTrackingId(null)}
+              className="w-full mt-3 text-center text-xs text-muted-foreground hover:text-foreground"
+            >
+              Not now
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Feed;

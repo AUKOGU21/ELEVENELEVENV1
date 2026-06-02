@@ -810,15 +810,15 @@ const Feed = () => {
 
       {/* ── Floating header ───────────────────────────────────────────────────── */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-10 py-4"
-        style={{ background: "rgba(235,230,222,0.96)", backdropFilter: "blur(12px)" }}
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between py-3"
+        style={{ background: "rgba(235,230,222,0.96)", backdropFilter: "blur(12px)", padding: isMobile ? "10px 12px" : "16px 40px" }}
       >
         {/* Left: Logo */}
-        <div className="flex-1 flex items-center">
+        <div className="flex items-center" style={{ flexShrink: 0 }}>
           <button
             onClick={() => navigate("/")}
             className="font-sans uppercase select-none"
-            style={{ letterSpacing: "0.32em", fontSize: 18, color: "#1C1712" }}
+            style={{ letterSpacing: isMobile ? "0.18em" : "0.32em", fontSize: isMobile ? 13 : 18, color: "#1C1712" }}
           >
             <span style={{ fontWeight: 700 }}>ELEVEN</span>
             <span style={{ fontWeight: 300 }}>ELEVEN</span>
@@ -832,35 +832,40 @@ const Feed = () => {
         >
           <button
             onClick={() => setActiveTab("feed")}
-            className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
-            style={
-              activeTab === "feed"
+            className="rounded-full font-medium transition-all"
+            style={{
+              fontSize: isMobile ? 13 : 14,
+              padding: isMobile ? "4px 14px" : "6px 16px",
+              ...(activeTab === "feed"
                 ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
-                : { color: "rgba(28,23,18,0.45)" }
-            }
+                : { color: "rgba(28,23,18,0.45)" })
+            }}
           >
             Feed
           </button>
           <button
             onClick={() => setActiveTab("mine")}
-            className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
-            style={
-              activeTab === "mine"
+            className="rounded-full font-medium transition-all"
+            style={{
+              fontSize: isMobile ? 13 : 14,
+              padding: isMobile ? "4px 14px" : "6px 16px",
+              ...(activeTab === "mine"
                 ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
-                : { color: "rgba(28,23,18,0.45)" }
-            }
+                : { color: "rgba(28,23,18,0.45)" })
+            }}
           >
             Mine {myDecisions.length > 0 && `(${myDecisions.length})`}
           </button>
         </div>
 
         {/* Right controls */}
-        <div className="flex-1 flex items-center justify-end gap-2">
+        <div className="flex items-center" style={{ gap: isMobile ? 6 : 8, flexShrink: 0 }}>
           {/* Filter icon */}
           <button
             onClick={() => setFilterOpen((v) => !v)}
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+            className="rounded-full flex items-center justify-center transition-all"
             style={{
+              width: isMobile ? 30 : 32, height: isMobile ? 30 : 32,
               background: filterOpen || filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest"
                 ? "#1C1712"
                 : "rgba(28,23,18,0.08)",
@@ -872,35 +877,37 @@ const Feed = () => {
             <SlidersHorizontal className="w-3.5 h-3.5" />
           </button>
 
-          {/* Post button */}
+          {/* Post button — icon only on mobile */}
           <button
             onClick={() => navigate(user ? "/post" : "/signin")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all"
+            className="flex items-center gap-1.5 rounded-full font-semibold transition-all"
             style={{
+              fontSize: isMobile ? 13 : 14,
+              padding: isMobile ? "5px 12px" : "6px 12px",
               border: "1.5px solid #C49E64",
               color: "#3A3530",
               background: "rgba(196,158,100,0.08)",
               boxShadow: "0 0 10px rgba(196,158,100,0.35), 0 0 20px rgba(196,158,100,0.15)",
             }}
           >
-            <Plus className="w-3 h-3" />
-            Post
+            <Plus style={{ width: isMobile ? 11 : 12, height: isMobile ? 11 : 12 }} />
+            {!isMobile && "Post"}
           </button>
 
           {/* Profile avatar */}
           {user ? (
             <button
               onClick={() => navigate("/profile")}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-semibold text-white overflow-hidden shrink-0"
-              style={{ background: "#3A3530" }}
+              className="rounded-full flex items-center justify-center text-[10px] font-semibold text-white overflow-hidden shrink-0"
+              style={{ width: isMobile ? 30 : 32, height: isMobile ? 30 : 32, background: "#3A3530" }}
             >
               {avatarContent(myProfile?.avatar_url ?? null, myProfile?.display_name ?? null)}
             </button>
           ) : (
             <button
               onClick={() => navigate("/signin")}
-              className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.08)", color: "rgba(28,23,18,0.45)" }}
+              className="rounded-full flex items-center justify-center"
+              style={{ width: isMobile ? 30 : 32, height: isMobile ? 30 : 32, background: "rgba(255,255,255,0.08)", color: "rgba(28,23,18,0.45)" }}
             >
               <User className="w-3.5 h-3.5" />
             </button>
@@ -1623,12 +1630,12 @@ const DecisionCard = ({
         );
       })()}
 
-      {/* ── Body: image left + data right ────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "stretch", borderRadius: "0 0 20px 20px", overflow: "hidden" }}>
+      {/* ── Body: image left + data right (stacked on mobile) ───────────────── */}
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "stretch", borderRadius: "0 0 20px 20px", overflow: "hidden" }}>
 
-        {/* ── Left: product image column — stretches to match right panel height ── */}
+        {/* ── Product image ── */}
         {decision.product_image_url && (
-          <div style={{ width: "42%", flexShrink: 0, background: "#EDE8E2" }}>
+          <div style={{ width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2" }}>
             {decision.product_image_url_2 ? (
               <>
                 <img

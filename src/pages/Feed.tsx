@@ -259,6 +259,18 @@ const SENTIMENT_STYLE: Record<NonNullable<Sentiment>, { color: string; bg: strin
   regret:  { color: "#7A4040", bg: "rgba(122,64,64,0.10)",   border: "rgba(122,64,64,0.28)",   label: "Regret my purchase" },
 };
 
+// ─── Mobile hook ─────────────────────────────────────────────────────────────
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Feed = () => {
@@ -266,6 +278,7 @@ const Feed = () => {
   const location = useLocation();
   const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // ── Data state
   const [decisions, setDecisions] = useState<DecisionRow[]>([]);
@@ -1063,6 +1076,7 @@ const Feed = () => {
               onHide={() => hideDecision(decision.id)}
               navigate={navigate}
               loggedOutcomeIds={loggedOutcomeIds}
+              isMobile={isMobile}
             />
           ))
         )}
@@ -1364,6 +1378,7 @@ interface CardProps {
   onHide: () => void;
   navigate: (path: string) => void;
   loggedOutcomeIds: Set<string>;
+  isMobile: boolean;
 }
 
 const DecisionCard = ({
@@ -1383,6 +1398,7 @@ const DecisionCard = ({
   onHide,
   navigate,
   loggedOutcomeIds,
+  isMobile,
 }: CardProps) => {
   const [showAllResponses, setShowAllResponses] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1427,11 +1443,11 @@ const DecisionCard = ({
       {/* ── User header row — ABOVE the image ─────────────────────────────────── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
-        padding: "14px 16px 12px",
+        padding: isMobile ? "10px 12px 8px" : "14px 16px 12px",
         borderRadius: "20px 20px 0 0",
       }}>
         {/* Avatar */}
-        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+        <div style={{ width: isMobile ? 44 : 72, height: isMobile ? 44 : 72, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 15 : 22, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
           {decision.profiles?.avatar_url
             ? <img src={decision.profiles.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <span>{getInitials(decision.profiles?.display_name ?? null)}</span>
@@ -1441,21 +1457,21 @@ const DecisionCard = ({
         {/* Name + meta + profile toggle */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Name */}
-          <p style={{ fontSize: 19, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 3 }}>
+          <p style={{ fontSize: isMobile ? 14 : 19, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 2 }}>
             {posterName}
           </p>
           {/* Age, city · match badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
-            <span style={{ fontSize: 19, color: "#8C7A70" }}>
+            <span style={{ fontSize: isMobile ? 13 : 19, color: "#8C7A70" }}>
               {posterMeta}
             </span>
             {decision.matchScore != null && (
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0,
-                fontSize: 18, fontWeight: 700, color: "#FDFAF6",
+                fontSize: isMobile ? 12 : 18, fontWeight: 700, color: "#FDFAF6",
                 background: "linear-gradient(135deg, #C4A47A 0%, #B8956A 50%, #A07848 100%)",
                 border: "1px solid rgba(220,185,130,0.55)",
-                borderRadius: 100, padding: "2px 7px",
+                borderRadius: 100, padding: isMobile ? "1px 6px" : "2px 7px",
                 letterSpacing: "0.03em",
                 boxShadow: "0 0 6px rgba(184,149,106,0.40), inset 0 1px 0 rgba(255,255,255,0.20)",
               }}>
@@ -1468,14 +1484,14 @@ const DecisionCard = ({
             onClick={() => setProfileOpen(v => !v)}
             style={{ display: "flex", alignItems: "center", gap: 3, color: "#8C7A70", background: "none", border: "none", cursor: "pointer", padding: 0 }}
           >
-            <span style={{ fontSize: 19 }}>{isOwn ? "Your profile" : "See her profile"}</span>
-            {profileOpen ? <ChevronUp style={{ width: 14, height: 14 }} /> : <ChevronDown style={{ width: 14, height: 14 }} />}
+            <span style={{ fontSize: isMobile ? 12 : 19 }}>{isOwn ? "Your profile" : "See her profile"}</span>
+            {profileOpen ? <ChevronUp style={{ width: 12, height: 12 }} /> : <ChevronDown style={{ width: 12, height: 12 }} />}
           </button>
         </div>
 
         {/* Date + Save (bookmark) */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: 19, color: "#8C7A70" }}>{timeAgo(decision.created_at)}</span>
+          <span style={{ fontSize: isMobile ? 12 : 19, color: "#8C7A70" }}>{timeAgo(decision.created_at)}</span>
           <button
             onClick={onSave}
             title={isSaved ? "Unsave" : "Save"}
@@ -1651,18 +1667,18 @@ const DecisionCard = ({
         )}
 
         {/* ── Right: all card data ── */}
-        <div style={{ flex: 1, minWidth: 0, padding: "20px 22px 24px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 0, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(4px)" }}>
+        <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "14px 14px 16px" : "20px 22px 24px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 0, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(4px)" }}>
 
           {/* Brand + product name */}
           {(decision.brand_name || decision.product_name) && (
             <div style={{ marginBottom: 4 }}>
               {decision.brand_name && (
-                <p style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
+                <p style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
                   {decision.brand_name}
                 </p>
               )}
               {decision.product_name && (
-                <p style={{ fontSize: 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8C7A70" }}>
+                <p style={{ fontSize: isMobile ? 11 : 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8C7A70" }}>
                   {decision.product_name}
                 </p>
               )}
@@ -1695,15 +1711,15 @@ const DecisionCard = ({
 
                 {/* Headline — replaced by "Purchased size + bubble" when size is present */}
                 {sizeBought ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                    <p style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, letterSpacing: "-0.01em", margin: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <p style={{ fontSize: isMobile ? 17 : 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, letterSpacing: "-0.01em", margin: 0 }}>
                       Purchased size
                     </p>
                     <div style={{
-                      width: 38, height: 38, borderRadius: "50%",
+                      width: isMobile ? 30 : 38, height: isMobile ? 30 : 38, borderRadius: "50%",
                       border: "1.5px solid rgba(0,0,0,0.18)",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, fontWeight: 700, color: "#1A1A1A",
+                      fontSize: isMobile ? 12 : 14, fontWeight: 700, color: "#1A1A1A",
                       background: "rgba(0,0,0,0.03)",
                       textTransform: "uppercase",
                       flexShrink: 0,
@@ -1712,7 +1728,7 @@ const DecisionCard = ({
                     </div>
                   </div>
                 ) : (
-                  <p style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, marginBottom: 12, letterSpacing: "-0.01em" }}>
+                  <p style={{ fontSize: isMobile ? 17 : 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, marginBottom: 10, letterSpacing: "-0.01em" }}>
                     {headline}
                   </p>
                 )}

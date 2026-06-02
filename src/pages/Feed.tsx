@@ -20,7 +20,8 @@ interface ResponseRow {
   match_score: number | null;
   helpfulness_votes: number;
   user_id: string;
-  profiles: { display_name: string | null } | null;
+  created_at: string;
+  profiles: { display_name: string | null; avatar_url?: string | null } | null;
 }
 
 interface OutcomeRow {
@@ -394,8 +395,8 @@ const Feed = () => {
       profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
         id, recommendation, reasoning, photo_url, match_score,
-        helpfulness_votes, user_id,
-        profiles ( display_name )
+        helpfulness_votes, user_id, created_at,
+        profiles ( display_name, avatar_url )
       )
     `;
 
@@ -1777,99 +1778,111 @@ const DecisionCard = ({
                   </div>
                 ))}
 
-                {/* Responses — still visible on closed cards for reference */}
-                {sortedResponses.length > 0 && (
+                {/* Responses — first 2 always expanded, rest behind toggle */}
+                {sortedResponses.length > 0 && (() => {
+                  const visibleResponses = sortedResponses.slice(0, 2);
+                  const hiddenResponses = sortedResponses.slice(2);
+                  const renderResponse = (resp: ResponseRow) => {
+                    const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
+                    const isOwnResp = resp.user_id === user?.id;
+                    const myVote = userVotes[resp.id];
+                    const isBuy = resp.recommendation === "buy";
+                    const isNoBuy = resp.recommendation === "do_not_buy";
+                    return (
+                      <div key={resp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 14, padding: "12px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        {/* Header row: avatar + name + match + rec badge */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {/* Mini avatar */}
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white", fontWeight: 700 }}>
+                              {resp.profiles?.avatar_url
+                                ? <img src={resp.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                : getInitials(resp.profiles?.display_name ?? null)}
+                            </div>
+                            <div>
+                              <span style={{ fontSize: 15, fontWeight: 700, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+                              {resp.match_score != null && (
+                                <span style={{
+                                  marginLeft: 6, fontSize: 13, fontWeight: 700,
+                                  color: "#C49E64",
+                                }}>✦ {Math.round(resp.match_score)}% Match</span>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 13, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
+                            {recommendationLabel(resp.recommendation)}
+                          </div>
+                        </div>
+
+                        {/* Reasoning */}
+                        <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
+
+                        {resp.photo_url && (
+                          <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
+                            style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
+                        )}
+
+                        {/* Footer: helpful button + date */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                          <button
+                            onClick={() => !isOwnResp && user && handleHelpfulVote(resp.id, "helpful")}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 6,
+                              padding: "4px 12px", borderRadius: 100,
+                              border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
+                              background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
+                              color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
+                              cursor: isOwnResp || !user ? "default" : "pointer",
+                              fontSize: 13, fontWeight: 600,
+                              transition: "all 0.15s",
+                              opacity: isOwnResp ? 0.5 : 1,
+                            }}
+                          >
+                            {myVote === "helpful" ? <Check style={{ width: 11, height: 11 }} /> : <ThumbsUp style={{ width: 11, height: 11 }} />}
+                            <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
+                          </button>
+                          <span style={{ fontSize: 13, color: "#8C7A70" }}>{timeAgo(resp.created_at)}</span>
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  return (
                   <>
                     <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginTop: 16, marginBottom: 16 }} />
                     <div style={{ marginBottom: 8 }}>
                       <p style={{ fontSize: 13, letterSpacing: "0.25em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 14, display: "flex", alignItems: "center", gap: 5 }}>
                         What women like you said <Info style={{ width: 13, height: 13, flexShrink: 0 }} />
                       </p>
-                      {!showAllResponses && (
-                        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                          {sortedResponses.slice(0, PREVIEW_COUNT).map((resp) => {
-                            const isBuy = resp.recommendation === "buy";
-                            const isNoBuy = resp.recommendation === "do_not_buy";
-                            return (
-                              <div key={resp.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,0,0.04)", borderRadius: 100, padding: "7px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
-                                <span style={{ fontSize: 16, fontWeight: 500, color: "#5A4A42" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
-                                <span style={{ fontSize: 15, fontWeight: 600, color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
-                                  · {recommendationLabel(resp.recommendation)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setShowAllResponses(v => !v)}
-                        style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showAllResponses ? 12 : 0 }}
-                      >
-                        <MessageCircle style={{ width: 17, height: 17, color: "#3A3530" }} />
-                        <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", textDecoration: "underline", textDecorationColor: "rgba(0,0,0,0.2)", textUnderlineOffset: 3 }}>
-                          {showAllResponses ? "Collapse" : `View ${sortedResponses.length} response${sortedResponses.length !== 1 ? "s" : ""}`}
-                        </span>
-                        <ArrowRight style={{ width: 15, height: 15, color: "#3A3530", transform: showAllResponses ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
-                      </button>
 
-                      {showAllResponses && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-                          {sortedResponses.map((resp) => {
-                            const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
-                            const isOwnResp = resp.user_id === user?.id;
-                            const myVote = userVotes[resp.id];
-                            const isBuy = resp.recommendation === "buy";
-                            const isNoBuy = resp.recommendation === "do_not_buy";
-                            return (
-                              <div key={resp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 14, padding: "12px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                                  <div>
-                                    <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
-                                    {resp.match_score != null && (
-                                      <span style={{ marginLeft: 8, fontSize: 17, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
-                                    )}
-                                  </div>
-                                  <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 15, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
-                                    {recommendationLabel(resp.recommendation)}
-                                  </div>
-                                </div>
-                                <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
-                                {resp.photo_url && (
-                                  <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
-                                    style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
-                                )}
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                                  <button
-                                    onClick={() => !isOwnResp && user && handleHelpfulVote(resp.id, "helpful")}
-                                    style={{
-                                      display: "flex", alignItems: "center", gap: 6,
-                                      padding: "5px 13px", borderRadius: 100,
-                                      border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
-                                      background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
-                                      color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
-                                      cursor: isOwnResp || !user ? "default" : "pointer",
-                                      fontSize: 15, fontWeight: 600,
-                                      transition: "all 0.15s",
-                                      opacity: isOwnResp ? 0.5 : 1,
-                                    }}
-                                  >
-                                    {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
-                                    <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
-                                  </button>
-                                  {myVote === "helpful" && counts.helpful > 1 && (
-                                    <span style={{ fontSize: 15, color: "#8C7A70" }}>
-                                      You and {counts.helpful - 1} {counts.helpful - 1 === 1 ? "other" : "others"} found this helpful
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                      {/* Always-visible first 2 */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {visibleResponses.map(renderResponse)}
+                      </div>
+
+                      {/* Hidden responses behind toggle */}
+                      {hiddenResponses.length > 0 && (
+                        <>
+                          {showAllResponses && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                              {hiddenResponses.map(renderResponse)}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setShowAllResponses(v => !v)}
+                            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 12 }}
+                          >
+                            <MessageCircle style={{ width: 15, height: 15, color: "#8C7A70" }} />
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#5A4A42", textDecoration: "underline", textDecorationColor: "rgba(0,0,0,0.2)", textUnderlineOffset: 3 }}>
+                              {showAllResponses ? "Collapse" : `+ ${hiddenResponses.length} more response${hiddenResponses.length !== 1 ? "s" : ""}`}
+                            </span>
+                          </button>
+                        </>
                       )}
                     </div>
                   </>
-                )}
+                  );
+                })()}
 
                 {/* CTA row — delete button for own cards only */}
                 <div style={{ marginTop: "auto", paddingTop: 16, display: "flex", alignItems: "center" }}>

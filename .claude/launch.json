@@ -6,6 +6,12 @@
       "runtimeExecutable": "/Users/aukogu/.bun/bin/bun",
       "runtimeArgs": ["run", "dev"],
       "port": 8080
+    },
+    {
+      "name": "waitlist",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4747", "--directory", "waitlist"],
+      "port": 4747
     }
   ]
 }

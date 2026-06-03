@@ -57,8 +57,8 @@
 
   /* hero */
   main{position:relative;z-index:3;flex:1;display:flex;flex-direction:column;
-    justify-content:center;align-items:center;text-align:center;
-    padding:24px clamp(24px,6vw,64px) 40px;max-width:680px;margin:0 auto;width:100%;}
+    justify-content:center;align-items:flex-start;text-align:left;
+    padding:24px clamp(24px,6vw,64px) 40px;max-width:680px;margin:0;width:100%;}
   .chip{display:inline-flex;align-items:center;gap:9px;
     font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.2em;
     text-transform:uppercase;color:var(--clay);border:1px solid var(--line);
@@ -71,11 +71,11 @@
     opacity:0;animation:rise 1s .22s ease forwards;}
   h1 em{font-style:italic;color:var(--clay);font-weight:360;}
   h1 .accent{color:var(--clay);}
-  .sub{margin:24px auto 0;max-width:500px;font-size:clamp(16px,2.1vw,18.5px);line-height:1.5;
+  .sub{margin:24px 0 0;max-width:500px;font-size:clamp(16px,2.1vw,18.5px);line-height:1.5;
     color:var(--nude-soft);opacity:0;animation:rise 1s .36s ease forwards;}
 
   /* form */
-  form{margin:38px auto 0;max-width:440px;width:100%;opacity:0;animation:rise 1s .5s ease forwards;}
+  form{margin:38px 0 0;max-width:440px;width:100%;opacity:0;animation:rise 1s .5s ease forwards;}
   .field{display:flex;gap:10px;align-items:stretch;border-bottom:1px solid rgba(233,224,207,.28);
     padding-bottom:4px;transition:border-color .3s ease;}
   .field:focus-within{border-color:var(--clay);}
@@ -91,7 +91,7 @@
   .field button:hover{color:var(--clay);}
   .field button .arr{transition:transform .25s ease;display:inline-block;}
   .field button:hover .arr{transform:translateX(4px);}
-  .microcopy{margin-top:14px;text-align:center;font-family:'Spline Sans Mono',monospace;font-size:11px;
+  .microcopy{margin-top:14px;text-align:left;font-family:'Spline Sans Mono',monospace;font-size:11px;
     letter-spacing:.06em;color:var(--nude-faint);min-height:16px;transition:color .3s ease;}
   .microcopy.err{color:var(--clay);}
   /* honeypot */
@@ -106,7 +106,7 @@
   #done.show ~ .triad{display:none;}
 
   /* triad */
-  .triad{position:relative;z-index:3;margin:48px auto 0;width:100%;max-width:440px;text-align:left;
+  .triad{position:relative;z-index:3;margin:48px 0 0;width:100%;max-width:440px;text-align:left;
     opacity:0;animation:rise 1.1s .72s ease forwards;}
   .triad-line{display:flex;gap:14px;align-items:baseline;padding:9px 0;
     border-top:1px solid var(--line);font-size:15px;color:var(--nude-soft);line-height:1.4;}

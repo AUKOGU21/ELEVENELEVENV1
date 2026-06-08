@@ -12,6 +12,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "4747", "--directory", "waitlist"],
       "port": 4747
+    },
+    {
+      "name": "emails",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4748", "--directory", "emails"],
+      "port": 4748
     }
   ]
 }

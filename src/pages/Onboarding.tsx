@@ -6,6 +6,7 @@ import { STEPS, SIZE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { computeMatchScore } from "@/lib/matching";
+import { toast } from "sonner";
 
 // ─── Match label helper ───────────────────────────────────────────────────────
 function getMatchLabel(mine: Record<string, any>, them: Record<string, any>): string {
@@ -81,6 +82,16 @@ const Onboarding = () => {
   const [authLoading, setAuthLoading]   = useState(false);
   const [quickWinPhase, setQuickWinPhase] = useState<"loading" | "ready">("loading");
   const [onboardingMatches, setOnboardingMatches] = useState<any[]>([]);
+
+  // ─── Welcome-email confirmation (fires once when arriving from signup) ───────
+  useEffect(() => {
+    if (!skipAccount) return;
+    toast("💌 welcome to the no-guess list", {
+      description: "we just sent a welcome to your inbox — peek in promotions if you don't see it.",
+      duration: 9000,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ─── City autocomplete ──────────────────────────────────────────────────────
   useEffect(() => {

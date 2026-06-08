@@ -463,7 +463,10 @@ const Feed = () => {
             ? null
             : computeMatchScore(myProfileData, d.profiles as any).total,
         }));
-        rows.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
+        rows.sort((a, b) => {
+          const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          return dateDiff !== 0 ? dateDiff : (b.matchScore ?? -1) - (a.matchScore ?? -1);
+        });
       }
 
       setDecisions(user ? rows : [...localFormatted, ...rows]);
@@ -770,8 +773,13 @@ const Feed = () => {
         const bScore = (b.confidence_score ?? 5) - (b.responses?.length ?? 0) * 0.5;
         return aScore - bScore; // lowest confidence + fewest responses first
       });
+    } else {
+      // "newest" — newest decisions up top, with match relevance only as a tiebreaker
+      filtered = [...filtered].sort((a, b) => {
+        const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return dateDiff !== 0 ? dateDiff : (b.matchScore ?? -1) - (a.matchScore ?? -1);
+      });
     }
-    // "newest" is default from DB order
 
     return filtered;
   };

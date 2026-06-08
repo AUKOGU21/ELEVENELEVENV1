@@ -291,7 +291,7 @@ const Feed = () => {
   const [filterBrand, setFilterBrand] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterStatus, setFilterStatus] = useState<"all" | "open">("all");
-  const [sortBy, setSortBy] = useState<"newest" | "discussed" | "needs_input">("newest");
+  const [sortBy, setSortBy] = useState<"newest" | "discussed" | "needs_input" | "relevant">("newest");
   const [filterOpen, setFilterOpen] = useState(false);
 
   // ── Weigh-in flow
@@ -773,6 +773,12 @@ const Feed = () => {
         const bScore = (b.confidence_score ?? 5) - (b.responses?.length ?? 0) * 0.5;
         return aScore - bScore; // lowest confidence + fewest responses first
       });
+    } else if (sortBy === "relevant") {
+      // "relevant" — highest match score first, newest as a tiebreaker
+      filtered = [...filtered].sort((a, b) => {
+        const scoreDiff = (b.matchScore ?? -1) - (a.matchScore ?? -1);
+        return scoreDiff !== 0 ? scoreDiff : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
     } else {
       // "newest" — newest decisions up top, with match relevance only as a tiebreaker
       filtered = [...filtered].sort((a, b) => {
@@ -995,6 +1001,7 @@ const Feed = () => {
                 <div className="flex gap-2 mb-3">
                   {([
                     { value: "newest", label: "Newest" },
+                    { value: "relevant", label: "Most relevant" },
                     { value: "discussed", label: "Most discussed" },
                     { value: "needs_input", label: "Needs input" },
                   ] as const).map(({ value, label }) => (
@@ -1997,88 +2004,82 @@ const DecisionCard = ({
                   <p style={{ fontSize: 13, letterSpacing: "0.25em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 14, display: "flex", alignItems: "center", gap: 5 }}>
                     What women like you are saying <Info style={{ width: 13, height: 13, flexShrink: 0 }} />
                   </p>
-                  {!showAllResponses && (
-                    <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-                      {sortedResponses.slice(0, PREVIEW_COUNT).map((resp) => {
-                        const isBuy = resp.recommendation === "buy";
-                        const isNoBuy = resp.recommendation === "do_not_buy";
-                        return (
-                          <div key={resp.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,0,0.04)", borderRadius: 100, padding: "7px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
-                            <span style={{ fontSize: 16, fontWeight: 500, color: "#5A4A42" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
-                            <span style={{ fontSize: 15, fontWeight: 600, color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
-                              · {recommendationLabel(resp.recommendation)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setShowAllResponses(v => !v)}
-                    style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showAllResponses ? 12 : 0 }}
-                  >
-                    <MessageCircle style={{ width: 17, height: 17, color: "#3A3530" }} />
-                    <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", textDecoration: "underline", textDecorationColor: "rgba(0,0,0,0.2)", textUnderlineOffset: 3 }}>
-                      {showAllResponses ? "Collapse" : `View ${sortedResponses.length} response${sortedResponses.length !== 1 ? "s" : ""}`}
-                    </span>
-                    <ArrowRight style={{ width: 15, height: 15, color: "#3A3530", transform: showAllResponses ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
-                  </button>
-
-                  {showAllResponses && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-                      {sortedResponses.map((resp) => {
-                        const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
-                        const isOwnResp = resp.user_id === user?.id;
-                        const myVote = userVotes[resp.id];
-                        const isBuy = resp.recommendation === "buy";
-                        const isNoBuy = resp.recommendation === "do_not_buy";
-                        return (
-                          <div key={resp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 14, padding: "12px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                              <div>
-                                <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
-                                {resp.match_score != null && (
-                                  <span style={{ marginLeft: 8, fontSize: 17, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
-                                )}
-                              </div>
-                              <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 15, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
-                                {recommendationLabel(resp.recommendation)}
-                              </div>
-                            </div>
-                            <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
-                            {resp.photo_url && (
-                              <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
-                                style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
-                            )}
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                              <button
-                                onClick={() => !isOwnResp && user && handleHelpfulVote(resp.id, "helpful")}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: 6,
-                                  padding: "5px 13px", borderRadius: 100,
-                                  border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
-                                  background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
-                                  color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
-                                  cursor: isOwnResp || !user ? "default" : "pointer",
-                                  fontSize: 15, fontWeight: 600,
-                                  transition: "all 0.15s",
-                                  opacity: isOwnResp ? 0.5 : 1,
-                                }}
-                              >
-                                {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
-                                <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
-                              </button>
-                              {myVote === "helpful" && counts.helpful > 1 && (
-                                <span style={{ fontSize: 15, color: "#8C7A70" }}>
-                                  You and {counts.helpful - 1} {counts.helpful - 1 === 1 ? "other" : "others"} found this helpful
-                                </span>
+                  {(() => {
+                    const renderResponse = (resp: ResponseRow) => {
+                      const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
+                      const isOwnResp = resp.user_id === user?.id;
+                      const myVote = userVotes[resp.id];
+                      const isBuy = resp.recommendation === "buy";
+                      const isNoBuy = resp.recommendation === "do_not_buy";
+                      return (
+                        <div key={resp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 14, padding: "12px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <div>
+                              <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+                              {resp.match_score != null && (
+                                <span style={{ marginLeft: 8, fontSize: 17, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
                               )}
                             </div>
+                            <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 15, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
+                              {recommendationLabel(resp.recommendation)}
+                            </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
+                          {resp.photo_url && (
+                            <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
+                              style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
+                          )}
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <button
+                              onClick={() => !isOwnResp && user && handleHelpfulVote(resp.id, "helpful")}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 6,
+                                padding: "5px 13px", borderRadius: 100,
+                                border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
+                                background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
+                                color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
+                                cursor: isOwnResp || !user ? "default" : "pointer",
+                                fontSize: 15, fontWeight: 600,
+                                transition: "all 0.15s",
+                                opacity: isOwnResp ? 0.5 : 1,
+                              }}
+                            >
+                              {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
+                              <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
+                            </button>
+                            {myVote === "helpful" && counts.helpful > 1 && (
+                              <span style={{ fontSize: 15, color: "#8C7A70" }}>
+                                You and {counts.helpful - 1} {counts.helpful - 1 === 1 ? "other" : "others"} found this helpful
+                              </span>
+                            )}
+                            <span style={{ marginLeft: "auto", fontSize: 14, color: "#8C7A70" }}>{timeAgo(resp.created_at)}</span>
+                          </div>
+                        </div>
+                      );
+                    };
+                    // Auto-show first 2 full comments; collapse the rest behind a toggle once there are 3+
+                    const visible = showAllResponses ? sortedResponses : sortedResponses.slice(0, PREVIEW_COUNT);
+                    const hiddenCount = sortedResponses.length - PREVIEW_COUNT;
+                    return (
+                      <>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: sortedResponses.length > PREVIEW_COUNT ? 12 : 0 }}>
+                          {visible.map(renderResponse)}
+                        </div>
+                        {sortedResponses.length > PREVIEW_COUNT && (
+                          <button
+                            onClick={() => setShowAllResponses(v => !v)}
+                            style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                          >
+                            <MessageCircle style={{ width: 17, height: 17, color: "#3A3530" }} />
+                            <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", textDecoration: "underline", textDecorationColor: "rgba(0,0,0,0.2)", textUnderlineOffset: 3 }}>
+                              {showAllResponses ? "Collapse" : `+ ${hiddenCount} more response${hiddenCount !== 1 ? "s" : ""}`}
+                            </span>
+                            <ArrowRight style={{ width: 15, height: 15, color: "#3A3530", transform: showAllResponses ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               ) : null}
 

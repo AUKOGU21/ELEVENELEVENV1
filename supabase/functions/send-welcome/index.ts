@@ -22,7 +22,7 @@ const SITE_URL = Deno.env.get("SITE_URL") ?? "https://geteleveneleven.com";
 const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
 const UNSUBSCRIBE_URL = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
 
-const SUBJECT = "You're officially on the no-guess list";
+const SUBJECT = "welcome to the no-guess list";
 
 function renderEmail(): string {
   return `<!DOCTYPE html>
@@ -36,7 +36,7 @@ function renderEmail(): string {
   <meta name="supported-color-schemes" content="light only">
   <title>${SUBJECT}</title>
   <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500&family=Hanken+Grotesk:wght@400;500;600&family=Spline+Sans+Mono:wght@500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Spline+Sans+Mono:wght@500&display=swap" rel="stylesheet">
   <style>
     html,body{margin:0!important;padding:0!important;width:100%!important;background:#ffffff;}
     *{-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%;}
@@ -44,7 +44,7 @@ function renderEmail(): string {
     img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline:none;text-decoration:none;display:block;}
     a{text-decoration:none;}
     body,td,div,p,a{font-family:'Hanken Grotesk',Helvetica,Arial,sans-serif;}
-    .serif{font-family:'Fraunces',Georgia,'Times New Roman',serif;}
+    .display{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;}
     .mono{font-family:'Spline Sans Mono','Courier New',monospace;}
     .btn:hover{background:#9A3F26!important;}
     @media only screen and (max-width:620px){
@@ -56,7 +56,7 @@ function renderEmail(): string {
 </head>
 <body style="margin:0;padding:0;background:#ffffff;">
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;opacity:0;color:transparent;height:0;width:0;">
-    You're officially on the no-guess list — one step closer to confident decision-making.
+    welcome to the no-guess list — one step closer to confident decision-making.
   </div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
     <tr>
@@ -68,13 +68,8 @@ function renderEmail(): string {
             </td>
           </tr>
           <tr>
-            <td align="center" class="px" style="padding:0 48px 14px;">
-              <span class="mono" style="font-size:11px;letter-spacing:3px;color:#CB5A3C;text-transform:uppercase;">You're on the list</span>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" class="px h1 serif" style="padding:0 48px 8px;font-size:38px;line-height:1.1;font-weight:400;letter-spacing:-0.5px;color:#100E0C;">
-              You're officially on the<br>no&#8209;guess&nbsp;list.
+            <td align="center" class="px h1 display" style="padding:8px 48px 8px;font-size:38px;line-height:1.08;font-weight:700;letter-spacing:-1px;color:#100E0C;">
+              welcome to the<br>no&#8209;guess&nbsp;list
             </td>
           </tr>
           <tr>
@@ -85,13 +80,13 @@ function renderEmail(): string {
             </td>
           </tr>
           <tr>
-            <td align="center" class="px serif" style="padding:6px 56px 0;font-size:21px;line-height:1.4;font-weight:400;color:#100E0C;">
-              You're one step closer to confident decision&#8209;making.
+            <td align="center" class="px display" style="padding:6px 56px 0;font-size:22px;line-height:1.3;font-weight:700;letter-spacing:-0.4px;color:#100E0C;">
+              you're one step closer to confident decision&#8209;making.
             </td>
           </tr>
           <tr>
             <td align="center" class="px" style="padding:14px 64px 0;font-size:15px;line-height:1.6;color:#6F665A;">
-              No more guessing, no more generic reviews. Just real outcomes from people who share your body, your taste, and your standards.
+              no more guessing, no more generic reviews. just real outcomes from people who share your body, your taste, and your standards.
             </td>
           </tr>
           <tr>
@@ -124,8 +119,7 @@ function renderEmail(): string {
           </tr>
           <tr>
             <td align="center" class="px" style="padding:0 48px 36px;font-size:11px;line-height:1.7;color:#b3ab9e;">
-              You're receiving this because you signed up for ElevenEleven.<br>
-              <a href="${UNSUBSCRIBE_URL}" style="color:#b3ab9e;text-decoration:underline;">Unsubscribe</a>
+              you're receiving this because you signed up for ElevenEleven.
             </td>
           </tr>
         </table>

@@ -953,7 +953,7 @@ const Feed = () => {
                     value={filterBrand}
                     onChange={(e) => setFilterBrand(e.target.value)}
                     placeholder="Search brand or item name"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-lg focus:outline-none"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-base focus:outline-none"
                     style={{ background: "rgba(28,23,18,0.06)", color: "#1C1712", border: "1px solid rgba(28,23,18,0.10)" }}
                   />
                 </div>
@@ -965,7 +965,7 @@ const Feed = () => {
                     <button
                       key={cat}
                       onClick={() => setFilterCategory(cat)}
-                      className="px-3 py-1.5 rounded-full text-lg font-medium transition-all"
+                      className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
                       style={
                         filterCategory === cat
                           ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
@@ -984,7 +984,7 @@ const Feed = () => {
                     <button
                       key={s}
                       onClick={() => setFilterStatus(s)}
-                      className="px-3 py-1.5 rounded-full text-lg font-medium transition-all"
+                      className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
                       style={
                         filterStatus === s
                           ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
@@ -1008,7 +1008,7 @@ const Feed = () => {
                     <button
                       key={value}
                       onClick={() => setSortBy(value)}
-                      className="px-3 py-1.5 rounded-full text-lg font-medium transition-all"
+                      className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
                       style={
                         sortBy === value
                           ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
@@ -1023,7 +1023,7 @@ const Feed = () => {
                 {(filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest") && (
                   <button
                     onClick={() => { setFilterBrand(""); setFilterCategory("All"); setFilterStatus("all"); setSortBy("newest"); }}
-                    className="text-lg flex items-center gap-1 mt-1"
+                    className="text-sm flex items-center gap-1 mt-1"
                     style={{ color: "rgba(28,23,18,0.40)" }}
                   >
                     <X className="w-3 h-3" /> Clear all
@@ -1480,18 +1480,18 @@ const DecisionCard = ({
         {/* Name + meta + profile toggle */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Name */}
-          <p style={{ fontSize: isMobile ? 14 : 19, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 2 }}>
+          <p style={{ fontSize: isMobile ? 14 : 17, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 2 }}>
             {posterName}
           </p>
           {/* Age, city · match badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
-            <span style={{ fontSize: isMobile ? 13 : 19, color: "#8C7A70" }}>
+            <span style={{ fontSize: isMobile ? 13 : 16, color: "#8C7A70" }}>
               {posterMeta}
             </span>
             {decision.matchScore != null && (
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0,
-                fontSize: isMobile ? 12 : 18, fontWeight: 700, color: "#FDFAF6",
+                fontSize: isMobile ? 12 : 15, fontWeight: 700, color: "#FDFAF6",
                 background: "linear-gradient(135deg, #C4A47A 0%, #B8956A 50%, #A07848 100%)",
                 border: "1px solid rgba(220,185,130,0.55)",
                 borderRadius: 100, padding: isMobile ? "1px 6px" : "2px 7px",
@@ -1507,14 +1507,14 @@ const DecisionCard = ({
             onClick={() => setProfileOpen(v => !v)}
             style={{ display: "flex", alignItems: "center", gap: 3, color: "#8C7A70", background: "none", border: "none", cursor: "pointer", padding: 0 }}
           >
-            <span style={{ fontSize: isMobile ? 12 : 19 }}>{isOwn ? "Your profile" : "See her profile"}</span>
+            <span style={{ fontSize: isMobile ? 12 : 16 }}>{isOwn ? "Your profile" : "See her profile"}</span>
             {profileOpen ? <ChevronUp style={{ width: 12, height: 12 }} /> : <ChevronDown style={{ width: 12, height: 12 }} />}
           </button>
         </div>
 
         {/* Date + Save (bookmark) */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: isMobile ? 12 : 19, color: "#8C7A70" }}>{timeAgo(decision.created_at)}</span>
+          <span style={{ fontSize: isMobile ? 12 : 15, color: "#8C7A70" }}>{timeAgo(decision.created_at)}</span>
           <button
             onClick={onSave}
             title={isSaved ? "Unsave" : "Save"}
@@ -1696,7 +1696,7 @@ const DecisionCard = ({
           {(decision.brand_name || decision.product_name) && (
             <div style={{ marginBottom: 4 }}>
               {decision.brand_name && (
-                <p style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
+                <p style={{ fontSize: isMobile ? 16 : 19, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
                   {decision.brand_name}
                 </p>
               )}
@@ -1735,7 +1735,7 @@ const DecisionCard = ({
                 {/* Headline — replaced by "Purchased size + bubble" when size is present */}
                 {sizeBought ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                    <p style={{ fontSize: isMobile ? 17 : 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, letterSpacing: "-0.01em", margin: 0 }}>
+                    <p style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, letterSpacing: "-0.01em", margin: 0 }}>
                       Purchased size
                     </p>
                     <div style={{
@@ -1751,7 +1751,7 @@ const DecisionCard = ({
                     </div>
                   </div>
                 ) : (
-                  <p style={{ fontSize: isMobile ? 17 : 24, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, marginBottom: 10, letterSpacing: "-0.01em" }}>
+                  <p style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, marginBottom: 10, letterSpacing: "-0.01em" }}>
                     {headline}
                   </p>
                 )}
@@ -1947,7 +1947,7 @@ const DecisionCard = ({
 
                       return (
                         <div key={i} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "12px 14px", marginBottom: i < uncertainties.length - 1 ? 8 : 0 }}>
-                          <p style={{ fontSize: 17, fontWeight: 700, color: "#1A1A1A", marginBottom: hasDetail ? 6 : 0 }}>{u}</p>
+                          <p style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A", marginBottom: hasDetail ? 6 : 0 }}>{u}</p>
                           {isBetweenSizes && decision.sizes_note && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                               <span style={{ fontSize: 15, color: "#8C7A70" }}>Deciding between</span>
@@ -1981,8 +1981,8 @@ const DecisionCard = ({
                     Confidence
                   </p>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginBottom: 6 }}>
-                    <span style={{ fontSize: 38, fontWeight: 700, color: "#3A3530", lineHeight: 1 }}>{confidence}</span>
-                    <span style={{ fontSize: 16, fontWeight: 500, color: "#8C7A70", lineHeight: 1 }}>/10</span>
+                    <span style={{ fontSize: 33, fontWeight: 700, color: "#3A3530", lineHeight: 1 }}>{confidence}</span>
+                    <span style={{ fontSize: 15, fontWeight: 500, color: "#8C7A70", lineHeight: 1 }}>/10</span>
                   </div>
                   <div style={{ display: "flex", gap: 2, marginBottom: 5 }}>
                     {Array.from({ length: 10 }).map((_, i) => (
@@ -2015,16 +2015,16 @@ const DecisionCard = ({
                         <div key={resp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 14, padding: "12px 14px", border: "1px solid rgba(0,0,0,0.06)" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                             <div>
-                              <span style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+                              <span style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
                               {resp.match_score != null && (
-                                <span style={{ marginLeft: 8, fontSize: 17, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
+                                <span style={{ marginLeft: 8, fontSize: 14, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
                               )}
                             </div>
                             <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 15, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
                               {recommendationLabel(resp.recommendation)}
                             </div>
                           </div>
-                          <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
+                          <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
                           {resp.photo_url && (
                             <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
                               style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />

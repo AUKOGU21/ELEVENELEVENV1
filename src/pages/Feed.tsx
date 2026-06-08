@@ -326,6 +326,9 @@ const Feed = () => {
   const [undoHiddenId, setUndoHiddenId] = useState<string | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const weighInCompletedRef = useRef(false);
+  // Fit-prompt modal: track its pending timer so it can't fire at a stale moment
+  const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fitPromptHandledRef = useRef(false);
 
   // ─── Effects ────────────────────────────────────────────────────────────────
 
@@ -339,19 +342,25 @@ const Feed = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "outcomes" }, () => fetchDecisions())
       .subscribe();
 
-    // Show fit modal after posting a decision (navigated here with state)
+    // Show fit modal after posting a decision (navigated here with state) — exactly once,
+    // even if this effect re-runs when `user` changes (auth resolve / token refresh).
     const variant = (location.state as any)?.fitPromptVariant;
-    if (variant) {
+    if (variant && !fitPromptHandledRef.current) {
+      fitPromptHandledRef.current = true;
       window.history.replaceState({}, "");
-      const t = setTimeout(() => {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+      fitTimerRef.current = setTimeout(() => {
+        fitTimerRef.current = null;
         setFitModalVariant("post_decision");
         setShowFitModal(true);
       }, 4000);
-      return () => { supabase.removeChannel(channel); clearTimeout(t); };
     }
 
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  // Cancel any pending fit-prompt timer if the component unmounts
+  useEffect(() => () => { if (fitTimerRef.current) clearTimeout(fitTimerRef.current); }, []);
 
   useEffect(() => {
     if (!user) { setSavedDecisionIds(new Set()); setHiddenDecisionIds(new Set()); return; }
@@ -545,6 +554,8 @@ const Feed = () => {
   // ─── Actions ────────────────────────────────────────────────────────────────
 
   const startWeighIn = (id: string) => {
+    // Starting a new action cancels any pending fit-prompt so it can't pop over this flow
+    if (fitTimerRef.current) { clearTimeout(fitTimerRef.current); fitTimerRef.current = null; }
     setWeighingIn(id);
     setWeighInStep("context");
     setContext(null);
@@ -562,7 +573,9 @@ const Feed = () => {
     setTake("");
     if (wasCompleted && user && shouldShowFitPrompt(user.id)) {
       markFitPromptShown(user.id);
-      setTimeout(() => {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+      fitTimerRef.current = setTimeout(() => {
+        fitTimerRef.current = null;
         setFitModalVariant("weigh_in");
         setShowFitModal(true);
       }, 3500);

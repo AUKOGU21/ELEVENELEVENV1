@@ -5,6 +5,7 @@ import { Upload, Loader2, ImageIcon, Link } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { shouldShowFitPrompt } from "@/components/DialInFitModal";
+import { imageToJpeg } from "@/lib/image";
 
 type FlowStep = "input" | "extracting" | "preview" | "uncertainty" | "context" | "confidence";
 
@@ -247,11 +248,12 @@ const PostDecision = () => {
 
     // Only upload the raw screenshot if we don't already have a clean image URL
     if (product.uploaded_file && !product.image_url) {
-      const ext = product.uploaded_file.name.split(".").pop() ?? "jpg";
-      const path = `${Date.now()}.${ext}`;
+      let body: Blob = product.uploaded_file;
+      try { body = await imageToJpeg(product.uploaded_file); } catch (e) { console.warn("product image convert failed, uploading raw:", e); }
+      const path = `${Date.now()}.jpg`;
       const { data: uploadData } = await supabase.storage
         .from("product-images")
-        .upload(path, product.uploaded_file, { upsert: true });
+        .upload(path, body, { upsert: true, contentType: "image/jpeg" });
 
       if (uploadData) {
         const { data: urlData } = supabase.storage
@@ -262,11 +264,12 @@ const PostDecision = () => {
     }
 
     if (secondPhoto) {
-      const ext2 = secondPhoto.name.split(".").pop() ?? "jpg";
-      const path2 = `${Date.now()}_2.${ext2}`;
+      let body2: Blob = secondPhoto;
+      try { body2 = await imageToJpeg(secondPhoto); } catch (e) { console.warn("second photo convert failed, uploading raw:", e); }
+      const path2 = `${Date.now()}_2.jpg`;
       const { data: uploadData2 } = await supabase.storage
         .from("product-images")
-        .upload(path2, secondPhoto, { upsert: true });
+        .upload(path2, body2, { upsert: true, contentType: "image/jpeg" });
 
       if (uploadData2) {
         const { data: urlData2 } = supabase.storage

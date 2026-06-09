@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { computeMatchScore } from "@/lib/matching";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { imageToJpeg } from "@/lib/image";
 import heroEditorial from "@/assets/hero-editorial.png";
 
 // ─── Badge levels ─────────────────────────────────────────────────────────────
@@ -245,8 +246,11 @@ const Profile = () => {
     setUploadingFitPhotos(true);
     const newUrls: string[] = [];
     for (const file of pendingFiles) {
+      // Re-encode to JPEG so iPhone HEIC photos render in browsers; fall back to raw on failure
+      let body: Blob = file;
+      try { body = await imageToJpeg(file); } catch (e) { console.warn("fit photo convert failed, uploading raw:", e); }
       const path = `fit-photos/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      const { data: upData } = await supabase.storage.from("product-images").upload(path, file, { upsert: true, contentType: "image/jpeg" });
+      const { data: upData } = await supabase.storage.from("product-images").upload(path, body, { upsert: true, contentType: "image/jpeg" });
       if (upData) {
         const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(upData.path);
         newUrls.push(urlData.publicUrl);

@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
 import { SILHOUETTE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { DialInFitModal, shouldShowFitPrompt } from "@/components/DialInFitModal";
+import { imageToJpeg } from "@/lib/image";
 import OutcomeModal from "@/components/OutcomeModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -605,8 +606,10 @@ const Feed = () => {
     // Upload response photo if attached
     let responsePhotoUrl: string | null = null;
     if (takePhoto) {
+      let photoBody: Blob = takePhoto;
+      try { photoBody = await imageToJpeg(takePhoto); } catch (e) { console.warn("response photo convert failed, uploading raw:", e); }
       const path = `response-photos/${user.id}/${Date.now()}.jpg`;
-      const { data: upData } = await supabase.storage.from("product-images").upload(path, takePhoto, { upsert: true, contentType: "image/jpeg" });
+      const { data: upData } = await supabase.storage.from("product-images").upload(path, photoBody, { upsert: true, contentType: "image/jpeg" });
       if (upData) {
         const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(upData.path);
         responsePhotoUrl = urlData.publicUrl;

@@ -772,10 +772,10 @@ const Profile = () => {
               ) : (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                    <h1 style={{ fontSize: 34, fontWeight: 700, color: PRIMARY, lineHeight: 1.05, margin: 0 }}>
+                    <h1 style={{ fontSize: 34, fontWeight: 700, color: PRIMARY, lineHeight: 1.05, margin: 0, flexShrink: 1, minWidth: 0 }}>
                       {formatName(profile?.display_name)}
                     </h1>
-                    <button onClick={() => setEditing(true)} style={{ color: MUTED, background: "none", border: "none", cursor: "pointer" }}>
+                    <button onClick={() => setEditing(true)} style={{ color: MUTED, background: "none", border: "none", cursor: "pointer", flexShrink: 0, padding: 0, lineHeight: 0 }}>
                       <Pencil style={{ width: 14, height: 14 }} />
                     </button>
                   </div>

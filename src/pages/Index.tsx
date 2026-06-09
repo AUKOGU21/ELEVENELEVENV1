@@ -466,22 +466,23 @@ const Index = () => {
 
       {/* ═══ FOOTER ══════════════════════════════════════════════════════════════ */}
       <footer
-        className="py-10 px-8 md:px-14 flex flex-col md:flex-row items-center justify-between gap-4"
+        className="py-10 px-8 md:px-14 flex flex-col md:grid md:grid-cols-3 items-center gap-4"
         style={{ background: "#3A3530", borderTop: "1px solid rgba(255,255,255,0.07)" }}
       >
-        <span style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(253,250,246,0.28)" }}>
+        <span className="md:justify-self-start" style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(253,250,246,0.28)" }}>
           <span style={{ fontWeight: 700 }}>ELEVEN</span>
           <span style={{ fontWeight: 300 }}>ELEVEN</span>
         </span>
         <a
           href="mailto:hello@geteleveneleven.com"
-          style={{ fontSize: 11, letterSpacing: "0.04em", color: "rgba(253,250,246,0.5)", textDecoration: "none", transition: "color 0.2s" }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.85)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.5)"; }}
+          className="md:justify-self-center"
+          style={{ fontSize: 13, letterSpacing: "0.04em", color: "rgba(253,250,246,0.55)", textDecoration: "none", transition: "color 0.2s", textAlign: "center" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.9)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.55)"; }}
         >
           Questions? hello@geteleveneleven.com
         </a>
-        <span style={{ fontSize: 10, letterSpacing: "0.16em", color: "rgba(253,250,246,0.22)" }}>
+        <span className="md:justify-self-end" style={{ fontSize: 10, letterSpacing: "0.16em", color: "rgba(253,250,246,0.22)" }}>
           © 2026 ELEVENELEVEN — All rights reserved
         </span>
       </footer>

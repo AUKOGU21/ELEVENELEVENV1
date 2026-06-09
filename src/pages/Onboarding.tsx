@@ -728,7 +728,7 @@ const Onboarding = () => {
             <motion.div key={current.key} {...slideVariants} transition={{ duration: 0.3 }}>
               <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">{current.title}</h2>
               <p className="text-muted-foreground text-base mb-6">{current.subtitle}</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {current.options?.map(opt => {
                   const isSelected = selected.includes(opt.label);
                   return (

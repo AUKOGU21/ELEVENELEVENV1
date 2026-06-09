@@ -144,8 +144,8 @@ const Index = () => {
 
         {/* ── Hero text — left zone, woman pushed to 80% right ── */}
         <div
-          className="absolute left-0 z-10 px-8 md:px-14"
-          style={{ top: "40%", width: "56vw" }}
+          className="absolute left-0 z-10 px-6 md:px-14 w-[88vw] md:w-[56vw]"
+          style={{ top: "40%" }}
         >
           <motion.h1
             initial={{ opacity: 0, y: 28 }}
@@ -154,13 +154,12 @@ const Index = () => {
             style={{
               fontFamily: "'Bodoni Moda', serif",
               fontOpticalSizing: "auto",
-              fontSize: "clamp(2.6rem, 5.2vw, 5.8rem)",
+              fontSize: "clamp(1.85rem, 5.2vw, 5.8rem)",
               lineHeight: 1.04,
               fontWeight: 400,
               color: "#FFFFFF",
               letterSpacing: "-0.01em",
               marginBottom: "1.4rem",
-              whiteSpace: "nowrap",
             }}
           >
             stop guessing.<br />

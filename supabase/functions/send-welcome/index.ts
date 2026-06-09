@@ -106,6 +106,39 @@ function renderEmail(): string {
             </td>
           </tr>
           <tr>
+            <td class="px" style="padding:40px 48px 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+                <td style="border-top:1px solid #ECE7DD;font-size:0;line-height:0;">&nbsp;</td>
+              </tr></table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" class="px display" style="padding:30px 48px 6px;font-size:21px;line-height:1.2;font-weight:700;letter-spacing:-0.4px;color:#100E0C;">
+              you're one of the first.
+            </td>
+          </tr>
+          <tr>
+            <td align="center" class="px" style="padding:0 56px 22px;font-size:15px;line-height:1.6;color:#6F665A;">
+              a small circle of women is shaping ElevenEleven from the inside. they trade honest takes, call out what's broken, and help decide what we build next.
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 48px 4px;">
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://chat.whatsapp.com/FJfXeZQ5LOPFLNkrFe5hsf" style="height:48px;v-text-anchor:middle;width:300px;" arcsize="0%" stroke="f" fillcolor="#CB5A3C">
+                <w:anchorlock/>
+                <center style="color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:2px;">JOIN THE FOUNDING CIRCLE</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-- -->
+              <a class="btn mono" href="https://chat.whatsapp.com/FJfXeZQ5LOPFLNkrFe5hsf" target="_blank"
+                 style="display:inline-block;background:#CB5A3C;color:#ffffff;font-size:13px;letter-spacing:2px;text-transform:uppercase;padding:15px 32px;border-radius:0;">
+                Join the founding circle&nbsp;&rarr;
+              </a>
+              <!--<![endif]-->
+            </td>
+          </tr>
+          <tr>
             <td class="px" style="padding:42px 48px 0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
                 <td style="border-top:1px solid #ECE7DD;font-size:0;line-height:0;">&nbsp;</td>

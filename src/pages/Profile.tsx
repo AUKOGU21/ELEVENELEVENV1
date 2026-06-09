@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { computeMatchScore } from "@/lib/matching";
+import { useIsMobile } from "@/hooks/use-mobile";
 import heroEditorial from "@/assets/hero-editorial.png";
 
 // ─── Badge levels ─────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ const TRUST_BG = "#3A1A17";
 // ─── Component ────────────────────────────────────────────────────────────────
 const Profile = () => {
   const navigate  = useNavigate();
+  const isMobile  = useIsMobile();
   const { user, signOut } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -872,18 +874,18 @@ const Profile = () => {
 
           {/* Trust bar — full-width strip at bottom of header card */}
           {!editing && (
-            <div style={{ background: TRUST_BG, padding: "14px 28px", display: "flex", alignItems: "center", gap: 16, position: "relative", zIndex: 2 }}>
+            <div style={{ background: TRUST_BG, padding: isMobile ? "14px 18px" : "14px 28px", display: "flex", alignItems: "center", gap: isMobile ? 12 : 16, position: "relative", zIndex: 2 }}>
               <span style={{ fontSize: 16, color: "#C4A47A", flexShrink: 0 }}>✦</span>
-              <div style={{ flexShrink: 0 }}>
+              <div style={{ flexShrink: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "rgba(245,239,234,0.92)", marginBottom: 2 }}>
                   Building trust in the community
                 </p>
-                <p style={{ fontSize: 15, color: "rgba(245,239,234,0.50)" }}>
+                <p style={{ fontSize: 15, color: "rgba(245,239,234,0.50)", lineHeight: 1.4 }}>
                   {stats.helpfulVotes} of {badgeInfo.threshold} helpful responses to reach {badgeInfo.next}
                 </p>
               </div>
-              {/* Segmented progress bar — 5 segments */}
-              {(() => {
+              {/* Segmented progress bar — 5 segments (hidden on mobile; text + count convey progress) */}
+              {!isMobile && (() => {
                 const SEGMENTS = 5;
                 const filledCount = Math.round((stats.helpfulVotes / badgeInfo.threshold) * SEGMENTS);
                 return (
@@ -900,7 +902,7 @@ const Profile = () => {
                   </div>
                 );
               })()}
-              <span style={{ fontSize: 15, fontWeight: 700, color: "rgba(245,239,234,0.75)", flexShrink: 0 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "rgba(245,239,234,0.75)", flexShrink: 0, marginLeft: isMobile ? "auto" : 0 }}>
                 {stats.helpfulVotes} / {badgeInfo.threshold}
               </span>
             </div>

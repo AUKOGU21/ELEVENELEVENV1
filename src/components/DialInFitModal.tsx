@@ -44,16 +44,29 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
     setAnswers(prev => ({ ...prev, [category]: prev[category] === option ? "" : option }));
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || saving) return;
     setSaving(true);
     const filtered = Object.fromEntries(
       Object.entries(answers).filter(([, v]) =>
         v && !v.toLowerCase().includes("average") && !v.toLowerCase().includes("proportional")
       )
     );
-    await supabase.from("profiles").update({ fit_details: filtered }).eq("id", user.id);
-    setSaving(false);
-    onClose();
+    try {
+      // Timeout guard so a hung request can never leave the button stuck on "Saving…"
+      const { error } = await Promise.race([
+        supabase.from("profiles").update({ fit_details: filtered }).eq("id", user.id),
+        new Promise<{ error: Error }>((_, reject) =>
+          setTimeout(() => reject(new Error("save timed out")), 10000)
+        ),
+      ]);
+      if (error) throw error;
+      onClose();
+    } catch (err) {
+      console.error("DialInFit save failed:", err);
+      // leave the modal open and re-enable the button so the user can retry or close
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filledCount = Object.values(answers).filter(Boolean).length;

@@ -323,11 +323,12 @@ const Profile = () => {
   const AVERAGE_TERMS = ["average", "about average", "typical", "standard", "normal", "medium", "moderate"];
   const isAverage = (v: string) => AVERAGE_TERMS.some(t => v.toLowerCase().includes(t));
 
-  const fitDetails = profile?.fit_details as Record<string, string> | null;
+  const fitDetails = profile?.fit_details as Record<string, unknown> | null;
   const notableFit = fitDetails
     ? Object.entries(fitDetails)
-        .filter(([k, v]) => v && k !== "Overall fit" && !isAverage(v))
-        .map(([, v]) => v)
+        // only string answers — skip meta keys like `_fit_photos` (array) that would crash isAverage()
+        .filter(([k, v]) => typeof v === "string" && v && k !== "Overall fit" && !isAverage(v))
+        .map(([, v]) => v as string)
     : [];
 
   const allTags = [

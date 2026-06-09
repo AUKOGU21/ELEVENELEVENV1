@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ArrowRight } from "lucide-react";
 import { FIT_CATEGORIES } from "@/components/onboarding/OnboardingData";
@@ -27,6 +27,8 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
   const { user } = useAuth();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  // Holds non-answer meta keys from fit_details (e.g. `_fit_photos`) so saving answers doesn't wipe them
+  const metaRef = useRef<Record<string, unknown>>({});
 
   useEffect(() => {
     if (!open || !user) return;
@@ -36,7 +38,15 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
       .eq("id", user.id)
       .single()
       .then(({ data }) => {
-        if (data?.fit_details) setAnswers(data.fit_details as Record<string, string>);
+        const fd = (data?.fit_details ?? {}) as Record<string, unknown>;
+        // Preserve underscore-prefixed meta (fit photos) untouched
+        metaRef.current = Object.fromEntries(Object.entries(fd).filter(([k]) => k.startsWith("_")));
+        // Only string answers belong in the selectable state
+        setAnswers(
+          Object.fromEntries(
+            Object.entries(fd).filter(([k, v]) => typeof v === "string" && !k.startsWith("_"))
+          ) as Record<string, string>
+        );
       });
   }, [open, user]);
 
@@ -47,14 +57,17 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
     if (!user || saving) return;
     setSaving(true);
     const filtered = Object.fromEntries(
-      Object.entries(answers).filter(([, v]) =>
-        v && !v.toLowerCase().includes("average") && !v.toLowerCase().includes("proportional")
+      Object.entries(answers).filter(([k, v]) =>
+        typeof v === "string" && v && !k.startsWith("_") &&
+        !v.toLowerCase().includes("average") && !v.toLowerCase().includes("proportional")
       )
     );
+    // Merge back the preserved meta (e.g. _fit_photos) so saving answers never wipes uploaded photos
+    const merged = { ...metaRef.current, ...filtered };
     try {
       // Timeout guard so a hung request can never leave the button stuck on "Saving…"
       const { error } = await Promise.race([
-        supabase.from("profiles").update({ fit_details: filtered }).eq("id", user.id),
+        supabase.from("profiles").update({ fit_details: merged }).eq("id", user.id),
         new Promise<{ error: Error }>((_, reject) =>
           setTimeout(() => reject(new Error("save timed out")), 10000)
         ),

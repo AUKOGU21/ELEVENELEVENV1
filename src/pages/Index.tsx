@@ -473,6 +473,14 @@ const Index = () => {
           <span style={{ fontWeight: 700 }}>ELEVEN</span>
           <span style={{ fontWeight: 300 }}>ELEVEN</span>
         </span>
+        <a
+          href="mailto:hello@geteleveneleven.com"
+          style={{ fontSize: 11, letterSpacing: "0.04em", color: "rgba(253,250,246,0.5)", textDecoration: "none", transition: "color 0.2s" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.85)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.5)"; }}
+        >
+          Questions? hello@geteleveneleven.com
+        </a>
         <span style={{ fontSize: 10, letterSpacing: "0.16em", color: "rgba(253,250,246,0.22)" }}>
           © 2026 ELEVENELEVEN — All rights reserved
         </span>

@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
 import { SILHOUETTE_OPTIONS } from "@/components/onboarding/OnboardingData";
-import { DialInFitModal, shouldShowFitPrompt, markFitPromptShown } from "@/components/DialInFitModal";
+import { DialInFitModal, shouldShowFitPrompt } from "@/components/DialInFitModal";
 import OutcomeModal from "@/components/OutcomeModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -572,7 +572,6 @@ const Feed = () => {
     setVote(null);
     setTake("");
     if (wasCompleted && user && shouldShowFitPrompt(user.id)) {
-      markFitPromptShown(user.id);
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
         fitTimerRef.current = null;

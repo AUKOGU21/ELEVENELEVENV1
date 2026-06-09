@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Loader2, ImageIcon, Link } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { shouldShowFitPrompt, markFitPromptShown } from "@/components/DialInFitModal";
+import { shouldShowFitPrompt } from "@/components/DialInFitModal";
 
 type FlowStep = "input" | "extracting" | "preview" | "uncertainty" | "context" | "confidence";
 
@@ -300,7 +300,6 @@ const PostDecision = () => {
 
     setSubmitting(false);
     const showFit = user && shouldShowFitPrompt(user.id);
-    if (showFit) markFitPromptShown(user!.id);
     navigate("/feed", { state: showFit ? { fitPromptVariant: "post_decision" } : undefined });
   };
 

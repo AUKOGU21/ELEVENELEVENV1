@@ -5,16 +5,16 @@ import { FIT_CATEGORIES } from "@/components/onboarding/OnboardingData";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
-const promptKey = (userId: string) => `eleven_fit_prompt_${userId}_at`;
+const doneKey = (userId: string) => `eleven_fit_prompt_done_${userId}`;
 
+// Show the fit prompt until the user has successfully saved their fit once — then never again.
+// (No time-based return; only a real save marks it done.)
 export function shouldShowFitPrompt(userId: string): boolean {
-  const last = localStorage.getItem(promptKey(userId));
-  if (!last) return true;
-  return Date.now() - parseInt(last) > 24 * 60 * 60 * 1000;
+  return !localStorage.getItem(doneKey(userId));
 }
 
-export function markFitPromptShown(userId: string): void {
-  localStorage.setItem(promptKey(userId), Date.now().toString());
+export function markFitPromptDone(userId: string): void {
+  localStorage.setItem(doneKey(userId), "1");
 }
 
 interface Props {
@@ -73,6 +73,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
         ),
       ]);
       if (error) throw error;
+      markFitPromptDone(user.id);   // saved successfully → never prompt again
       onClose();
     } catch (err) {
       console.error("DialInFit save failed:", err);

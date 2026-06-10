@@ -35,6 +35,20 @@ Deno.serve(async (req) => {
   );
   const rows: any[] = await res.json();
 
+  // Who converted: waitlist emails that now have a beta account
+  const joined = new Set<string>();
+  try {
+    const au = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    });
+    const aj = await au.json();
+    for (const u of (aj.users || [])) if (u.email) joined.add(String(u.email).toLowerCase());
+  } catch (e) {
+    console.error("auth list failed:", e);
+  }
+  const isJoined = (email: string) => joined.has((email || "").toLowerCase());
+  const converted = rows.filter((r) => isJoined(r.email));
+
   const now = Date.now();
   const dayAgo = now - 86_400_000;
   const total = rows.length;
@@ -56,7 +70,8 @@ Deno.serve(async (req) => {
       ? new Date(r.created_at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
       : "";
     const src = r.utm_source || r.source || "";
-    return `<tr><td style="padding:3px 0;color:#1C1712;">${esc(name)}</td><td style="padding:3px 12px;color:#6F665A;">${esc(r.email || "")}</td><td style="padding:3px 12px;color:#9A3F26;">${esc(src)}</td><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(when)}</td></tr>`;
+    const badge = isJoined(r.email) ? ` <span style="color:#16a34a;font-size:11px;font-weight:600;">✓ joined</span>` : "";
+    return `<tr><td style="padding:3px 0;color:#1C1712;">${esc(name)}${badge}</td><td style="padding:3px 12px;color:#6F665A;">${esc(r.email || "")}</td><td style="padding:3px 12px;color:#9A3F26;">${esc(src)}</td><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(when)}</td></tr>`;
   }).join("");
 
   const html = `
@@ -64,6 +79,9 @@ Deno.serve(async (req) => {
     <p style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#9c9488;">ELEVENELEVEN · WAITLIST</p>
     <p style="font-size:28px;font-weight:700;margin:4px 0 0;">${total} signups</p>
     <p style="font-size:15px;color:#6F665A;margin:2px 0 20px;">${last24} in the last 24 hours</p>
+    <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:4px;">Joined the beta</p>
+    <p style="font-size:20px;font-weight:700;margin:0 0 4px;color:#16a34a;">${converted.length} of ${total} converted</p>
+    <p style="font-size:13px;color:#6F665A;margin:0 0 22px;">${converted.length ? esc(converted.map((c) => ((c.first_name || "").trim() || (c.email || ""))).join(", ")) : "none yet"}</p>
     <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:4px;">By source</p>
     <table style="font-size:14px;border-collapse:collapse;margin-bottom:22px;">${sourceRows}</table>
     <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:6px;">Latest signups</p>
@@ -76,7 +94,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       from: FROM,
       to: [DIGEST_TO],
-      subject: `waitlist: ${total} signups (${last24} in last 24h)`,
+      subject: `waitlist: ${total} signups · ${converted.length} joined`,
       html,
     }),
   });

@@ -21,6 +21,25 @@ function esc(s: string): string {
   return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Exact row count via PostgREST without fetching rows
+async function tableCount(path: string): Promise<number> {
+  try {
+    const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/${path}`, {
+      method: "HEAD",
+      headers: {
+        apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+        Prefer: "count=exact",
+        Range: "0-0",
+      },
+    });
+    const n = (r.headers.get("content-range") || "").split("/")[1];
+    return n && n !== "*" ? parseInt(n) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 Deno.serve(async (req) => {
   if (DIGEST_SECRET) {
     const auth = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -49,6 +68,26 @@ Deno.serve(async (req) => {
   const isJoined = (email: string) => joined.has((email || "").toLowerCase());
   const converted = rows.filter((r) => isJoined(r.email));
 
+  // In-app activity (actions in the beta app)
+  const accounts = joined.size;
+  const [onboarded, decisionsN, weighins, outcomesN, votesN, savesN] = await Promise.all([
+    tableCount("profiles?select=id&onboarding_completed=eq.true"),
+    tableCount("decisions?select=id"),
+    tableCount("responses?select=id"),
+    tableCount("outcomes?select=id"),
+    tableCount("response_votes?select=id"),
+    tableCount("saved_decisions?select=id"),
+  ]);
+  let recentDecisions: any[] = [];
+  try {
+    const rd = await fetch(
+      `${SUPABASE_URL}/rest/v1/decisions?select=brand_name,product_name,confidence_score,created_at,profiles(display_name)&order=created_at.desc&limit=5`,
+      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+    );
+    recentDecisions = await rd.json();
+    if (!Array.isArray(recentDecisions)) recentDecisions = [];
+  } catch { /* ignore */ }
+
   const now = Date.now();
   const dayAgo = now - 86_400_000;
   const total = rows.length;
@@ -74,6 +113,25 @@ Deno.serve(async (req) => {
     return `<tr><td style="padding:3px 0;color:#1C1712;">${esc(name)}${badge}</td><td style="padding:3px 12px;color:#6F665A;">${esc(r.email || "")}</td><td style="padding:3px 12px;color:#9A3F26;">${esc(src)}</td><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(when)}</td></tr>`;
   }).join("");
 
+  const activityStats = [
+    ["Beta accounts", `${accounts} (onboarded ${onboarded})`],
+    ["Decisions posted", `${decisionsN}`],
+    ["Weigh-ins", `${weighins}`],
+    ["Outcomes logged", `${outcomesN}`],
+    ["Helpful votes", `${votesN}`],
+    ["Saves", `${savesN}`],
+  ].map(([k, v]) => `<tr><td style="padding:2px 0;color:#6F665A;">${esc(k)}</td><td style="padding:2px 0 2px 16px;font-weight:600;color:#1C1712;">${esc(v)}</td></tr>`).join("");
+
+  const decRows = recentDecisions.map((d: any) => {
+    const who = (d.profiles?.display_name || "").trim() || "—";
+    const item = [d.brand_name, d.product_name].filter(Boolean).join(" ") || "(item)";
+    const when = d.created_at
+      ? new Date(d.created_at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+      : "";
+    const conf = d.confidence_score != null ? `${d.confidence_score}/10` : "";
+    return `<tr><td style="padding:3px 0;color:#1C1712;">${esc(who)}</td><td style="padding:3px 12px;color:#6F665A;">${esc(item)}</td><td style="padding:3px 12px;color:#9A3F26;">${esc(conf)}</td><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(when)}</td></tr>`;
+  }).join("") || `<tr><td style="padding:3px 0;color:#9c9488;">no decisions posted yet</td></tr>`;
+
   const html = `
   <div style="font-family:Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#1C1712;">
     <p style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#9c9488;">ELEVENELEVEN · WAITLIST</p>
@@ -86,6 +144,11 @@ Deno.serve(async (req) => {
     <table style="font-size:14px;border-collapse:collapse;margin-bottom:22px;">${sourceRows}</table>
     <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:6px;">Latest signups</p>
     <table style="font-size:13px;border-collapse:collapse;width:100%;">${latestRows}</table>
+    <div style="border-top:1px solid #ECE7DD;margin:28px 0 18px;"></div>
+    <p style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#9c9488;">In-app activity</p>
+    <table style="font-size:14px;border-collapse:collapse;margin:8px 0 22px;">${activityStats}</table>
+    <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:6px;">Recent decisions posted</p>
+    <table style="font-size:13px;border-collapse:collapse;width:100%;">${decRows}</table>
   </div>`;
 
   const send = await fetch("https://api.resend.com/emails", {

@@ -112,14 +112,11 @@ Do not include any explanation, just the JSON.`,
     if (body.url) {
       console.log("Processing URL:", body.url);
 
-      let imageUrl: string | null = null;
-      let title: string = "";
-      let description: string = "";
-      let price: string | null = null;
+      const origin = (() => { try { return new URL(body.url).origin; } catch { return ""; } })();
 
-      // Strategy 1: Direct HTML fetch — try browser UA first, fall back to Googlebot
-      const origin = (() => { try { const u = new URL(body.url); return u.origin; } catch { return ""; } })();
-
+      // Direct HTML fetch — browser UA first, then social-crawler UAs that many
+      // sites whitelist (Facebook/Googlebot get clean OG/JSON-LD even when the
+      // browser UA is challenged).
       const FETCH_ATTEMPTS = [
         {
           "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -149,11 +146,7 @@ Do not include any explanation, just the JSON.`,
       let html = "";
       for (const headers of FETCH_ATTEMPTS) {
         try {
-          const htmlRes = await fetch(body.url, {
-            headers,
-            signal: AbortSignal.timeout(9000),
-            redirect: "follow",
-          });
+          const htmlRes = await fetch(body.url, { headers, signal: AbortSignal.timeout(9000), redirect: "follow" });
           if (htmlRes.ok) {
             html = await htmlRes.text();
             console.log("Fetched HTML with UA:", (headers["User-Agent"] as string).slice(0, 40));
@@ -165,161 +158,100 @@ Do not include any explanation, just the JSON.`,
         }
       }
 
-      try {
-        if (html) {
-          // Extract og:image
-          const ogImageMatch =
-            html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-          if (ogImageMatch?.[1]) imageUrl = ogImageMatch[1];
+      // ---- Pull every field from the strongest source in the HTML ----
+      // Priority for name/image/brand/price: JSON-LD Product schema (most
+      // reliable, present on the vast majority of retail PDPs) → OpenGraph /
+      // Twitter / itemprop meta → <title> / URL slug / description.
+      let f = extractFields(html);
 
-          // Extract og:title or <title>
-          const ogTitleMatch =
-            html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
-            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
-          if (ogTitleMatch?.[1]) {
-            title = ogTitleMatch[1];
+      // If the direct fetch was blocked (Cloudflare/Akamai) or returned a JS
+      // shell, we'll have no image and/or only a junk name. Re-fetch through
+      // Jina Reader, which renders JS and proxies past most bot walls, then
+      // run the same parser over the rendered HTML and fill any gaps.
+      const weak = !f.image || (isJunkName(f.ldName) && isJunkName(f.ogTitle));
+      if (weak) {
+        try {
+          const jr = await fetch(`https://r.jina.ai/${body.url}`, {
+            headers: { "x-return-format": "html", "x-timeout": "15" },
+            signal: AbortSignal.timeout(22000),
+          });
+          if (jr.ok) {
+            const jf = extractFields(await jr.text());
+            f = {
+              ldName: !isJunkName(f.ldName) ? f.ldName : jf.ldName,
+              ldImage: f.ldImage || jf.ldImage,
+              ldBrand: f.ldBrand || jf.ldBrand,
+              ldPrice: f.ldPrice || jf.ldPrice,
+              ogTitle: !isJunkName(f.ogTitle) ? f.ogTitle : jf.ogTitle,
+              ogImage: f.ogImage || jf.ogImage,
+              ogDesc: f.ogDesc || jf.ogDesc,
+              ogPrice: f.ogPrice || jf.ogPrice,
+              image: f.image || jf.image,
+            };
+            console.log("Jina fallback applied — image:", !!f.image, "name:", !isJunkName(f.ldName) || !isJunkName(f.ogTitle));
           } else {
-            const titleTagMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-            if (titleTagMatch?.[1]) title = titleTagMatch[1];
+            console.log("Jina non-OK:", jr.status);
           }
-
-          // Extract og:description
-          const ogDescMatch =
-            html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i) ||
-            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i);
-          if (ogDescMatch?.[1]) description = ogDescMatch[1];
-
-          // Extract price — try multiple sources in priority order
-
-          // 1. og:price:amount or product:price:amount meta tags
-          const ogPriceMatch =
-            html.match(/<meta[^>]+property=["'](?:og|product):price:amount["'][^>]+content=["']([^"']+)["']/i) ||
-            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["'](?:og|product):price:amount["']/i);
-          if (ogPriceMatch?.[1]) price = ogPriceMatch[1].trim();
-
-          // 2. JSON-LD structured data (Product schema)
-          if (!price) {
-            const jsonLdMatches = html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-            for (const match of jsonLdMatches) {
-              try {
-                const json = JSON.parse(match[1]);
-                const items = Array.isArray(json) ? json : [json];
-                for (const item of items) {
-                  const offers = item.offers ?? item["@graph"]?.find?.((g: Record<string, unknown>) => g["@type"] === "Product")?.offers;
-                  if (offers) {
-                    const offer = Array.isArray(offers) ? offers[0] : offers;
-                    const p = offer.price ?? offer.lowPrice;
-                    if (p != null) { price = String(p); break; }
-                  }
-                }
-                if (price) break;
-              } catch { /* malformed JSON-LD, skip */ }
-            }
-          }
-
-          // 3. meta name="price" (some older retailers)
-          if (!price) {
-            const namePriceMatch =
-              html.match(/<meta[^>]+name=["']price["'][^>]+content=["']([^"']+)["']/i) ||
-              html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']price["']/i);
-            if (namePriceMatch?.[1]) price = namePriceMatch[1].trim();
-          }
-
-          // Strip currency symbols/commas from price
-          if (price) price = price.replace(/[^0-9.]/g, "") || null;
-
-          console.log("Direct fetch — title:", title, "imageUrl:", imageUrl, "price:", price);
+        } catch (e) {
+          console.log("Jina fallback failed:", e);
         }
-      } catch (e) {
-        console.log("Direct HTML fetch failed:", e);
       }
 
-      // Strategy 2: Microlink as fallback for image/title
-      if (!imageUrl || !title) {
+      // Microlink as a last-ditch image grab if everything above still has none.
+      if (!f.image) {
         try {
-          const mlRes = await fetch(
-            `https://api.microlink.io/?url=${encodeURIComponent(body.url)}&meta=true`,
-          );
+          const mlRes = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(body.url)}&meta=true`);
           const mlData = await mlRes.json();
-          console.log("Microlink status:", mlData.status);
-          if (mlData.status === "success" && mlData.data) {
-            if (!imageUrl && mlData.data.image?.url) imageUrl = mlData.data.image.url;
-            if (!title && mlData.data.title) title = mlData.data.title;
-          }
+          if (mlData.status === "success" && mlData.data?.image?.url) f.image = mlData.data.image.url;
+          if (isJunkName(f.ogTitle) && mlData.data?.title) f.ogTitle = mlData.data.title;
         } catch (e) {
           console.log("Microlink failed:", e);
         }
       }
 
-      // Parse brand/name from title (e.g. "Product Name | Brand" or "Brand - Product")
+      // ---- Resolve final fields ----
       const domainBrand = extractDomainBrand(body.url);
-      let productName = "";
-      let brand = domainBrand;
 
-      if (title) {
-        // Decode HTML entities
-        title = title.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
-        const parts = title.split(/\s*[|–—]\s*/); // split on | – —
+      // Parse a product name + brand out of the best title string ("Name | Brand")
+      const rawTitle = decodeEntities(f.ogTitle || "");
+      let titleName = "", titleBrand = "";
+      if (rawTitle) {
+        const parts = rawTitle.split(/\s*[|–—]\s*/);
         if (parts.length >= 2) {
-          // Title-case the product name (Zara returns ALL CAPS titles)
           const raw = parts[0].trim();
-          productName = raw === raw.toUpperCase()
-            ? raw.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
-            : raw;
-          // Strip country/region suffixes from brand (e.g. "ZARA United States" → "Zara")
-          const rawBrand = parts[parts.length - 1].trim();
-          brand = rawBrand.split(" ")[0] || domainBrand;
+          titleName = raw === raw.toUpperCase() ? toTitleCase(raw) : raw; // Zara ships ALL CAPS
+          titleBrand = parts[parts.length - 1].trim().split(" ")[0] || ""; // "ZARA United States" → "Zara"
         } else {
-          productName = title;
+          titleName = parts[0].trim();
         }
       }
 
-      // Fallback: parse product name from URL slug
-      if (!productName) {
-        try {
-          const pathname = new URL(body.url).pathname;
-          const segments = pathname.split("/").filter(Boolean);
-          // Find the longest slug segment (likely the product name)
-          const slug = segments.sort((a, b) => b.length - a.length)[0] ?? "";
-          const cleaned = slug
-            .replace(/\.\w{2,4}$/, "")           // remove file extension (.html, .htm)
-            .replace(/-p\d{5,}$/i, "")            // remove Zara-style product IDs (-p02786321)
-            .replace(/-\d{5,}$/, "")              // remove trailing numeric IDs
-            .replace(/-/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase())
-            .trim();
-          if (cleaned.length > 3) productName = cleaned;
-        } catch { /* ignore */ }
+      // Name: first non-junk candidate, JSON-LD wins. Rejects SKU codes like "1183C102_751".
+      const name = firstGood([f.ldName, titleName, slugToName(body.url), f.ogDesc.split(".")[0]]);
+
+      // Brand: JSON-LD brand, then the title's brand half, then the domain.
+      // Reject CDN/WAF names a challenge page may leak (e.g. "Cloudflare").
+      const WAF = /^(cloudflare|incapsula|imperva|akamai|distil|perimeterx|datadome|fastly)$/i;
+      const brandCand = firstGood([f.ldBrand, titleBrand]);
+      const brand = brandCand && !WAF.test(brandCand) ? brandCand : domainBrand;
+
+      // Image: JSON-LD → OG/Twitter → Jina/Microlink, made absolute; Zara CDN last resort.
+      const imageUrl = absolutize(f.ldImage || f.ogImage || f.image, origin) || zaraFallback(body.url);
+
+      // Price: JSON-LD → meta. Parse to a number and round to 2 decimals to kill
+      // float artifacts (e.g. "22921.800001" → "22921.8").
+      let price: string | null = f.ldPrice || f.ogPrice;
+      if (price) {
+        const n = parseFloat(price.replace(/[^0-9.]/g, ""));
+        price = Number.isFinite(n) ? String(Math.round(n * 100) / 100) : null;
       }
 
-      // Attempt to enrich from description if name still weak
-      if (!productName || productName.length < 4) {
-        if (description) productName = description.split(".")[0].trim();
-      }
-
-      // For Zara specifically — try their CDN image pattern from the URL product ID
-      if (!imageUrl) {
-        try {
-          const hostname = new URL(body.url).hostname;
-          if (hostname.includes("zara.com")) {
-            const pathname = new URL(body.url).pathname;
-            const idMatch = pathname.match(/p(\d{7,})/i);
-            if (idMatch) {
-              // Zara CDN pattern — attempt common image URL
-              const productId = idMatch[1];
-              imageUrl = `https://static.zara.net/assets/public/product/p${productId}/image/main.jpg?ts=1&dpr=1`;
-            }
-          }
-        } catch { /* ignore */ }
-      }
-
-      console.log("Final result — brand:", brand, "name:", productName, "image:", imageUrl);
+      console.log("Final — brand:", brand, "name:", name, "image:", imageUrl, "price:", price);
 
       return new Response(
         JSON.stringify({
           brand,
-          name: productName,
+          name,
           retailer: domainBrand,
           image_url: imageUrl,
           price,
@@ -351,4 +283,163 @@ function extractDomainBrand(url: string): string {
   } catch {
     return "";
   }
+}
+
+interface Fields {
+  ldName: string | null; ldImage: string | null; ldBrand: string | null; ldPrice: string | null;
+  ogTitle: string; ogImage: string | null; ogDesc: string; ogPrice: string | null;
+  image: string | null;
+}
+
+// Parse all product signals out of an HTML document. Used on both the direct
+// fetch and the Jina-rendered HTML so the two paths stay identical.
+function extractFields(html: string): Fields {
+  const f: Fields = {
+    ldName: null, ldImage: null, ldBrand: null, ldPrice: null,
+    ogTitle: "", ogImage: null, ogDesc: "", ogPrice: null, image: null,
+  };
+  if (!html) return f;
+
+  const ld: { name?: string; image?: string; brand?: string; price?: string } = {};
+  for (const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { walkJsonLd(JSON.parse(m[1].trim()), ld); } catch { /* malformed JSON-LD, skip */ }
+  }
+  f.ldName = ld.name ?? null;
+  f.ldImage = ld.image ?? null;
+  f.ldBrand = ld.brand ?? null;
+  f.ldPrice = ld.price != null ? String(ld.price) : null;
+
+  f.ogTitle = metaContent(html, "og:title") || (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? "");
+  f.ogImage = metaContent(html, "og:image") || metaContent(html, "og:image:secure_url") ||
+              metaContent(html, "twitter:image") || metaContent(html, "twitter:image:src") || metaContent(html, "image");
+  f.ogDesc = metaContent(html, "og:description") || "";
+  f.ogPrice = metaContent(html, "og:price:amount") || metaContent(html, "product:price:amount") || metaContent(html, "price");
+
+  // Convenience: the single best image this document offers.
+  f.image = f.ldImage || f.ogImage;
+  return f;
+}
+
+// Read a <meta> content value by property / name / itemprop, in either attribute order.
+function metaContent(html: string, key: string): string | null {
+  const k = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const a = html.match(new RegExp(`<meta[^>]+(?:property|name|itemprop)=["']${k}["'][^>]+content=["']([^"']+)["']`, "i"));
+  if (a?.[1]) return a[1];
+  const b = html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name|itemprop)=["']${k}["']`, "i"));
+  return b?.[1] ?? null;
+}
+
+// Recursively walk a parsed JSON-LD blob and pull name/image/brand/price from
+// the first Product node found (handles @graph arrays and nested objects).
+function walkJsonLd(
+  node: unknown,
+  acc: { name?: string; image?: string; brand?: string; price?: string },
+): void {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) { for (const n of node) walkJsonLd(n, acc); return; }
+  const obj = node as Record<string, unknown>;
+  const t = obj["@type"];
+  const types = (Array.isArray(t) ? t : [t]).map((x) => String(x || "").toLowerCase());
+  if (types.some((x) => x.includes("product"))) {
+    if (!acc.name && typeof obj.name === "string") acc.name = obj.name;
+    if (!acc.image) {
+      const img = obj.image;
+      if (typeof img === "string") acc.image = img;
+      else if (Array.isArray(img) && img.length) acc.image = typeof img[0] === "string" ? img[0] : (img[0] as Record<string, string>)?.url;
+      else if (img && typeof img === "object" && typeof (img as Record<string, unknown>).url === "string") acc.image = (img as Record<string, string>).url;
+    }
+    if (!acc.brand) {
+      const b = obj.brand;
+      if (typeof b === "string") acc.brand = b;
+      else if (b && typeof b === "object" && typeof (b as Record<string, unknown>).name === "string") acc.brand = (b as Record<string, string>).name;
+    }
+    if (!acc.price) {
+      const offers = obj.offers;
+      const offer = (Array.isArray(offers) ? offers[0] : offers) as Record<string, unknown> | undefined;
+      if (offer && typeof offer === "object") {
+        const spec = offer.priceSpecification as Record<string, unknown> | undefined;
+        const p = offer.price ?? offer.lowPrice ?? spec?.price ?? spec?.lowPrice;
+        if (p != null) acc.price = String(p);
+      }
+    }
+  }
+  for (const k of Object.keys(obj)) {
+    if (k === "@type") continue;
+    const v = obj[k];
+    if (v && typeof v === "object") walkJsonLd(v, acc);
+  }
+}
+
+// Titles a bot wall / error page returns instead of the product — discard these
+// so we fall back to the URL slug for a name.
+const BLOCKED_TITLE = /^(just a moment|attention required|access denied|are you (a )?(human|robot)|robot check|captcha|please wait|checking your browser|one moment|site maintenance|403 forbidden|forbidden|404|page not found|not found|error)\b/i;
+
+// A name is junk if it's empty, too short, a bot-wall title, or a bare SKU/style
+// code with no spaces and a digit (e.g. "1183C102_751", "p02786321").
+function isJunkName(s: string | null | undefined): boolean {
+  if (!s) return true;
+  const t = decodeEntities(String(s)).trim();
+  if (t.length < 3) return true;
+  if (BLOCKED_TITLE.test(t)) return true;
+  if (!/\s/.test(t) && /\d/.test(t) && /^[\w\-.]+$/.test(t)) return true;
+  return false;
+}
+
+// First non-junk string in priority order, trimmed and entity-decoded.
+function firstGood(candidates: (string | null | undefined)[]): string {
+  for (const c of candidates) {
+    if (!isJunkName(c)) return decodeEntities(String(c).trim());
+  }
+  return "";
+}
+
+function decodeEntities(s: string): string {
+  return (s || "")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
+    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+}
+
+function toTitleCase(s: string): string {
+  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Turn the longest URL path segment into a readable product name.
+function slugToName(url: string): string {
+  try {
+    const segs = new URL(url).pathname.split("/").filter(Boolean);
+    const slug = segs.sort((a, b) => b.length - a.length)[0] ?? "";
+    const cleaned = slug
+      .replace(/\.\w{2,4}$/, "")   // file extension
+      .replace(/-p\d{5,}$/i, "")    // Zara-style product IDs
+      .replace(/-\d{5,}$/, "")      // trailing numeric IDs
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+    return cleaned.length > 3 ? cleaned : "";
+  } catch {
+    return "";
+  }
+}
+
+// Make a possibly-relative image URL absolute.
+function absolutize(u: string | null, base: string): string | null {
+  if (!u) return null;
+  const t = u.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("//")) return "https:" + t;
+  try { return new URL(t, base).href; } catch { return t; }
+}
+
+// Zara renders images in JS; reconstruct the CDN URL from the product ID.
+function zaraFallback(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("zara.com")) {
+      const idMatch = u.pathname.match(/p(\d{7,})/i);
+      if (idMatch) return `https://static.zara.net/assets/public/product/p${idMatch[1]}/image/main.jpg?ts=1&dpr=1`;
+    }
+  } catch { /* ignore */ }
+  return null;
 }

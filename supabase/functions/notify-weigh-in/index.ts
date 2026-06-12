@@ -57,7 +57,7 @@ const TEMPLATE = `<!DOCTYPE html>
   <meta name="x-apple-disable-message-reformatting">
   <meta name="color-scheme" content="light only">
   <meta name="supported-color-schemes" content="light only">
-  <title>you got a weigh-in</title>
+  <title>someone just weighed in</title>
   <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Spline+Sans+Mono:wght@500&display=swap" rel="stylesheet">
   <style>
@@ -92,7 +92,7 @@ const TEMPLATE = `<!DOCTYPE html>
           </tr>
           <tr>
             <td align="center" class="px h1 display" style="padding:8px 48px 8px;font-size:40px;line-height:1.06;font-weight:700;letter-spacing:-1px;color:#100E0C;">
-              you got a weigh&#8209;in
+              someone just weighed in
             </td>
           </tr>
           <tr>

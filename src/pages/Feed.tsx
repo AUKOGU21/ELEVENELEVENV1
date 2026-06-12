@@ -627,6 +627,12 @@ const Feed = () => {
       ...(responsePhotoUrl ? { photo_url: responsePhotoUrl } : {}),
     });
 
+    // Email the post owner that someone weighed in (fire-and-forget; the
+    // function skips self-weigh-ins and never blocks the UI on failure).
+    supabase.functions
+      .invoke("notify-weigh-in", { body: { decision_id: weighingIn, responder_id: user.id } })
+      .catch((e) => console.warn("weigh-in notify failed:", e));
+
     await fetchDecisions();
     setSubmitting(false);
     setTakePhoto(null);

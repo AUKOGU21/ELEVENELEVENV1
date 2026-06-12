@@ -1666,7 +1666,7 @@ const DecisionCard = ({
 
         {/* ── Product image ── */}
         {decision.product_image_url && (
-          <div style={{ width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2" }}>
+          <div style={{ position: "relative", width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2" }}>
             {decision.product_image_url_2 ? (
               <>
                 <img

@@ -706,6 +706,19 @@ const PostDecision = () => {
                         </div>
                       </>
                     )}
+
+                    <div className="mt-5">
+                      <p className="text-base font-medium text-foreground mb-1">
+                        Anything making you unsure? <span className="font-normal text-muted-foreground">(optional)</span>
+                      </p>
+                      <textarea
+                        value={contextNotes["Between sizes"] ?? ""}
+                        onChange={(e) => setContextNotes((prev) => ({ ...prev, ["Between sizes"]: e.target.value }))}
+                        placeholder="e.g. I'm usually a 7 but this brand runs small, and I have wide feet"
+                        rows={2}
+                        className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent resize-none"
+                      />
+                    </div>
                   </div>
                 )}
 

@@ -1468,10 +1468,8 @@ const DecisionCard = ({
     .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
 
   const posterName = formatName(decision.profiles?.display_name ?? null);
-  const posterMeta = [
-    decision.profiles?.age,
-    decision.profiles?.city?.split(",")[0],
-  ].filter(Boolean).join(", ");
+  // City only — age is kept on profiles but intentionally hidden in the feed.
+  const posterMeta = decision.profiles?.city?.split(",")[0] ?? "";
 
   return (
     <div

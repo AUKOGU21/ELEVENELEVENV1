@@ -473,6 +473,12 @@ const OutcomeModal = ({ open, onClose, decision, onComplete }: OutcomeModalProps
         .eq("id", decision.id);
     }
 
+    // Close the loop: email everyone who weighed in (fire-and-forget; the
+    // function skips if there were no weigh-ins and never blocks the UI).
+    supabase.functions
+      .invoke("notify-outcome", { body: { decision_id: decision.id } })
+      .catch((e) => console.warn("outcome notify failed:", e));
+
     setSaving(false);
     setCurrentStepIdx(steps.length - 1);
     onComplete(finalState.outcome!);

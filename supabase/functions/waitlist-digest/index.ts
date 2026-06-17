@@ -68,25 +68,8 @@ Deno.serve(async (req) => {
   const isJoined = (email: string) => joined.has((email || "").toLowerCase());
   const converted = rows.filter((r) => isJoined(r.email));
 
-  // In-app activity (actions in the beta app)
-  const accounts = joined.size;
-  const [onboarded, decisionsN, weighins, outcomesN, votesN, savesN] = await Promise.all([
-    tableCount("profiles?select=id&onboarding_completed=eq.true"),
-    tableCount("decisions?select=id"),
-    tableCount("responses?select=id"),
-    tableCount("outcomes?select=id"),
-    tableCount("response_votes?select=id"),
-    tableCount("saved_decisions?select=id"),
-  ]);
-  let recentDecisions: any[] = [];
-  try {
-    const rd = await fetch(
-      `${SUPABASE_URL}/rest/v1/decisions?select=brand_name,product_name,confidence_score,created_at,profiles(display_name)&order=created_at.desc&limit=5`,
-      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
-    );
-    recentDecisions = await rd.json();
-    if (!Array.isArray(recentDecisions)) recentDecisions = [];
-  } catch { /* ignore */ }
+  // In-app activity is computed further below (after the waitlist stats) so it
+  // can reuse `now` / `dayAgo`.
 
   const now = Date.now();
   const dayAgo = now - 86_400_000;
@@ -113,24 +96,81 @@ Deno.serve(async (req) => {
     return `<tr><td style="padding:3px 0;color:#1C1712;">${esc(name)}${badge}</td><td style="padding:3px 12px;color:#6F665A;">${esc(r.email || "")}</td><td style="padding:3px 12px;color:#9A3F26;">${esc(src)}</td><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(when)}</td></tr>`;
   }).join("");
 
-  const activityStats = [
-    ["Beta accounts", `${accounts} (onboarded ${onboarded})`],
-    ["Decisions posted", `${decisionsN}`],
-    ["Weigh-ins", `${weighins}`],
-    ["Outcomes logged", `${outcomesN}`],
-    ["Helpful votes", `${votesN}`],
-    ["Saves", `${savesN}`],
+  // ── In-app activity: funnel, 24h deltas, liquidity gaps, silent accounts, feed ──
+  async function rowsOf(path: string): Promise<any[]> {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+      const j = await r.json();
+      return Array.isArray(j) ? j : [];
+    } catch { return []; }
+  }
+  const [profilesA, decisionsA, responsesA, savesA, outcomesA, votesA] = await Promise.all([
+    rowsOf("profiles?select=id,display_name,onboarding_completed"),
+    rowsOf("decisions?select=id,user_id,brand_name,product_name,created_at"),
+    rowsOf("responses?select=user_id,decision_id,recommendation,created_at"),
+    rowsOf("saved_decisions?select=user_id,decision_id,created_at"),
+    rowsOf("outcomes?select=user_id,decision_id,created_at"),
+    rowsOf("response_votes?select=id"),
+  ]);
+  let authUsers: any[] = [];
+  try {
+    const au = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+    authUsers = (await au.json()).users || [];
+  } catch { /* ignore */ }
+  const TEAM = new Set(["aukogu@mba2026.hbs.edu", "alexiskukogu@gmail.com", "srishtisat_09@berkeley.edu"]);
+
+  const nameOf = (uid: string) => (profilesA.find((x) => x.id === uid)?.display_name || "").trim() || "—";
+  const itemFor = (d: any) => [d?.brand_name, d?.product_name].filter(Boolean).join(" ") || "(item)";
+  const itemOf = (did: string) => itemFor(decisionsA.find((x) => x.id === did));
+  const fmtWhen = (ts: string | number | null) => ts ? new Date(ts).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+  const isRecent = (ts: string | null) => !!ts && new Date(ts).getTime() >= dayAgo;
+
+  const pc: Record<string, { posts: number; weighs: number; saves: number; outcomes: number }> = {};
+  const bump = (uid: string, k: "posts" | "weighs" | "saves" | "outcomes") => { if (!uid) return; (pc[uid] ||= { posts: 0, weighs: 0, saves: 0, outcomes: 0 })[k]++; };
+  for (const d of decisionsA) bump(d.user_id, "posts");
+  for (const r of responsesA) bump(r.user_id, "weighs");
+  for (const s of savesA) bump(s.user_id, "saves");
+  for (const o of outcomesA) bump(o.user_id, "outcomes");
+
+  const accounts = authUsers.length || joined.size;
+  const onboardedN = profilesA.filter((p) => p.onboarding_completed).length;
+  const postedN = Object.values(pc).filter((v) => v.posts > 0).length;
+  const weighedN = Object.values(pc).filter((v) => v.weighs > 0).length;
+  const outcomeUsersN = Object.values(pc).filter((v) => v.outcomes > 0).length;
+
+  const funnelRows = [
+    ["Accounts", `${accounts}`],
+    ["Onboarded", `${onboardedN}`],
+    ["Posted a decision", `${postedN}`],
+    ["Weighed in", `${weighedN}`],
+    ["Logged an outcome", `${outcomeUsersN}`],
   ].map(([k, v]) => `<tr><td style="padding:2px 0;color:#6F665A;">${esc(k)}</td><td style="padding:2px 0 2px 16px;font-weight:600;color:#1C1712;">${esc(v)}</td></tr>`).join("");
 
-  const decRows = recentDecisions.map((d: any) => {
-    const who = (d.profiles?.display_name || "").trim() || "—";
-    const item = [d.brand_name, d.product_name].filter(Boolean).join(" ") || "(item)";
-    const when = d.created_at
-      ? new Date(d.created_at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-      : "";
-    const conf = d.confidence_score != null ? `${d.confidence_score}/10` : "";
-    return `<tr><td style="padding:3px 0;color:#1C1712;">${esc(who)}</td><td style="padding:3px 12px;color:#6F665A;">${esc(item)}</td><td style="padding:3px 12px;color:#9A3F26;">${esc(conf)}</td><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(when)}</td></tr>`;
-  }).join("") || `<tr><td style="padding:3px 0;color:#9c9488;">no decisions posted yet</td></tr>`;
+  const totalsLine = `${decisionsA.length} posts · ${responsesA.length} weigh-ins · ${outcomesA.length} outcomes · ${votesA.length} votes · ${savesA.length} saves`;
+  const delta24Line = `+${authUsers.filter((u) => isRecent(u.created_at)).length} accounts · +${decisionsA.filter((d) => isRecent(d.created_at)).length} posts · +${responsesA.filter((r) => isRecent(r.created_at)).length} weigh-ins · +${savesA.filter((s) => isRecent(s.created_at)).length} saves`;
+
+  const weighCount: Record<string, number> = {};
+  for (const r of responsesA) weighCount[r.decision_id] = (weighCount[r.decision_id] || 0) + 1;
+  const avgWeigh = decisionsA.length ? (responsesA.length / decisionsA.length).toFixed(1) : "0";
+  const zeroRows = decisionsA.filter((d) => !weighCount[d.id])
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map((d) => `<tr><td style="padding:3px 0;color:#1C1712;">${esc(nameOf(d.user_id))}</td><td style="padding:3px 12px;color:#6F665A;">${esc(itemFor(d))}</td><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(fmtWhen(d.created_at))}</td></tr>`)
+    .join("") || `<tr><td style="padding:3px 0;color:#16a34a;">every post has a weigh-in</td></tr>`;
+
+  const silent = authUsers.filter((u) => {
+    if (TEAM.has((u.email || "").toLowerCase())) return false;
+    const c = pc[u.id];
+    return !c || (c.posts === 0 && c.weighs === 0);
+  }).map((u) => nameOf(u.id)).filter((n) => n !== "—");
+  const silentLine = silent.length ? esc(silent.join(", ")) : "none";
+
+  const feed: Array<{ t: number; txt: string }> = [];
+  for (const s of savesA) feed.push({ t: new Date(s.created_at || 0).getTime(), txt: `${nameOf(s.user_id)} saved ${itemOf(s.decision_id)}` });
+  for (const r of responsesA) feed.push({ t: new Date(r.created_at || 0).getTime(), txt: `${nameOf(r.user_id)} weighed in (${r.recommendation || "?"}) on ${itemOf(r.decision_id)}` });
+  for (const o of outcomesA) feed.push({ t: new Date(o.created_at || 0).getTime(), txt: `${nameOf(o.user_id)} logged an outcome on ${itemOf(o.decision_id)}` });
+  for (const d of decisionsA) feed.push({ t: new Date(d.created_at || 0).getTime(), txt: `${nameOf(d.user_id)} posted ${itemFor(d)}` });
+  const feedRows = feed.filter((e) => e.t > 0).sort((a, b) => b.t - a.t).slice(0, 12)
+    .map((e) => `<tr><td style="padding:3px 0;color:#9c9488;white-space:nowrap;">${esc(fmtWhen(e.t))}</td><td style="padding:3px 0 3px 12px;color:#1C1712;">${esc(e.txt)}</td></tr>`).join("");
 
   const html = `
   <div style="font-family:Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#1C1712;">
@@ -146,9 +186,16 @@ Deno.serve(async (req) => {
     <table style="font-size:13px;border-collapse:collapse;width:100%;">${latestRows}</table>
     <div style="border-top:1px solid #ECE7DD;margin:28px 0 18px;"></div>
     <p style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#9c9488;">In-app activity</p>
-    <table style="font-size:14px;border-collapse:collapse;margin:8px 0 22px;">${activityStats}</table>
-    <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:6px;">Recent decisions posted</p>
-    <table style="font-size:13px;border-collapse:collapse;width:100%;">${decRows}</table>
+    <p style="font-size:13px;color:#1C1712;margin:6px 0 2px;font-weight:600;">Last 24h: ${delta24Line}</p>
+    <p style="font-size:12px;color:#9c9488;margin:0 0 16px;">All time: ${totalsLine}</p>
+    <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:4px;">Activation funnel</p>
+    <table style="font-size:14px;border-collapse:collapse;margin:4px 0 20px;">${funnelRows}</table>
+    <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9A3F26;margin-bottom:6px;">Posts needing a weigh-in · cover these (avg ${avgWeigh}/post)</p>
+    <table style="font-size:13px;border-collapse:collapse;width:100%;margin-bottom:20px;">${zeroRows}</table>
+    <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:4px;">Silent accounts · joined, no activity</p>
+    <p style="font-size:13px;color:#6F665A;margin:0 0 20px;line-height:1.5;">${silentLine}</p>
+    <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9c9488;margin-bottom:6px;">Recent activity</p>
+    <table style="font-size:13px;border-collapse:collapse;width:100%;">${feedRows}</table>
   </div>`;
 
   const send = await fetch("https://api.resend.com/emails", {

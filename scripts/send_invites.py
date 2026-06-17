@@ -18,7 +18,8 @@ SB = os.environ.get("SUPABASE_ACCESS_TOKEN")
 KEY = os.environ.get("RESEND_API_KEY")
 DRY = os.environ.get("INVITE_DRY_RUN") == "1"
 # Excluded from beta invites (men — the beta is women-first). Lowercase.
-EXCLUDE = {"jean.pinatel@essec.edu", "sergeysbelov1@gmail.com"}
+EXCLUDE = {"jean.pinatel@essec.edu", "sergeysbelov1@gmail.com", "ahkalex88@gmail.com",
+           "jud.asiruwa@hotmail.com"}  # Judson — held pending gender confirmation (women-first beta)
 TEMPLATE = os.path.join(os.path.dirname(__file__), "..", "emails", "invite.html")
 
 if not SB:

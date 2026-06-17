@@ -50,13 +50,20 @@ def query(sql):
     return data
 
 
-# Invited (invited_at set) but NOT joined (no matching auth.users row)
+# Track nudges so nobody is ever nudged twice
+query("alter table public.waitlist add column if not exists nudged_at timestamptz;")
+
+# Invited >1 day ago (so a freshly-invited person never gets invite + nudge
+# back to back), NOT joined, and not yet nudged.
 recipients = query(
     """
     select w.first_name, w.email
     from public.waitlist w
     left join auth.users u on lower(u.email) = lower(w.email)
-    where w.invited_at is not null and u.id is null
+    where w.invited_at is not null
+      and w.invited_at < now() - interval '1 day'
+      and u.id is null
+      and w.nudged_at is null
     order by w.invited_at;
     """
 )
@@ -89,6 +96,8 @@ for r in recipients:
         rid = json.loads(out).get("id")
     except Exception:
         rid = None
+    if rid:
+        query(f"update public.waitlist set nudged_at = now() where lower(email) = lower('{email}')")
     print(f"  {'OK ' if rid else 'ERR'} {first:<14}{email:<34}{rid or out[:120]}")
     sent += 1 if rid else 0
     time.sleep(0.7)

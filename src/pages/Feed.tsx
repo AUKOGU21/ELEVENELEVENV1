@@ -1842,11 +1842,15 @@ const DecisionCard = ({
                               <span style={{ fontSize: 15, fontWeight: 700, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
                               {resp.match_score != null && (() => {
                                 const m = Math.round(resp.match_score);
-                                const strong = m >= 70, mid = m >= 45;
-                                const glow = strong ? "0 0 16px rgba(203,90,60,0.60)" : mid ? "0 0 13px rgba(196,158,100,0.50)" : "0 0 9px rgba(196,158,100,0.35)";
-                                const bg = strong ? "rgba(203,90,60,0.15)" : "rgba(196,158,100,0.13)";
-                                const bd = strong ? "rgba(203,90,60,0.6)" : "rgba(196,158,100,0.55)";
-                                const col = strong ? "#9A3F26" : "#8A6620";
+                                // Distinct hue per tier; strong = warm rose (desirable, not alarm-red).
+                                let col, bg, bd, glow;
+                                if (m >= 70) {            // strong — deep rose, hot glow
+                                  col = "#9B2F63"; bg = "rgba(190,70,130,0.14)"; bd = "rgba(190,70,130,0.55)"; glow = "0 0 16px rgba(190,70,130,0.55)";
+                                } else if (m >= 45) {     // solid — gold, soft glow
+                                  col = "#8A6620"; bg = "rgba(196,158,100,0.16)"; bd = "rgba(196,158,100,0.6)"; glow = "0 0 12px rgba(196,158,100,0.45)";
+                                } else {                  // low — muted taupe, no glow
+                                  col = "#7C7066"; bg = "rgba(124,112,102,0.10)"; bd = "rgba(124,112,102,0.35)"; glow = "none";
+                                }
                                 return (
                                   <span style={{
                                     marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4,

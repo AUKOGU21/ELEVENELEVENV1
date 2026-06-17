@@ -176,14 +176,15 @@ function scoreProportions(a: Profile, b: Profile): number {
   const detailsA = (a.fit_details ?? {}) as Record<string, string>;
   const detailsB = (b.fit_details ?? {}) as Record<string, string>;
 
+  // Only score categories BOTH answered, so a sparse match doesn't penalize you.
   const answered = PROPORTION_CATEGORIES.filter(
-    (cat) => detailsA[cat] || detailsB[cat]
+    (cat) => detailsA[cat] && detailsB[cat]
   );
 
-  if (answered.length === 0) return 10; // both unknown — half credit
+  if (answered.length === 0) return 10; // no shared answers — neutral, not a penalty
 
   const matching = answered.filter(
-    (cat) => detailsA[cat] && detailsB[cat] && detailsA[cat] === detailsB[cat]
+    (cat) => detailsA[cat] === detailsB[cat]
   ).length;
 
   return (matching / answered.length) * 20;

@@ -1840,12 +1840,23 @@ const DecisionCard = ({
                             </div>
                             <div>
                               <span style={{ fontSize: 15, fontWeight: 700, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
-                              {resp.match_score != null && (
-                                <span style={{
-                                  marginLeft: 6, fontSize: 13, fontWeight: 700,
-                                  color: "#C49E64",
-                                }}>✦ {Math.round(resp.match_score)}% Match</span>
-                              )}
+                              {resp.match_score != null && (() => {
+                                const m = Math.round(resp.match_score);
+                                const strong = m >= 70, mid = m >= 45;
+                                const glow = strong ? "0 0 16px rgba(203,90,60,0.60)" : mid ? "0 0 13px rgba(196,158,100,0.50)" : "0 0 9px rgba(196,158,100,0.35)";
+                                const bg = strong ? "rgba(203,90,60,0.15)" : "rgba(196,158,100,0.13)";
+                                const bd = strong ? "rgba(203,90,60,0.6)" : "rgba(196,158,100,0.55)";
+                                const col = strong ? "#9A3F26" : "#8A6620";
+                                return (
+                                  <span style={{
+                                    marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4,
+                                    fontSize: 12, fontWeight: 800, letterSpacing: "0.02em",
+                                    padding: "2px 10px", borderRadius: 100,
+                                    color: col, background: bg, border: `1px solid ${bd}`,
+                                    boxShadow: glow,
+                                  }}>✦ {m}% match</span>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 13, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>

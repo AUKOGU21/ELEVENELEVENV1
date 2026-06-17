@@ -293,6 +293,7 @@ const PostDecision = () => {
       product_image_url_2: finalImageUrl2 ?? null,
       product_url: product.source_url || null,
       product_category: product.category || null,
+      product_price: product.price ? (parseFloat(String(product.price).replace(/[^0-9.]/g, "")) || null) : null,
       confidence_score: confidence,
       uncertainty_text: uncertainties.join(", "),
       price_note: priceNote.trim() ? `$${priceNote.trim()}` : null,

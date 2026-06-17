@@ -126,11 +126,37 @@ function jaccardSimilarity(a: string[], b: string[]): number {
   return intersection / union;
 }
 
+// Confirmed families + adjacency. Graded credit replaces all-or-nothing:
+// same silhouette = 30, same family = 20, adjacent family = 10, else 0.
+const SILHOUETTE_FAMILY: Record<string, string> = {
+  "Lean and elongated": "lean",
+  "Slim with subtle shape": "lean",
+  "Straight and athletic": "lean",
+  "Sculpted and athletic": "sculpted",
+  "Soft and even": "soft",
+  "Soft midsection": "soft",
+  "Mid curve": "curvy",
+  "Curved with definition": "curvy",
+  "Full and curved": "curvy",
+};
+const SILHOUETTE_ADJACENT: Record<string, string[]> = {
+  lean: ["sculpted", "soft"],
+  sculpted: ["lean", "curvy"],
+  soft: ["lean", "curvy"],
+  curvy: ["soft", "sculpted"],
+};
+
 function scoreSilhouette(a: Profile, b: Profile): number {
-  const arrA = a.silhouette_preference ?? [];
-  const arrB = b.silhouette_preference ?? [];
-  if (arrA.length === 0 && arrB.length === 0) return 15; // both unknown — half credit
-  return jaccardSimilarity(arrA, arrB) * 30;
+  const sa = (a.silhouette_preference ?? [])[0];
+  const sb = (b.silhouette_preference ?? [])[0];
+  if (!sa || !sb) return 15; // missing on either side — neutral, don't penalize
+  if (sa === sb) return 30;
+  const fa = SILHOUETTE_FAMILY[sa];
+  const fb = SILHOUETTE_FAMILY[sb];
+  if (!fa || !fb) return 0;
+  if (fa === fb) return 20;
+  if (SILHOUETTE_ADJACENT[fa]?.includes(fb)) return 10;
+  return 0;
 }
 
 // -------------------------------------------------------------------

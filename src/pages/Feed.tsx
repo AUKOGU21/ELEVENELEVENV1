@@ -120,6 +120,25 @@ const recommendationColor = (rec: string) => {
   return "text-amber-400";
 };
 
+// Match-strength badge — single source of truth for every weigh-in renderer.
+// taupe/flat (low) → gold glow (solid) → rose glow (strong).
+function MatchBadge({ score }: { score: number | null }) {
+  if (score == null) return null;
+  const m = Math.round(score);
+  let col, bg, bd, glow;
+  if (m >= 70) { col = "#9B2F63"; bg = "rgba(190,70,130,0.14)"; bd = "rgba(190,70,130,0.55)"; glow = "0 0 16px rgba(190,70,130,0.55)"; }
+  else if (m >= 45) { col = "#8A6620"; bg = "rgba(196,158,100,0.16)"; bd = "rgba(196,158,100,0.6)"; glow = "0 0 12px rgba(196,158,100,0.45)"; }
+  else { col = "#7C7066"; bg = "rgba(124,112,102,0.10)"; bd = "rgba(124,112,102,0.35)"; glow = "none"; }
+  return (
+    <span style={{
+      marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4,
+      fontSize: 12, fontWeight: 800, letterSpacing: "0.02em",
+      padding: "2px 10px", borderRadius: 100,
+      color: col, background: bg, border: `1px solid ${bd}`, boxShadow: glow,
+    }}>✦ {m}% match</span>
+  );
+}
+
 // ─── Outcome card helpers ──────────────────────────────────────────────────────
 
 type Sentiment = "happy" | "neutral" | "regret" | null;
@@ -1840,27 +1859,7 @@ const DecisionCard = ({
                             </div>
                             <div>
                               <span style={{ fontSize: 15, fontWeight: 700, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
-                              {resp.match_score != null && (() => {
-                                const m = Math.round(resp.match_score);
-                                // Distinct hue per tier; strong = warm rose (desirable, not alarm-red).
-                                let col, bg, bd, glow;
-                                if (m >= 70) {            // strong — deep rose, hot glow
-                                  col = "#9B2F63"; bg = "rgba(190,70,130,0.14)"; bd = "rgba(190,70,130,0.55)"; glow = "0 0 16px rgba(190,70,130,0.55)";
-                                } else if (m >= 45) {     // solid — gold, soft glow
-                                  col = "#8A6620"; bg = "rgba(196,158,100,0.16)"; bd = "rgba(196,158,100,0.6)"; glow = "0 0 12px rgba(196,158,100,0.45)";
-                                } else {                  // low — muted taupe, no glow
-                                  col = "#7C7066"; bg = "rgba(124,112,102,0.10)"; bd = "rgba(124,112,102,0.35)"; glow = "none";
-                                }
-                                return (
-                                  <span style={{
-                                    marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4,
-                                    fontSize: 12, fontWeight: 800, letterSpacing: "0.02em",
-                                    padding: "2px 10px", borderRadius: 100,
-                                    color: col, background: bg, border: `1px solid ${bd}`,
-                                    boxShadow: glow,
-                                  }}>✦ {m}% match</span>
-                                );
-                              })()}
+                              <MatchBadge score={resp.match_score} />
                             </div>
                           </div>
                           <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 13, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
@@ -2046,9 +2045,7 @@ const DecisionCard = ({
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                             <div>
                               <span style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
-                              {resp.match_score != null && (
-                                <span style={{ marginLeft: 8, fontSize: 14, color: "#3A3530" }}>{Math.round(resp.match_score)}% match</span>
-                              )}
+                              <MatchBadge score={resp.match_score} />
                             </div>
                             <div style={{ borderRadius: 100, padding: "3px 10px", fontSize: 15, fontWeight: 600, background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
                               {recommendationLabel(resp.recommendation)}

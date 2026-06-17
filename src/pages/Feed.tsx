@@ -1724,6 +1724,11 @@ const DecisionCard = ({
                   {decision.product_name}
                 </p>
               )}
+              {decision.price_note && (
+                <p style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#1A1A1A", marginTop: 5 }}>
+                  {decision.price_note.startsWith("$") ? decision.price_note : `$${decision.price_note}`}
+                </p>
+              )}
               {!decision.product_image_url && decision.product_url && (
                 <a href={decision.product_url} target="_blank" rel="noopener noreferrer"
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 15, color: "#5A4A42", textDecoration: "none", marginTop: 4 }}>
@@ -1959,10 +1964,9 @@ const DecisionCard = ({
                     return uncertainties.map((u: string, i: number) => {
                       const ul = u.toLowerCase();
                       const isBetweenSizes = ul.includes("between sizes");
-                      const isWorthPrice = ul.includes("worth the price");
                       const matchKey = Object.keys(contextMap).find(k => ul.includes(k) || k.includes(ul));
                       const detail = matchKey ? contextMap[matchKey] : null;
-                      const hasDetail = (isBetweenSizes && decision.sizes_note) || (isWorthPrice && decision.price_note) || detail;
+                      const hasDetail = (isBetweenSizes && decision.sizes_note) || detail;
 
                       return (
                         <div key={i} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "12px 14px", marginBottom: i < uncertainties.length - 1 ? 8 : 0 }}>
@@ -1975,14 +1979,6 @@ const DecisionCard = ({
                                   {s.trim()}
                                 </span>
                               ))}
-                            </div>
-                          )}
-                          {isWorthPrice && decision.price_note && (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ fontSize: 15, color: "#8C7A70" }}>Listed at</span>
-                              <span style={{ fontSize: 15, fontWeight: 700, color: "#3A3530" }}>
-                                {decision.price_note.startsWith("$") ? decision.price_note : `$${decision.price_note}`}
-                              </span>
                             </div>
                           )}
                           {detail && (

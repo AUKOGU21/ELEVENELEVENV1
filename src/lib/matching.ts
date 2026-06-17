@@ -24,11 +24,32 @@ const HEIGHT_ORDER = [
   "Over 6'0\"",
 ];
 
+// Profiles store raw heights like 5'11"; map any height (raw or legacy bucket
+// label) to a bucket index so scoring actually works.
+function heightToInches(s: string): number | null {
+  const m = s.match(/(\d+)\s*'\s*(\d+)?/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 12 + (m[2] ? parseInt(m[2], 10) : 0);
+}
+
+function heightBucketIndex(s: string | null): number {
+  if (!s) return -1;
+  const direct = HEIGHT_ORDER.indexOf(s); // legacy bucket label
+  if (direct !== -1) return direct;
+  const inches = heightToInches(s);
+  if (inches == null) return -1;
+  if (inches < 60) return 0;
+  if (inches <= 63) return 1;
+  if (inches <= 66) return 2;
+  if (inches <= 69) return 3;
+  if (inches <= 72) return 4;
+  return 5;
+}
+
 function scoreHeight(a: string | null, b: string | null): number {
-  if (!a || !b) return 7; // unknown — give half credit
-  const ai = HEIGHT_ORDER.indexOf(a);
-  const bi = HEIGHT_ORDER.indexOf(b);
-  if (ai === -1 || bi === -1) return 7;
+  const ai = heightBucketIndex(a);
+  const bi = heightBucketIndex(b);
+  if (ai === -1 || bi === -1) return 7; // unknown — half credit
   const delta = Math.abs(ai - bi);
   if (delta === 0) return 15;
   if (delta === 1) return 10;
@@ -50,11 +71,35 @@ const SIZE_ORDER = [
   "XXL (20–22)",
 ];
 
+// Profiles store sizes as bare letters ("S") or number ranges ("00–0");
+// normalize to a SIZE_ORDER index so scoring actually works.
+const LETTER_SIZE: Record<string, number> = { XXS: 0, XS: 1, S: 2, M: 3, L: 4, XL: 5, XXL: 6 };
+
+function sizeIndex(s: string | null): number {
+  if (!s) return -1;
+  const direct = SIZE_ORDER.indexOf(s);
+  if (direct !== -1) return direct;
+  const t = s.toUpperCase().replace(/\s/g, "");
+  const letter = t.match(/^(XXS|XXL|XS|XL|S|M|L)/);
+  if (letter) return LETTER_SIZE[letter[1]];
+  if (t.includes("00")) return 0;
+  const num = t.match(/\d+/);
+  if (num) {
+    const v = parseInt(num[0], 10);
+    if (v <= 2) return 1;
+    if (v <= 6) return 2;
+    if (v <= 10) return 3;
+    if (v <= 14) return 4;
+    if (v <= 18) return 5;
+    return 6;
+  }
+  return -1;
+}
+
 function scoreSingleSize(a: string | null, b: string | null, max: number): number {
-  if (!a || !b) return max * 0.5; // unknown — half credit
-  const ai = SIZE_ORDER.indexOf(a);
-  const bi = SIZE_ORDER.indexOf(b);
-  if (ai === -1 || bi === -1) return max * 0.5;
+  const ai = sizeIndex(a);
+  const bi = sizeIndex(b);
+  if (ai === -1 || bi === -1) return max * 0.5; // unknown — half credit
   const delta = Math.abs(ai - bi);
   if (delta === 0) return max;
   if (delta === 1) return max * 0.5;

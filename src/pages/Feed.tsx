@@ -583,6 +583,30 @@ const Feed = () => {
     setTake("");
   };
 
+  // One-tap outcome log from the card prompt: saves the core signal, flips
+  // status so the card shows its logged state, and fires the close-the-loop email.
+  const quickLogOutcome = async (id: string, outcome: "bought_it" | "didnt_buy") => {
+    if (!user) return;
+    const did = outcome === "bought_it";
+    const newStatus = did ? "purchased" : "closed";
+    const patch = { status: newStatus, outcomes: [{ did_purchase: did, outcome_type: outcome }] } as any;
+    setLoggedOutcomeIds(prev => { const next = new Set(prev); next.add(id); return next; });
+    setDecisions(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
+    setMyDecisions(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
+    try {
+      await supabase.from("outcomes").upsert(
+        { decision_id: id, user_id: user.id, did_purchase: did, outcome_type: outcome },
+        { onConflict: "decision_id" },
+      );
+      await supabase.from("decisions").update({ status: newStatus }).eq("id", id);
+      supabase.functions
+        .invoke("notify-outcome", { body: { decision_id: id } })
+        .catch((e) => console.warn("outcome notify failed:", e));
+    } catch (e) {
+      console.error("quick log outcome failed:", e);
+    }
+  };
+
   const closeWeighIn = () => {
     const wasCompleted = weighInCompletedRef.current;
     weighInCompletedRef.current = false;
@@ -1129,6 +1153,7 @@ const Feed = () => {
               userVotes={userVotes}
               setLightboxUrl={setLightboxUrl}
               setTrackingId={setTrackingId}
+              quickLogOutcome={quickLogOutcome}
               startWeighIn={startWeighIn}
               handleDelete={handleDelete}
               handleHelpfulVote={handleHelpfulVote}
@@ -1431,6 +1456,7 @@ interface CardProps {
   userVotes: Record<string, "helpful" | "not_helpful">;
   setLightboxUrl: (url: string | null) => void;
   setTrackingId: (id: string | null) => void;
+  quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy") => void;
   startWeighIn: (id: string) => void;
   handleDelete: (id: string) => void;
   handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
@@ -1451,6 +1477,7 @@ const DecisionCard = ({
   userVotes,
   setLightboxUrl,
   setTrackingId,
+  quickLogOutcome,
   startWeighIn,
   handleDelete,
   handleHelpfulVote,
@@ -1466,6 +1493,7 @@ const DecisionCard = ({
   const [showAllResponses, setShowAllResponses] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [snoozedOutcome, setSnoozedOutcome] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -1485,6 +1513,9 @@ const DecisionCard = ({
 
   const sortedResponses = [...(decision.responses ?? [])]
     .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
+
+  // Weigh-ins from other women (excludes the poster) — drives the outcome prompt.
+  const weighInCount = sortedResponses.filter((r) => r.user_id !== decision.user_id).length;
 
   const posterName = formatName(decision.profiles?.display_name ?? null);
   // City only — age is kept on profiles but intentionally hidden in the feed.
@@ -2120,21 +2151,34 @@ const DecisionCard = ({
                     <span style={{ fontSize: 14, color: "#8C7A70", lineHeight: 1.4 }}>Share your take to help others like you.</span>
                   </>
                 ) : isOwn ? (
-                  <>
+                  <div style={{ width: "100%" }}>
                     {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
-                      <button onClick={() => setTrackingId(decision.id)} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 15, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer" }}>
-                        Log outcome
-                      </button>
+                      snoozedOutcome ? (
+                        <p style={{ fontSize: 14, color: "#8C7A70", margin: 0 }}>Got it. We'll check back later.</p>
+                      ) : (
+                        <div>
+                          <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
+                            {weighInCount > 0
+                              ? `${weighInCount} ${weighInCount === 1 ? "woman" : "women"} weighed in to help you. Did you go for it?`
+                              : "Did you go for it?"}
+                          </p>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => quickLogOutcome(decision.id, "bought_it")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
+                            <button onClick={() => quickLogOutcome(decision.id, "didnt_buy")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
+                            <button onClick={() => setSnoozedOutcome(true)} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
+                          </div>
+                        </div>
+                      )
                     )}
                     {activeTab === "mine" && (
                       <button
                         onClick={() => { if (confirm("Remove this decision?")) handleDelete(decision.id); }}
-                        style={{ marginLeft: "auto", padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 15, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                        style={{ display: "block", marginLeft: "auto", marginTop: 12, padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 15, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
                       >
                         Delete
                       </button>
                     )}
-                  </>
+                  </div>
                 ) : (
                   <>
                     <button onClick={() => startWeighIn(decision.id)} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>

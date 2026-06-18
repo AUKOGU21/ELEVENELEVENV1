@@ -137,7 +137,7 @@ function tippingFactorOptions(outcome: OutcomeType, primary: string): string[] {
       return [
         "I still wasn't sure which size would work",
         "I needed more personalized feedback",
-        "Feedback from people like me steered me away",
+        "Feedback from people like me changed my mind",
         "Something else",
       ];
     }
@@ -145,7 +145,7 @@ function tippingFactorOptions(outcome: OutcomeType, primary: string): string[] {
       return [
         "I couldn't picture it on my body",
         "I needed more visual proof",
-        "Feedback from people like me steered me away",
+        "Feedback from people like me changed my mind",
         "Something else",
       ];
     }
@@ -153,7 +153,7 @@ function tippingFactorOptions(outcome: OutcomeType, primary: string): string[] {
       return [
         "The photos were not enough",
         "I still could not picture it on me",
-        "Feedback from people like me steered me away",
+        "Feedback from people like me changed my mind",
         "Something else",
       ];
     }
@@ -162,7 +162,7 @@ function tippingFactorOptions(outcome: OutcomeType, primary: string): string[] {
         "It didn't feel worth it",
         "I wanted more certainty before spending",
         "I found better value elsewhere",
-        "Feedback from people like me steered me away",
+        "Feedback from people like me changed my mind",
         "Something else",
       ];
     }
@@ -170,7 +170,7 @@ function tippingFactorOptions(outcome: OutcomeType, primary: string): string[] {
       return [
         "I did not trust the quality",
         "I wanted more proof it would hold up",
-        "Feedback from people like me steered me away",
+        "Feedback from people like me changed my mind",
         "Something else",
       ];
     }
@@ -178,11 +178,11 @@ function tippingFactorOptions(outcome: OutcomeType, primary: string): string[] {
       return [
         "I just need to see it in real life",
         "I wasn't convinced the color would work on me",
-        "Feedback from people like me steered me away",
+        "Feedback from people like me changed my mind",
         "Something else",
       ];
     }
-    return ["I wasn't confident enough", "Feedback from people like me steered me away", "Something else"];
+    return ["I wasn't confident enough", "Feedback from people like me changed my mind", "Something else"];
   }
 
   if (outcome === "still_deciding") {

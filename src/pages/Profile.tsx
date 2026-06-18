@@ -5,7 +5,8 @@ import { ArrowLeft, Pencil, Check, X, Camera, LogOut, TrendingUp, ChevronDown, C
 import Cropper from "react-easy-crop";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
+import { SILHOUETTE_OPTIONS, STYLE_OPTIONS, HEIGHT_OPTIONS, SIZE_OPTIONS } from "@/components/onboarding/OnboardingData";
+import { DialInFitModal } from "@/components/DialInFitModal";
 import { computeMatchScore } from "@/lib/matching";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { imageToJpeg } from "@/lib/image";
@@ -64,7 +65,11 @@ const Profile = () => {
   const [recentDecisions, setRecentDecisions] = useState<any[]>([]);
 
   // Edit modes
-  const [editMode, setEditMode]           = useState<null | "silhouette" | "style">(null);
+  const [editMode, setEditMode]           = useState<null | "silhouette" | "style" | "sizes">(null);
+  const [showFitModal, setShowFitModal]   = useState(false);
+  const [editHeight, setEditHeight]       = useState<string | null>(null);
+  const [editTop, setEditTop]             = useState<string | null>(null);
+  const [editBottom, setEditBottom]       = useState<string | null>(null);
   const [editSilhouette, setEditSilhouette] = useState<string | null>(null);
   const [editStyle, setEditStyle]         = useState<string[]>([]);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -215,6 +220,24 @@ const Profile = () => {
       setProfile((p: any) => ({ ...p, avatar_url: url })); setCropSrc(null);
     } catch { alert("Something went wrong."); }
     finally { setUploadingPhoto(false); }
+  };
+
+  const openSizesEdit = () => {
+    setEditHeight(profile?.height_range ?? null);
+    setEditTop(profile?.top_size ?? null);
+    setEditBottom(profile?.bottom_size ?? null);
+    setEditMode("sizes");
+  };
+  const saveSizes = async () => {
+    setSavingProfile(true);
+    await supabase.from("profiles").update({
+      height_range: editHeight,
+      top_size: editTop,
+      bottom_size: editBottom,
+    }).eq("id", user!.id);
+    setSavingProfile(false);
+    setEditMode(null);
+    fetchProfile();
   };
 
   const openSilhouetteEdit = () => { setEditSilhouette(profile?.silhouette_preference?.[0] ?? null); setEditMode("silhouette"); };
@@ -1123,40 +1146,89 @@ const Profile = () => {
                 </div>
               </div>
 
-              {/* Height / Top size / Bottom size — 3 cols with labels */}
-              {(profile?.height_range || profile?.top_size || profile?.bottom_size) && (
-                <div style={{ display: "flex", gap: 0, borderTop: `1px solid ${DIVIDER}`, borderBottom: `1px solid ${DIVIDER}`, marginBottom: 16 }}>
+              {/* Height / Top size / Bottom size — editable */}
+              {editMode === "sizes" ? (
+                <div style={{ borderTop: `1px solid ${DIVIDER}`, paddingTop: 16, marginBottom: 16 }}>
                   {[
-                    profile?.height_range  && { label: "Height",      value: profile.height_range },
-                    profile?.top_size      && { label: "Top size",     value: profile.top_size },
-                    profile?.bottom_size   && { label: "Bottom size",  value: profile.bottom_size },
-                  ].filter(Boolean).map((item: any, i, arr) => (
-                    <div key={item.label} style={{ flex: 1, padding: "14px 16px", borderRight: i < arr.length - 1 ? `1px solid ${DIVIDER}` : "none" }}>
-                      <p style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 6 }}>{item.label}</p>
-                      <p style={{ fontSize: 15, fontWeight: 600, color: PRIMARY }}>{item.value}</p>
+                    { label: "Height", val: editHeight, set: setEditHeight, opts: HEIGHT_OPTIONS.map((h) => h.label) },
+                    { label: "Top size", val: editTop, set: setEditTop, opts: SIZE_OPTIONS },
+                    { label: "Bottom size", val: editBottom, set: setEditBottom, opts: SIZE_OPTIONS },
+                  ].map((row) => (
+                    <div key={row.label} style={{ marginBottom: 14 }}>
+                      <p style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 8 }}>{row.label}</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {row.opts.map((opt) => (
+                          <button key={opt} onClick={() => row.set(row.val === opt ? null : opt)}
+                            style={{ fontSize: 15, padding: "6px 14px", borderRadius: 100, cursor: "pointer",
+                              border: `1px solid ${row.val === opt ? ACCENT : PILL_BDR}`,
+                              background: row.val === opt ? ACCENT : "transparent",
+                              color: row.val === opt ? "#FDFAF6" : SECONDARY }}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ))}
+                  <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                    <button onClick={saveSizes} disabled={savingProfile}
+                      style={{ fontSize: 16, fontWeight: 600, padding: "10px 20px", borderRadius: 10, border: "none", background: ACCENT, color: "#FDFAF6", cursor: "pointer" }}>
+                      {savingProfile ? "Saving…" : "Save"}
+                    </button>
+                    <button onClick={() => setEditMode(null)} style={btnSecondary}>Cancel</button>
+                  </div>
                 </div>
-              )}
-
-              {/* Fit tags */}
-              {allTags.length > 0 && (
-                <div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                    {visibleTags.map((tag, i) => (
-                      <span key={i} style={{ fontSize: 16, color: SECONDARY, background: PILL_BG, border: `1px solid ${PILL_BDR}`, borderRadius: 100, padding: "6px 14px" }}>
-                        {tag}
-                      </span>
+              ) : (profile?.height_range || profile?.top_size || profile?.bottom_size) ? (
+                <div style={{ borderTop: `1px solid ${DIVIDER}`, borderBottom: `1px solid ${DIVIDER}`, marginBottom: 16, position: "relative" }}>
+                  <button onClick={openSizesEdit}
+                    style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: ACCENT, fontSize: 14, zIndex: 1 }}>Edit</button>
+                  <div style={{ display: "flex", gap: 0 }}>
+                    {[
+                      profile?.height_range  && { label: "Height",      value: profile.height_range },
+                      profile?.top_size      && { label: "Top size",     value: profile.top_size },
+                      profile?.bottom_size   && { label: "Bottom size",  value: profile.bottom_size },
+                    ].filter(Boolean).map((item: any, i, arr) => (
+                      <div key={item.label} style={{ flex: 1, padding: "14px 16px", borderRight: i < arr.length - 1 ? `1px solid ${DIVIDER}` : "none" }}>
+                        <p style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 6 }}>{item.label}</p>
+                        <p style={{ fontSize: 15, fontWeight: 600, color: PRIMARY }}>{item.value}</p>
+                      </div>
                     ))}
                   </div>
-                  {allTags.length > 5 && (
-                    <button onClick={() => setShowAllTags(v => !v)}
-                      style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 16, color: ACCENT, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                      {showAllTags ? <><ChevronUp style={{ width: 13, height: 13 }} /> Show less</> : <><ChevronDown style={{ width: 13, height: 13 }} /> {allTags.length - 5} more</>}
-                    </button>
-                  )}
                 </div>
+              ) : (
+                <button onClick={openSizesEdit}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 16px", borderRadius: 14, border: `1px dashed ${PILL_BDR}`, background: "transparent", cursor: "pointer", boxSizing: "border-box", marginBottom: 16 }}>
+                  <span style={{ fontSize: 16, color: MUTED }}>Add your sizes</span>
+                  <span style={{ fontSize: 15, color: ACCENT }}>+ Add</span>
+                </button>
               )}
+
+              {/* Fit details (dial-in features) — editable via the fit modal */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <p style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED }}>Fit details</p>
+                  <button onClick={() => setShowFitModal(true)}
+                    style={{ fontSize: 14, color: ACCENT, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+                </div>
+                {allTags.length > 0 ? (
+                  <>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                      {visibleTags.map((tag, i) => (
+                        <span key={i} style={{ fontSize: 16, color: SECONDARY, background: PILL_BG, border: `1px solid ${PILL_BDR}`, borderRadius: 100, padding: "6px 14px" }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    {allTags.length > 5 && (
+                      <button onClick={() => setShowAllTags(v => !v)}
+                        style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 16, color: ACCENT, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                        {showAllTags ? <><ChevronUp style={{ width: 13, height: 13 }} /> Show less</> : <><ChevronDown style={{ width: 13, height: 13 }} /> {allTags.length - 5} more</>}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 16, color: MUTED }}>Not set yet. Tap Edit to dial in your fit.</span>
+                )}
+              </div>
             </div>
           ) : (
             <button onClick={openSilhouetteEdit}
@@ -1292,6 +1364,7 @@ const Profile = () => {
 
       </div>
       </div>{/* end scrollable content */}
+      <DialInFitModal open={showFitModal} onClose={() => { setShowFitModal(false); fetchProfile(); }} />
     </div>
   );
 };

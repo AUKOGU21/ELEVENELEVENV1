@@ -2159,8 +2159,8 @@ const DecisionCard = ({
                         <div>
                           <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
                             {weighInCount > 0
-                              ? `${weighInCount} ${weighInCount === 1 ? "woman" : "women"} weighed in to help you. Did you go for it?`
-                              : "Did you go for it?"}
+                              ? `${weighInCount} ${weighInCount === 1 ? "woman" : "women"} weighed in. Don't leave ${weighInCount === 1 ? "her" : "them"} hanging, spill.`
+                              : "How'd it go?"}
                           </p>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => quickLogOutcome(decision.id, "bought_it")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>

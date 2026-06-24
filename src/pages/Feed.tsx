@@ -1858,6 +1858,27 @@ const DecisionCard = ({
 
             return (
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                {/* Original context — what she was deciding, so browsers see the question behind the outcome */}
+                {(decision.uncertainty_text || decision.sizes_note) && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 8 }}>
+                      Was deciding
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {(decision.uncertainty_text ?? "").split(", ").map((u) => u.trim()).filter(Boolean).map((u, i) => (
+                        <span key={`u${i}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 100, padding: "4px 12px" }}>{u}</span>
+                      ))}
+                      {decision.sizes_note && decision.sizes_note.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
+                        <span key={`s${s}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.12)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "4px 12px" }}>{s}</span>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 13, color: "#8C7A70", marginTop: 8 }}>
+                      Started at <strong style={{ color: "#3A3530" }}>{confidence}/10</strong> confidence
+                    </p>
+                    <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginTop: 14 }} />
+                  </div>
+                )}
+
                 {/* Label */}
                 <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
                   Outcome

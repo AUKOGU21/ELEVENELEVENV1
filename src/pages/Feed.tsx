@@ -2066,7 +2066,7 @@ const DecisionCard = ({
               <div style={{ display: "flex", gap: 12, padding: "10px 0" }}>
                 {/* Decision block — one card per uncertainty */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
+                  <p style={{ fontSize: isMobile ? 12 : 13, letterSpacing: isMobile ? "0.08em" : "0.3em", whiteSpace: "nowrap", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
                     Decisions / Considerations
                   </p>
                   {(() => {

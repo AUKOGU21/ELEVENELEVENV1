@@ -723,7 +723,7 @@ const PostDecision = () => {
                   </div>
                 )}
 
-                {uncertainties.filter(u => FOLLOWUP_UNCERTAINTIES.includes(u)).map((u) => (
+                {uncertainties.filter(u => u !== "Between sizes" && u !== "Other").map((u) => (
                   <div key={u}>
                     <p className="text-base font-medium text-foreground mb-1">{u}</p>
                     <p className="text-base text-muted-foreground mb-2">What specifically are you unsure about?</p>

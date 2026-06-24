@@ -2140,7 +2140,7 @@ const DecisionCard = ({
               {/* Responses section */}
               {sortedResponses.length > 0 ? (
                 <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 13, letterSpacing: "0.25em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 14, display: "flex", alignItems: "center", gap: 5 }}>
+                  <p style={{ fontSize: 13, letterSpacing: isMobile ? "0.02em" : "0.25em", whiteSpace: "nowrap", textTransform: "uppercase", color: "#8C7A70", marginBottom: 14, display: "flex", alignItems: "center", gap: 5 }}>
                     What women like you are saying <Info style={{ width: 13, height: 13, flexShrink: 0 }} />
                   </p>
                   {(() => {

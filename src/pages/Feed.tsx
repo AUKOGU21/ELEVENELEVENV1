@@ -336,6 +336,10 @@ const Feed = () => {
   // ── User meta
   const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
 
+  // ── Activation nudge: surface one matched decision to brand-new users.
+  // Persists until they weigh in once — no manual dismiss.
+  const [hasWeighedIn, setHasWeighedIn] = useState<boolean | null>(null);
+
   // ── Vote state
   const [userVotes, setUserVotes] = useState<Record<string, "helpful" | "not_helpful">>({});
   const [voteCounts, setVoteCounts] = useState<Record<string, { helpful: number; not_helpful: number }>>({});
@@ -409,6 +413,17 @@ const Feed = () => {
       }
     };
     loadUserVotes();
+  }, [user]);
+
+  // Has this user ever weighed in? Drives the activation nudge (shown only to
+  // accounts that have never weighed in and never posted).
+  useEffect(() => {
+    if (!user) { setHasWeighedIn(null); return; }
+    supabase
+      .from("responses")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .then(({ count }) => setHasWeighedIn((count ?? 0) > 0));
   }, [user]);
 
   // ─── Data fetch ──────────────────────────────────────────────────────────────
@@ -677,6 +692,7 @@ const Feed = () => {
       .catch((e) => console.warn("weigh-in notify failed:", e));
 
     await fetchDecisions();
+    setHasWeighedIn(true); // dismiss the activation nudge — they've now acted
     setSubmitting(false);
     setTakePhoto(null);
     setTakePhotoPreview(null);
@@ -857,12 +873,50 @@ const Feed = () => {
   const displayList = getFilteredDecisions(activeTab === "feed" ? decisions : myDecisions)
     .filter(d => !hiddenDecisionIds.has(d.id));
 
+  // ── Activation nudge target: the single highest-match open decision the user
+  // didn't post. Shown only to brand-new accounts (no posts, no weigh-ins).
+  const activationTarget = (() => {
+    const open = decisions.filter(d => d.user_id !== user?.id && (!d.status || d.status === "open"));
+    open.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
+    return open[0] ?? null;
+  })();
+  const showActivation = !!user && activeTab === "feed"
+    && myDecisions.length === 0 && hasWeighedIn === false && !!activationTarget;
+
   // ─── Render helpers ───────────────────────────────────────────────────────────
 
   const avatarContent = (avatarUrl: string | null, displayName: string | null) =>
     avatarUrl
       ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
       : <span>{getInitials(displayName)}</span>;
+
+  // Activation nudge card — pinned above the feed for never-active accounts.
+  const renderActivationCard = () => {
+    const t = activationTarget!;
+    const m = t.matchScore != null ? Math.round(t.matchScore) : null;
+    return (
+      <div style={{ background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 18, padding: 18, marginBottom: 18 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#8A6620", textTransform: "uppercase" }}>✦ For you</span>
+        <p className="font-sans" style={{ fontSize: 26, lineHeight: 1.1, color: "#1C1712", margin: "10px 0 8px" }}>Break the ice.</p>
+        <p style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(28,23,18,0.6)", margin: "0 0 14px" }}>Here's a decision from someone in your circle. Weigh in, and let us start learning your taste.</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 11, background: "rgba(28,23,18,0.04)", border: "1px solid rgba(28,23,18,0.08)", borderRadius: 12, padding: 9, marginBottom: 14 }}>
+          <div style={{ width: 48, height: 58, borderRadius: 8, background: "#D9CFC2", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {t.product_image_url
+              ? <img src={t.product_image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <Camera className="w-5 h-5" style={{ color: "rgba(28,23,18,0.35)" }} />}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {t.brand_name && <span style={{ display: "block", fontSize: 11, letterSpacing: "0.04em", color: "rgba(28,23,18,0.5)", textTransform: "uppercase" }}>{t.brand_name}</span>}
+            <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1C1712", margin: "1px 0 5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.product_name ?? "A decision"}</span>
+            {m != null && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 100, color: "#9B2F63", background: "rgba(190,70,130,0.12)", border: "1px solid rgba(190,70,130,0.5)" }}>✦ {m}% match</span>}
+          </div>
+        </div>
+        <button onClick={() => startWeighIn(t.id)} className="w-full" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "#1C1712", color: "#F4EEE6", borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 600 }}>
+          Weigh in <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  };
 
   // ─── Main render ──────────────────────────────────────────────────────────────
 
@@ -1144,7 +1198,9 @@ const Feed = () => {
             )}
           </div>
         ) : (
-          displayList.map((decision) => (
+          <>
+            {showActivation && renderActivationCard()}
+            {displayList.map((decision) => (
             <DecisionCard
               key={decision.id}
               decision={decision}
@@ -1166,7 +1222,8 @@ const Feed = () => {
               loggedOutcomeIds={loggedOutcomeIds}
               isMobile={isMobile}
             />
-          ))
+            ))}
+          </>
         )}
       </div>
 

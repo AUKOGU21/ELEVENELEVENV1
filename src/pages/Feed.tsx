@@ -46,6 +46,7 @@ interface DecisionRow {
   product_image_url: string | null;
   product_image_url_2: string | null;
   product_url: string | null;
+  product_category: string | null;
   price_note: string | null;
   sizes_note: string | null;
   context_note: string | null;
@@ -434,7 +435,7 @@ const Feed = () => {
     // No outcomes join here — we fetch outcomes separately below to avoid
     // PostgREST FK detection issues causing the join to silently return null.
     const query = `
-      id, product_name, brand_name, product_image_url, product_image_url_2, product_url,
+      id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_category,
       price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
       profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
@@ -1858,27 +1859,6 @@ const DecisionCard = ({
 
             return (
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                {/* Original context — what she was deciding, so browsers see the question behind the outcome */}
-                {(decision.uncertainty_text || decision.sizes_note) && (
-                  <div style={{ marginBottom: 16 }}>
-                    <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 8 }}>
-                      Was deciding
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {(decision.uncertainty_text ?? "").split(", ").map((u) => u.trim()).filter(Boolean).map((u, i) => (
-                        <span key={`u${i}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 100, padding: "4px 12px" }}>{u}</span>
-                      ))}
-                      {decision.sizes_note && decision.sizes_note.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
-                        <span key={`s${s}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.12)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "4px 12px" }}>{s}</span>
-                      ))}
-                    </div>
-                    <p style={{ fontSize: 13, color: "#8C7A70", marginTop: 8 }}>
-                      Started at <strong style={{ color: "#3A3530" }}>{confidence}/10</strong> confidence
-                    </p>
-                    <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginTop: 14 }} />
-                  </div>
-                )}
-
                 {/* Label */}
                 <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
                   Outcome
@@ -1945,10 +1925,31 @@ const DecisionCard = ({
                   </div>
                 ))}
 
-                {/* Responses — first 2 always expanded, rest behind toggle */}
+                {/* Original context — what she was deciding, kept below the outcome so the result lands first */}
+                {(decision.uncertainty_text || decision.sizes_note) && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginBottom: 14 }} />
+                    <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 8 }}>
+                      Was deciding
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {(decision.uncertainty_text ?? "").split(", ").map((u) => u.trim()).filter(Boolean).map((u, i) => (
+                        <span key={`u${i}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 100, padding: "4px 12px" }}>{u}</span>
+                      ))}
+                      {decision.sizes_note && decision.sizes_note.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
+                        <span key={`s${s}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.12)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "4px 12px" }}>{s}</span>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 13, color: "#8C7A70", marginTop: 8 }}>
+                      Started at <strong style={{ color: "#3A3530" }}>{confidence}/10</strong> confidence
+                    </p>
+                  </div>
+                )}
+
+                {/* Responses — collapsed by default on closed cards so the outcome lands first */}
                 {sortedResponses.length > 0 && (() => {
-                  const visibleResponses = sortedResponses.slice(0, 2);
-                  const hiddenResponses = sortedResponses.slice(2);
+                  const visibleResponses = sortedResponses.slice(0, 0);
+                  const hiddenResponses = sortedResponses;
                   const renderResponse = (resp: ResponseRow) => {
                     const counts = voteCounts[resp.id] ?? { helpful: 0, not_helpful: 0 };
                     const isOwnResp = resp.user_id === user?.id;
@@ -2036,7 +2037,7 @@ const DecisionCard = ({
                           >
                             <MessageCircle style={{ width: 15, height: 15, color: "#8C7A70" }} />
                             <span style={{ fontSize: 14, fontWeight: 600, color: "#5A4A42", textDecoration: "underline", textDecorationColor: "rgba(0,0,0,0.2)", textUnderlineOffset: 3 }}>
-                              {showAllResponses ? "Collapse" : `+ ${hiddenResponses.length} more response${hiddenResponses.length !== 1 ? "s" : ""}`}
+                              {showAllResponses ? "Collapse" : `See what ${hiddenResponses.length} ${hiddenResponses.length === 1 ? "woman" : "women"} said`}
                             </span>
                           </button>
                         </>

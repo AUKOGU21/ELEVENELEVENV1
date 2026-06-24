@@ -182,6 +182,7 @@ Do not include any explanation, just the JSON.`,
               ldImage: f.ldImage || jf.ldImage,
               ldBrand: f.ldBrand || jf.ldBrand,
               ldPrice: f.ldPrice || jf.ldPrice,
+              ldCategory: f.ldCategory || jf.ldCategory,
               ogTitle: !isJunkName(f.ogTitle) ? f.ogTitle : jf.ogTitle,
               ogImage: f.ogImage || jf.ogImage,
               ogDesc: f.ogDesc || jf.ogDesc,
@@ -246,7 +247,16 @@ Do not include any explanation, just the JSON.`,
         price = Number.isFinite(n) ? String(Math.round(n * 100) / 100) : null;
       }
 
-      console.log("Final — brand:", brand, "name:", name, "image:", imageUrl, "price:", price);
+      // Category: classify from the page's structured signals (JSON-LD
+      // taxonomy + URL path section + name), never from the prose description
+      // which is too noisy ("thank" → tank, etc.). Null if nothing matches.
+      const pathForCat = (() => {
+        try { return decodeURIComponent(new URL(body.url).pathname).replace(/[-_/]+/g, " "); }
+        catch { return ""; }
+      })();
+      const category = resolveCategory([f.ldCategory, pathForCat, name]);
+
+      console.log("Final — brand:", brand, "name:", name, "image:", imageUrl, "price:", price, "category:", category);
 
       return new Response(
         JSON.stringify({
@@ -256,7 +266,7 @@ Do not include any explanation, just the JSON.`,
           image_url: imageUrl,
           price,
           color: null,
-          category: null,
+          category,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -287,20 +297,51 @@ function extractDomainBrand(url: string): string {
 
 interface Fields {
   ldName: string | null; ldImage: string | null; ldBrand: string | null; ldPrice: string | null;
+  ldCategory: string | null;
   ogTitle: string; ogImage: string | null; ogDesc: string; ogPrice: string | null;
   image: string | null;
+}
+
+// Classify a single clean signal (JSON-LD taxonomy, URL path, or product name)
+// into one of the 7 app categories. Order matters: more specific garment types
+// are checked first so "denim jacket" → Outerwear, not Bottoms.
+function categoryFromText(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const s = raw.toLowerCase();
+  const groups: [string, string[]][] = [
+    ["Shoes", ["shoe", "boot", "sneaker", "heel", "sandal", "loafer", "pump", "mule", "footwear", "clog"]],
+    ["Bags", ["bag", "purse", "handbag", "tote", "clutch", "backpack", "crossbody", "satchel"]],
+    ["Accessories", ["accessor", "belt", "scarf", "beanie", "jewel", "earring", "necklace", "bracelet", "sunglass", "glove", "hosiery"]],
+    ["Outerwear", ["jacket", "coat", "blazer", "cardigan", "parka", "trench", "outerwear", "puffer", "anorak"]],
+    ["Dresses", ["dress", "gown", "romper", "jumpsuit", "frock"]],
+    ["Bottoms", ["jean", "denim", "trouser", "pant", "shorts", "skirt", "legging", "chino", "cargo", "culotte"]],
+    ["Tops", ["t-shirt", "tee", "tank", "top", "shirt", "blouse", "sweater", "sweatshirt", "hoodie", "crop", "knit", "cami", "camisole", "bodysuit", "turtleneck", "polo", "vest", "henley", "crew", "long sleeve", "longsleeve", "tunic"]],
+  ];
+  for (const [cat, kws] of groups) {
+    if (kws.some((k) => s.includes(k))) return cat;
+  }
+  return null;
+}
+
+// First category match across signals, tried in priority order.
+function resolveCategory(signals: (string | null | undefined)[]): string | null {
+  for (const sig of signals) {
+    const c = categoryFromText(sig);
+    if (c) return c;
+  }
+  return null;
 }
 
 // Parse all product signals out of an HTML document. Used on both the direct
 // fetch and the Jina-rendered HTML so the two paths stay identical.
 function extractFields(html: string): Fields {
   const f: Fields = {
-    ldName: null, ldImage: null, ldBrand: null, ldPrice: null,
+    ldName: null, ldImage: null, ldBrand: null, ldPrice: null, ldCategory: null,
     ogTitle: "", ogImage: null, ogDesc: "", ogPrice: null, image: null,
   };
   if (!html) return f;
 
-  const ld: { name?: string; image?: string; brand?: string; price?: string } = {};
+  const ld: { name?: string; image?: string; brand?: string; price?: string; category?: string } = {};
   for (const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
     try { walkJsonLd(JSON.parse(m[1].trim()), ld); } catch { /* malformed JSON-LD, skip */ }
   }
@@ -308,6 +349,7 @@ function extractFields(html: string): Fields {
   f.ldImage = ld.image ?? null;
   f.ldBrand = ld.brand ?? null;
   f.ldPrice = ld.price != null ? String(ld.price) : null;
+  f.ldCategory = ld.category ?? null;
 
   f.ogTitle = metaContent(html, "og:title") || (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? "");
   f.ogImage = metaContent(html, "og:image") || metaContent(html, "og:image:secure_url") ||
@@ -333,7 +375,7 @@ function metaContent(html: string, key: string): string | null {
 // the first Product node found (handles @graph arrays and nested objects).
 function walkJsonLd(
   node: unknown,
-  acc: { name?: string; image?: string; brand?: string; price?: string },
+  acc: { name?: string; image?: string; brand?: string; price?: string; category?: string },
 ): void {
   if (!node || typeof node !== "object") return;
   if (Array.isArray(node)) { for (const n of node) walkJsonLd(n, acc); return; }
@@ -361,6 +403,11 @@ function walkJsonLd(
         const p = offer.price ?? offer.lowPrice ?? spec?.price ?? spec?.lowPrice;
         if (p != null) acc.price = String(p);
       }
+    }
+    if (!acc.category) {
+      const c = obj.category;
+      if (typeof c === "string") acc.category = c;
+      else if (Array.isArray(c)) acc.category = c.filter((x) => typeof x === "string").join(" ");
     }
   }
   for (const k of Object.keys(obj)) {

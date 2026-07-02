@@ -931,6 +931,13 @@ const Feed = () => {
     return age >= 14;
   });
   const showFollowupBanner = !!user && activeTab === "feed" && followupPending.length > 0;
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.debug("[followup-banner]", {
+      show: showFollowupBanner, count: followupPending.length, activeTab, hasUser: !!user,
+      items: followupPending.map((d) => ({ name: d.product_name, status: d.status, created: d.outcomes?.[0]?.created_at, followed: d.outcomes?.[0]?.followed_up_at })),
+    });
+  }
 
   // ─── Render helpers ───────────────────────────────────────────────────────────
 
@@ -1249,7 +1256,7 @@ const Feed = () => {
         ) : (
           <>
             {showFollowupBanner && (
-              <button onClick={() => setActiveTab("mine")} style={{ display: "flex", width: "100%", textAlign: "left", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer" }}>
+              <button onClick={() => setActiveTab("mine")} style={{ position: "relative", zIndex: 10, display: "flex", width: "100%", textAlign: "left", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer", boxShadow: "0 2px 14px rgba(120,60,20,0.10)" }}>
                 <div>
                   <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A6620", margin: 0 }}>Follow up</p>
                   <p style={{ fontSize: 14, fontWeight: 600, color: "#1C1712", margin: "4px 0 0" }}>

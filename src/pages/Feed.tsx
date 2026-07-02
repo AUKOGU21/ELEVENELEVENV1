@@ -2019,6 +2019,57 @@ const DecisionCard = ({
                   </div>
                 )}
 
+                {/* 2-week follow-up prompt — owner only, once the purchase is 14+ days old */}
+                {isOwn && decision.status === "purchased" && (() => {
+                  const o = decision.outcomes?.[0] ?? null;
+                  const ageDays = o?.created_at ? (Date.now() - new Date(o.created_at).getTime()) / 86400000 : 0;
+                  if (!o || o.followed_up_at || ageDays < 14 || fuSnoozed) return null;
+                  const itemName = [decision.brand_name, decision.product_name].filter(Boolean).join(" ").trim() || "your pick";
+                  const heading = (t: string) => <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>{t}</p>;
+                  const dark: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+                  const outline: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+                  const ghost: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+                  const wrap = (inner: React.ReactNode) => <div style={{ background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 12, padding: 14, marginBottom: 16 }}>{inner}</div>;
+                  if (fuStage === "kept") return wrap(
+                    <div>
+                      {heading(`It's been 2 weeks — how did the ${itemName} hold up?`)}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button style={dark} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Kept it</button>
+                        <button style={outline} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returned it</button>
+                        <button style={ghost} onClick={() => setFuSnoozed(true)}>Later</button>
+                      </div>
+                    </div>
+                  );
+                  if (fuStage === "recommend") return wrap(
+                    <div>
+                      {heading("Would you recommend it to someone like you?")}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button style={dark} onClick={() => { setFuRec(true); setFuStage("confidence"); }}>Yes</button>
+                        <button style={outline} onClick={() => { setFuRec(false); setFuStage("confidence"); }}>No</button>
+                      </div>
+                    </div>
+                  );
+                  if (fuStage === "confidence") return wrap(
+                    <div>
+                      {heading("How do you feel about the decision now?")}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {Array.from({ length: 10 }).map((_, i) => {
+                          const n = i + 1;
+                          return <button key={n} onClick={() => { setFuConf(n); setFuStage("take"); }} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", color: "#1A1A1A", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{n}</button>;
+                        })}
+                      </div>
+                      <p style={{ fontSize: 12, color: "#8C7A70", margin: "8px 0 0" }}>1 = wish I hadn't, 10 = so glad I did</p>
+                    </div>
+                  );
+                  return wrap(
+                    <div>
+                      {heading("Anything you'd tell someone like you? (optional)")}
+                      <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={2} placeholder="e.g. runs small, sized up and so glad I did" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+                      <button onClick={() => submitFollowup(decision.id, { kept: fuKept ?? true, recommend: fuRec, confidenceAfter: fuConf, take: fuTake })} style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }}>Done</button>
+                    </div>
+                  );
+                })()}
+
                 {/* Responses — collapsed by default on closed cards so the outcome lands first */}
                 {sortedResponses.length > 0 && (() => {
                   const visibleResponses = sortedResponses.slice(0, 0);
@@ -2336,57 +2387,6 @@ const DecisionCard = ({
                             <button onClick={() => quickLogOutcome(decision.id, "didnt_buy")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
                             <button onClick={() => setSnoozedOutcome(true)} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
                           </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* 2-week follow-up: closes the loop with kept/returned + recommend + ending confidence + take */}
-                    {decision.status === "purchased" && (() => {
-                      const o = decision.outcomes?.[0] ?? null;
-                      const ageDays = o?.created_at ? (Date.now() - new Date(o.created_at).getTime()) / 86400000 : 0;
-                      if (!o || o.followed_up_at || ageDays < 14 || fuSnoozed) return null;
-                      const itemName = [decision.brand_name, decision.product_name].filter(Boolean).join(" ").trim() || "your pick";
-                      const heading = (t: string) => <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>{t}</p>;
-                      const dark: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" };
-                      const outline: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" };
-                      const ghost: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" };
-
-                      if (fuStage === "kept") return (
-                        <div>
-                          {heading(`It's been 2 weeks — how did the ${itemName} hold up?`)}
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button style={dark} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Kept it</button>
-                            <button style={outline} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returned it</button>
-                            <button style={ghost} onClick={() => setFuSnoozed(true)}>Later</button>
-                          </div>
-                        </div>
-                      );
-                      if (fuStage === "recommend") return (
-                        <div>
-                          {heading("Would you recommend it to someone like you?")}
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button style={dark} onClick={() => { setFuRec(true); setFuStage("confidence"); }}>Yes</button>
-                            <button style={outline} onClick={() => { setFuRec(false); setFuStage("confidence"); }}>No</button>
-                          </div>
-                        </div>
-                      );
-                      if (fuStage === "confidence") return (
-                        <div>
-                          {heading("How do you feel about the decision now?")}
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {Array.from({ length: 10 }).map((_, i) => {
-                              const n = i + 1;
-                              return <button key={n} onClick={() => { setFuConf(n); setFuStage("take"); }} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", color: "#1A1A1A", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{n}</button>;
-                            })}
-                          </div>
-                          <p style={{ fontSize: 12, color: "#8C7A70", margin: "8px 0 0" }}>1 = wish I hadn't, 10 = so glad I did</p>
-                        </div>
-                      );
-                      return (
-                        <div>
-                          {heading("Anything you'd tell someone like you? (optional)")}
-                          <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={2} placeholder="e.g. runs small, sized up and so glad I did" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
-                          <button onClick={() => submitFollowup(decision.id, { kept: fuKept ?? true, recommend: fuRec, confidenceAfter: fuConf, take: fuTake })} style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }}>Done</button>
                         </div>
                       );
                     })()}

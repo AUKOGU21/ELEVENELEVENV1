@@ -42,6 +42,7 @@ interface OutcomeRow {
   confidence_after: number | null;
   take: string | null;
   followed_up_at: string | null;
+  created_at: string | null;
 }
 
 interface DecisionRow {
@@ -494,7 +495,7 @@ const Feed = () => {
       if (allDecisionIds.length > 0) {
         const { data: outcomesData } = await supabase
           .from("outcomes")
-          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at")
           .in("decision_id", allDecisionIds)
           .order("created_at", { ascending: false });
 
@@ -571,7 +572,7 @@ const Feed = () => {
         if (myDecisionIds.length > 0) {
           const { data: myOutcomesData } = await supabase
             .from("outcomes")
-            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at")
             .in("decision_id", myDecisionIds)
             .order("created_at", { ascending: false });
 
@@ -608,6 +609,31 @@ const Feed = () => {
 
   // One-tap outcome log from the card prompt: saves the core signal, flips
   // status so the card shows its logged state, and fires the close-the-loop email.
+  // The 2-week follow-up: records kept/returned, recommend, ending confidence, and
+  // an optional take, and stamps followed_up_at so the card fills in and the nudge stops.
+  const submitFollowup = async (
+    id: string,
+    data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null },
+  ) => {
+    if (!user) return;
+    const patch: any = {
+      kept: data.kept,
+      recommend: data.recommend,
+      confidence_after: data.confidenceAfter,
+      take: data.take && data.take.trim() ? data.take.trim() : null,
+      followed_up_at: new Date().toISOString(),
+    };
+    const merge = (d: DecisionRow): DecisionRow =>
+      d.id === id ? { ...d, outcomes: [{ ...(d.outcomes?.[0] ?? {} as any), ...patch }] } : d;
+    setDecisions(prev => prev.map(merge));
+    setMyDecisions(prev => prev.map(merge));
+    try {
+      await supabase.from("outcomes").update(patch).eq("decision_id", id);
+    } catch (e) {
+      console.error("followup submit failed:", e);
+    }
+  };
+
   const quickLogOutcome = async (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => {
     if (!user) return;
     const did = outcome === "bought_it";
@@ -895,6 +921,16 @@ const Feed = () => {
   })();
   const showActivation = !!user && activeTab === "feed"
     && myDecisions.length === 0 && hasWeighedIn === false && !!activationTarget;
+
+  // Purchases that hit the 2-week mark and still need their follow-up (drives the banner).
+  const followupPending = myDecisions.filter((d) => {
+    if (d.status !== "purchased") return false;
+    const o = d.outcomes?.[0];
+    if (!o || o.followed_up_at) return false;
+    const age = o.created_at ? (Date.now() - new Date(o.created_at).getTime()) / 86400000 : 0;
+    return age >= 14;
+  });
+  const showFollowupBanner = !!user && activeTab === "feed" && followupPending.length > 0;
 
   // ─── Render helpers ───────────────────────────────────────────────────────────
 
@@ -1212,6 +1248,20 @@ const Feed = () => {
           </div>
         ) : (
           <>
+            {showFollowupBanner && (
+              <button onClick={() => setActiveTab("mine")} style={{ display: "flex", width: "100%", textAlign: "left", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer" }}>
+                <div>
+                  <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A6620", margin: 0 }}>Follow up</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "#1C1712", margin: "4px 0 0" }}>
+                    {followupPending.length === 1 ? "1 purchase is ready to close the loop" : `${followupPending.length} purchases are ready to close the loop`}
+                  </p>
+                  <p style={{ fontSize: 12, color: "rgba(28,23,18,0.55)", margin: "2px 0 0" }}>
+                    {[followupPending[0].brand_name, followupPending[0].product_name].filter(Boolean).join(" ").trim()}{followupPending.length > 1 ? " and more" : ""}
+                  </p>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#8A6620", whiteSpace: "nowrap" }}>Review &rarr;</span>
+              </button>
+            )}
             {showActivation && renderActivationCard()}
             {displayList.map((decision) => (
             <DecisionCard
@@ -1223,6 +1273,7 @@ const Feed = () => {
               setLightboxUrl={setLightboxUrl}
               setTrackingId={setTrackingId}
               quickLogOutcome={quickLogOutcome}
+              submitFollowup={submitFollowup}
               startWeighIn={startWeighIn}
               handleDelete={handleDelete}
               handleHelpfulVote={handleHelpfulVote}
@@ -1431,7 +1482,7 @@ const Feed = () => {
                 // if there are multiple rows for the same decision_id.
                 const { data: rows } = await supabase
                   .from("outcomes")
-                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at")
                   .eq("decision_id", id)
                   .order("created_at", { ascending: false })
                   .limit(1);
@@ -1527,6 +1578,7 @@ interface CardProps {
   setLightboxUrl: (url: string | null) => void;
   setTrackingId: (id: string | null) => void;
   quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
+  submitFollowup: (id: string, data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null }) => void;
   startWeighIn: (id: string) => void;
   handleDelete: (id: string) => void;
   handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
@@ -1548,6 +1600,7 @@ const DecisionCard = ({
   setLightboxUrl,
   setTrackingId,
   quickLogOutcome,
+  submitFollowup,
   startWeighIn,
   handleDelete,
   handleHelpfulVote,
@@ -1565,6 +1618,13 @@ const DecisionCard = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [snoozedOutcome, setSnoozedOutcome] = useState(false);
   const [pickingSize, setPickingSize] = useState(false);
+  // 2-week follow-up wizard state
+  const [fuStage, setFuStage] = useState<"kept" | "recommend" | "confidence" | "take">("kept");
+  const [fuKept, setFuKept] = useState<boolean | null>(null);
+  const [fuRec, setFuRec] = useState<boolean | null>(null);
+  const [fuConf, setFuConf] = useState<number | null>(null);
+  const [fuTake, setFuTake] = useState("");
+  const [fuSnoozed, setFuSnoozed] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -1875,7 +1935,6 @@ const DecisionCard = ({
             const recommend = outcome?.recommend;
             const uncertainties = (decision.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
             const sizeChips = (decision.sizes_note ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-            const SERIF = "'Cormorant Garamond', Georgia, serif";
             const LBL: React.CSSProperties = { fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: 0 };
 
             return (
@@ -1889,7 +1948,7 @@ const DecisionCard = ({
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={LBL}>Final decision</p>
-                      <p style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 26, color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1, whiteSpace: "nowrap" }}>{bought ? "Bought it" : "Didn't buy it"}</p>
+                      <p style={{ fontWeight: 800, fontSize: 24, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, whiteSpace: "nowrap" }}>{bought ? "Bought it" : "Didn't buy it"}</p>
                     </div>
                   </div>
                   {bought && sizeBought && (
@@ -1897,7 +1956,7 @@ const DecisionCard = ({
                       <div style={{ width: 1, alignSelf: "stretch", background: "rgba(0,0,0,0.1)", margin: "0 14px" }} />
                       <div style={{ flexShrink: 0 }}>
                         <p style={LBL}>Purchased size</p>
-                        <p style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 26, color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1, textTransform: "uppercase" }}>{sizeBought}</p>
+                        <p style={{ fontWeight: 800, fontSize: 24, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, textTransform: "uppercase" }}>{sizeBought}</p>
                       </div>
                     </>
                   )}
@@ -1937,8 +1996,8 @@ const DecisionCard = ({
                   <div style={{ marginBottom: 16 }}>
                     <p style={{ ...LBL, marginBottom: 8 }}>Her take</p>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <span style={{ fontFamily: SERIF, fontSize: 26, color: "#C2B9A6", lineHeight: 0.7 }}>&ldquo;</span>
-                      <p style={{ fontFamily: SERIF, fontSize: 17, fontStyle: "italic", lineHeight: 1.45, margin: 0, color: "#3A3530" }}>{take}</p>
+                      <span style={{ fontSize: 26, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
+                      <p style={{ fontSize: 15, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}</p>
                     </div>
                   </div>
                 )}
@@ -2273,6 +2332,58 @@ const DecisionCard = ({
                         </div>
                       );
                     })()}
+
+                    {/* 2-week follow-up: closes the loop with kept/returned + recommend + ending confidence + take */}
+                    {decision.status === "purchased" && (() => {
+                      const o = decision.outcomes?.[0] ?? null;
+                      const ageDays = o?.created_at ? (Date.now() - new Date(o.created_at).getTime()) / 86400000 : 0;
+                      if (!o || o.followed_up_at || ageDays < 14 || fuSnoozed) return null;
+                      const itemName = [decision.brand_name, decision.product_name].filter(Boolean).join(" ").trim() || "your pick";
+                      const heading = (t: string) => <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>{t}</p>;
+                      const dark: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+                      const outline: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+                      const ghost: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+
+                      if (fuStage === "kept") return (
+                        <div>
+                          {heading(`It's been 2 weeks — how did the ${itemName} hold up?`)}
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button style={dark} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Kept it</button>
+                            <button style={outline} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returned it</button>
+                            <button style={ghost} onClick={() => setFuSnoozed(true)}>Later</button>
+                          </div>
+                        </div>
+                      );
+                      if (fuStage === "recommend") return (
+                        <div>
+                          {heading("Would you recommend it to someone like you?")}
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button style={dark} onClick={() => { setFuRec(true); setFuStage("confidence"); }}>Yes</button>
+                            <button style={outline} onClick={() => { setFuRec(false); setFuStage("confidence"); }}>No</button>
+                          </div>
+                        </div>
+                      );
+                      if (fuStage === "confidence") return (
+                        <div>
+                          {heading("How do you feel about the decision now?")}
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {Array.from({ length: 10 }).map((_, i) => {
+                              const n = i + 1;
+                              return <button key={n} onClick={() => { setFuConf(n); setFuStage("take"); }} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", color: "#1A1A1A", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{n}</button>;
+                            })}
+                          </div>
+                          <p style={{ fontSize: 12, color: "#8C7A70", margin: "8px 0 0" }}>1 = wish I hadn't, 10 = so glad I did</p>
+                        </div>
+                      );
+                      return (
+                        <div>
+                          {heading("Anything you'd tell someone like you? (optional)")}
+                          <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={2} placeholder="e.g. runs small, sized up and so glad I did" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+                          <button onClick={() => submitFollowup(decision.id, { kept: fuKept ?? true, recommend: fuRec, confidenceAfter: fuConf, take: fuTake })} style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }}>Done</button>
+                        </div>
+                      );
+                    })()}
+
                     {activeTab === "mine" && (
                       <button
                         onClick={() => { if (confirm("Remove this decision?")) handleDelete(decision.id); }}

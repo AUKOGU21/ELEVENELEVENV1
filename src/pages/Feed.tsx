@@ -37,6 +37,11 @@ interface OutcomeRow {
   size_recommendation: string | null;
   outcome_detail: string | null;
   outcome_detail_other: string | null;
+  kept: boolean | null;
+  recommend: boolean | null;
+  confidence_after: number | null;
+  take: string | null;
+  followed_up_at: string | null;
 }
 
 interface DecisionRow {
@@ -489,7 +494,7 @@ const Feed = () => {
       if (allDecisionIds.length > 0) {
         const { data: outcomesData } = await supabase
           .from("outcomes")
-          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at")
           .in("decision_id", allDecisionIds)
           .order("created_at", { ascending: false });
 
@@ -566,7 +571,7 @@ const Feed = () => {
         if (myDecisionIds.length > 0) {
           const { data: myOutcomesData } = await supabase
             .from("outcomes")
-            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at")
             .in("decision_id", myDecisionIds)
             .order("created_at", { ascending: false });
 
@@ -1426,7 +1431,7 @@ const Feed = () => {
                 // if there are multiple rows for the same decision_id.
                 const { data: rows } = await supabase
                   .from("outcomes")
-                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at")
                   .eq("decision_id", id)
                   .order("created_at", { ascending: false })
                   .limit(1);
@@ -1859,98 +1864,92 @@ const DecisionCard = ({
 
           {/* ── OUTCOME CARD (purchased / closed) ── */}
           {(decision.status === "purchased" || decision.status === "closed") ? (() => {
-            const { headline, sentiment, contextLines, writeIns, sizeBought } = buildOutcomeDisplay(
-              decision.outcomes?.[0] ?? null,
-              decision.status,
-            );
-            const sentimentStyle = sentiment ? SENTIMENT_STYLE[sentiment] : null;
+            const outcome = decision.outcomes?.[0] ?? null;
+            const bought = decision.status === "purchased";
+            const sizeBought = outcome?.size_bought ?? null;
+            const confidenceAfter = outcome?.confidence_after ?? null;
+            // Prefer the dedicated take; fall back to legacy write-ins so old outcomes still read well.
+            const take = outcome?.take || outcome?.fit_result_note || outcome?.outcome_detail_other || outcome?.tipping_factor_other || null;
+            const followedUp = !!outcome?.followed_up_at;
+            const kept = outcome?.kept;
+            const recommend = outcome?.recommend;
+            const uncertainties = (decision.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+            const sizeChips = (decision.sizes_note ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+            const SERIF = "'Cormorant Garamond', Georgia, serif";
+            const LBL: React.CSSProperties = { fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: 0 };
 
             return (
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                {/* Label */}
-                <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
-                  Outcome
-                </p>
 
-                {/* Headline — replaced by "Purchased size + bubble" when size is present */}
-                {sizeBought ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                    <p style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, letterSpacing: "-0.01em", margin: 0 }}>
-                      Purchased size
-                    </p>
-                    <div style={{
-                      width: isMobile ? 30 : 38, height: isMobile ? 30 : 38, borderRadius: "50%",
-                      border: "1.5px solid rgba(0,0,0,0.18)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: isMobile ? 12 : 14, fontWeight: 700, color: "#1A1A1A",
-                      background: "rgba(0,0,0,0.03)",
-                      textTransform: "uppercase",
-                      flexShrink: 0,
-                    }}>
-                      {sizeBought}
+                {/* Final decision panel */}
+                <div style={{ background: "rgba(0,0,0,0.035)", borderRadius: 12, padding: "16px 14px", display: "flex", alignItems: "flex-start", marginBottom: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 11 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: bought ? "#6E7A44" : "#8C7A70", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {bought ? <Check style={{ width: 20, height: 20, color: "#fff" }} /> : <X style={{ width: 18, height: 18, color: "#fff" }} />}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={LBL}>Final decision</p>
+                      <p style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 26, color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1, whiteSpace: "nowrap" }}>{bought ? "Bought it" : "Didn't buy it"}</p>
                     </div>
                   </div>
-                ) : (
-                  <p style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: "#1A1A1A", lineHeight: 1.15, marginBottom: 10, letterSpacing: "-0.01em" }}>
-                    {headline}
-                  </p>
-                )}
+                  {bought && sizeBought && (
+                    <>
+                      <div style={{ width: 1, alignSelf: "stretch", background: "rgba(0,0,0,0.1)", margin: "0 14px" }} />
+                      <div style={{ flexShrink: 0 }}>
+                        <p style={LBL}>Purchased size</p>
+                        <p style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 26, color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1, textTransform: "uppercase" }}>{sizeBought}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
 
-                {/* Sentiment badge */}
-                {sentimentStyle && (
-                  <div style={{ marginBottom: contextLines.length || writeIns.length ? 14 : 0 }}>
-                    <span style={{
-                      display: "inline-flex", alignItems: "center",
-                      fontSize: 13, fontWeight: 600,
-                      color: sentimentStyle.color,
-                      background: sentimentStyle.bg,
-                      border: `1px solid ${sentimentStyle.border}`,
-                      borderRadius: 100, padding: "4px 12px",
-                    }}>
-                      {sentimentStyle.label}
-                    </span>
-                  </div>
-                )}
-
-                {/* Context lines + write-ins with dividers between each */}
-                {[
-                  ...contextLines.map((line) => ({ type: "line" as const, text: line })),
-                  ...writeIns.map((text) => ({ type: "quote" as const, text })),
-                ].map((item, i) => (
-                  <div key={i}>
-                    {i > 0 && <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginTop: 10, marginBottom: 10 }} />}
-                    {item.type === "line" ? (
-                      <p style={{ fontSize: 15, color: "#5A4A42", lineHeight: 1.5, margin: 0 }}>
-                        {item.text.startsWith("Recommends:") ? (
-                          <><strong>Recommends:</strong>{item.text.slice("Recommends:".length)}</>
-                        ) : item.text}
-                      </p>
+                {/* Confidence journey */}
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ ...LBL, marginBottom: 9 }}>Confidence journey</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 15, color: "#3A3530" }}>Started <strong style={{ fontSize: 17 }}>{confidence}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
+                    <span style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.22)" }} />
+                    {confidenceAfter != null ? (
+                      <span style={{ fontSize: 15, color: "#3A3530" }}>Ended <strong style={{ fontSize: 17, color: "#6E7A44" }}>{confidenceAfter}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
                     ) : (
-                      <p style={{ fontSize: 15, fontStyle: "italic", color: "#5A4A42", lineHeight: 1.55, margin: 0 }}>
-                        "{item.text}"
-                      </p>
+                      <span style={{ fontSize: 13, color: "#B0A498", fontStyle: "italic" }}>pending</span>
                     )}
                   </div>
-                ))}
+                </div>
 
-                {/* Original context — what she was deciding, kept below the outcome so the result lands first */}
-                {(decision.uncertainty_text || decision.sizes_note) && (
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ height: 1, background: "rgba(0,0,0,0.07)", marginBottom: 14 }} />
-                    <p style={{ fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 8 }}>
-                      Was deciding
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {(decision.uncertainty_text ?? "").split(", ").map((u) => u.trim()).filter(Boolean).map((u, i) => (
-                        <span key={`u${i}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 100, padding: "4px 12px" }}>{u}</span>
+                {/* Was deciding about */}
+                {(uncertainties.length > 0 || sizeChips.length > 0) && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ ...LBL, marginBottom: 9 }}>Was deciding about</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                      {uncertainties.map((u, i) => (
+                        <span key={`u${i}`} style={{ fontSize: 13, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "5px 12px", whiteSpace: "nowrap" }}>{u}</span>
                       ))}
-                      {decision.sizes_note && decision.sizes_note.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
-                        <span key={`s${s}`} style={{ fontSize: 14, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.12)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "4px 12px" }}>{s}</span>
+                      {sizeChips.map((s) => (
+                        <span key={`s${s}`} style={{ fontSize: 13, color: "#3A3530", background: "rgba(184,149,106,0.14)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "5px 12px", whiteSpace: "nowrap" }}>{s}</span>
                       ))}
                     </div>
-                    <p style={{ fontSize: 13, color: "#8C7A70", marginTop: 8 }}>
-                      Started at <strong style={{ color: "#3A3530" }}>{confidence}/10</strong> confidence
-                    </p>
+                  </div>
+                )}
+
+                {/* Her take — only once she's written one */}
+                {take && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ ...LBL, marginBottom: 8 }}>Her take</p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <span style={{ fontFamily: SERIF, fontSize: 26, color: "#C2B9A6", lineHeight: 0.7 }}>&ldquo;</span>
+                      <p style={{ fontFamily: SERIF, fontSize: 17, fontStyle: "italic", lineHeight: 1.45, margin: 0, color: "#3A3530" }}>{take}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommends / kept — only after the 2-week follow-up */}
+                {followedUp && (kept != null || recommend != null) && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 16 }}>
+                    {recommend === true && <span style={{ fontSize: 12, background: "#6E7A44", color: "#fff", borderRadius: 100, padding: "4px 11px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}><Check style={{ width: 12, height: 12 }} /> Recommends to her matches</span>}
+                    {recommend === false && <span style={{ fontSize: 12, background: "rgba(122,64,64,0.10)", color: "#7A4040", borderRadius: 100, padding: "4px 11px", fontWeight: 600 }}>Wouldn't recommend</span>}
+                    {kept === true && <span style={{ fontSize: 12, color: "#6E7A44", fontWeight: 600 }}>Kept it</span>}
+                    {kept === false && <span style={{ fontSize: 12, color: "#7A4040", fontWeight: 600 }}>Returned it</span>}
                   </div>
                 )}
 

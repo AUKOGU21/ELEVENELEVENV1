@@ -173,7 +173,9 @@ function buildOutcomeDisplay(outcome: OutcomeRow | null, status: string): Outcom
 
   // ── Flow 1: Between sizes / Will it fit right ────────────────────────────────
   if (primary === "Between sizes" || primary === "Will it fit right") {
-    let sentiment: Sentiment = "happy";
+    // Only assert a sentiment when fit was actually captured (the full modal).
+    // The quick "Bought it → which size?" path records size alone, no fit judgment.
+    let sentiment: Sentiment = outcome.fit_result ? "happy" : null;
     if (outcome.fit_result === "Not at all what I expected" || outcome.size_recommendation === "Don't buy") {
       sentiment = "regret";
     } else if (outcome.fit_result === "OK fit, but not perfect") {
@@ -601,17 +603,22 @@ const Feed = () => {
 
   // One-tap outcome log from the card prompt: saves the core signal, flips
   // status so the card shows its logged state, and fires the close-the-loop email.
-  const quickLogOutcome = async (id: string, outcome: "bought_it" | "didnt_buy") => {
+  const quickLogOutcome = async (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => {
     if (!user) return;
     const did = outcome === "bought_it";
     const newStatus = did ? "purchased" : "closed";
-    const patch = { status: newStatus, outcomes: [{ did_purchase: did, outcome_type: outcome }] } as any;
+    // For a between-sizes purchase we also capture which size she landed on — the
+    // highest-value signal in the whole app. primary_uncertainty flags it so the
+    // outcome card renders "Purchased size N".
+    const outcomeRow: any = { did_purchase: did, outcome_type: outcome };
+    if (sizeBought) { outcomeRow.size_bought = sizeBought; outcomeRow.primary_uncertainty = "Between sizes"; }
+    const patch = { status: newStatus, outcomes: [outcomeRow] } as any;
     setLoggedOutcomeIds(prev => { const next = new Set(prev); next.add(id); return next; });
     setDecisions(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
     setMyDecisions(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
     try {
       await supabase.from("outcomes").upsert(
-        { decision_id: id, user_id: user.id, did_purchase: did, outcome_type: outcome },
+        { decision_id: id, user_id: user.id, ...outcomeRow },
         { onConflict: "decision_id" },
       );
       await supabase.from("decisions").update({ status: newStatus }).eq("id", id);
@@ -1514,7 +1521,7 @@ interface CardProps {
   userVotes: Record<string, "helpful" | "not_helpful">;
   setLightboxUrl: (url: string | null) => void;
   setTrackingId: (id: string | null) => void;
-  quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy") => void;
+  quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
   startWeighIn: (id: string) => void;
   handleDelete: (id: string) => void;
   handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
@@ -1552,6 +1559,7 @@ const DecisionCard = ({
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [snoozedOutcome, setSnoozedOutcome] = useState(false);
+  const [pickingSize, setPickingSize] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -2231,10 +2239,27 @@ const DecisionCard = ({
                   </>
                 ) : isOwn ? (
                   <div style={{ width: "100%" }}>
-                    {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
-                      snoozedOutcome ? (
-                        <p style={{ fontSize: 14, color: "#8C7A70", margin: 0 }}>Got it. We'll check back later.</p>
-                      ) : (
+                    {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (() => {
+                      const sizeOptions = (decision.uncertainty_text || "").includes("Between sizes")
+                        ? (decision.sizes_note || "").split(",").map((s) => s.trim()).filter(Boolean)
+                        : [];
+                      if (snoozedOutcome) {
+                        return <p style={{ fontSize: 14, color: "#8C7A70", margin: 0 }}>Got it. We'll check back later.</p>;
+                      }
+                      if (pickingSize) {
+                        return (
+                          <div>
+                            <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>Which size did you get?</p>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              {sizeOptions.map((s) => (
+                                <button key={s} onClick={() => quickLogOutcome(decision.id, "bought_it", s)} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{s}</button>
+                              ))}
+                              <button onClick={() => quickLogOutcome(decision.id, "bought_it")} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Not sure</button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
                         <div>
                           <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
                             {weighInCount > 0
@@ -2242,13 +2267,13 @@ const DecisionCard = ({
                               : "How'd it go?"}
                           </p>
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => quickLogOutcome(decision.id, "bought_it")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
+                            <button onClick={() => sizeOptions.length ? setPickingSize(true) : quickLogOutcome(decision.id, "bought_it")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
                             <button onClick={() => quickLogOutcome(decision.id, "didnt_buy")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
                             <button onClick={() => setSnoozedOutcome(true)} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
                           </div>
                         </div>
-                      )
-                    )}
+                      );
+                    })()}
                     {activeTab === "mine" && (
                       <button
                         onClick={() => { if (confirm("Remove this decision?")) handleDelete(decision.id); }}

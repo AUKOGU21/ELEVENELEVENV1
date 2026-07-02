@@ -348,6 +348,8 @@ const Feed = () => {
 
   // ── Modals & overlays
   const [trackingId, setTrackingId] = useState<string | null>(null);
+  // Pre-seeds the outcome modal when opened from the Bought it / Passed buttons.
+  const [outcomeInitial, setOutcomeInitial] = useState<"bought_it" | "didnt_buy" | null>(null);
   const [loggedOutcomeIds, setLoggedOutcomeIds] = useState<Set<string>>(new Set());
   const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -1282,6 +1284,7 @@ const Feed = () => {
               userVotes={userVotes}
               setLightboxUrl={setLightboxUrl}
               setTrackingId={setTrackingId}
+              setOutcomeInitial={setOutcomeInitial}
               quickLogOutcome={quickLogOutcome}
               submitFollowup={submitFollowup}
               startWeighIn={startWeighIn}
@@ -1467,7 +1470,8 @@ const Feed = () => {
 
       <OutcomeModal
         open={trackingId !== null}
-        onClose={() => setTrackingId(null)}
+        initialOutcome={outcomeInitial}
+        onClose={() => { setTrackingId(null); setOutcomeInitial(null); }}
         decision={decisions.find(d => d.id === trackingId) ?? myDecisions.find(d => d.id === trackingId) ?? { id: trackingId ?? '', uncertainty_text: null }}
         onComplete={(outcome) => {
           if (outcome !== "still_deciding" && trackingId) {
@@ -1588,6 +1592,7 @@ interface CardProps {
   userVotes: Record<string, "helpful" | "not_helpful">;
   setLightboxUrl: (url: string | null) => void;
   setTrackingId: (id: string | null) => void;
+  setOutcomeInitial: (o: "bought_it" | "didnt_buy" | null) => void;
   quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
   submitFollowup: (id: string, data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null }) => void;
   startWeighIn: (id: string) => void;
@@ -1610,6 +1615,7 @@ const DecisionCard = ({
   userVotes,
   setLightboxUrl,
   setTrackingId,
+  setOutcomeInitial,
   quickLogOutcome,
   submitFollowup,
   startWeighIn,
@@ -2359,27 +2365,10 @@ const DecisionCard = ({
                   </>
                 ) : isOwn ? (
                   <div style={{ width: "100%" }}>
-                    {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (() => {
-                      const sizeOptions = (decision.uncertainty_text || "").includes("Between sizes")
-                        ? (decision.sizes_note || "").split(",").map((s) => s.trim()).filter(Boolean)
-                        : [];
-                      if (snoozedOutcome) {
-                        return <p style={{ fontSize: 14, color: "#8C7A70", margin: 0 }}>Got it. We'll check back later.</p>;
-                      }
-                      if (pickingSize) {
-                        return (
-                          <div>
-                            <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>Which size did you get?</p>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              {sizeOptions.map((s) => (
-                                <button key={s} onClick={() => quickLogOutcome(decision.id, "bought_it", s)} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{s}</button>
-                              ))}
-                              <button onClick={() => quickLogOutcome(decision.id, "bought_it")} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Not sure</button>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return (
+                    {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
+                      snoozedOutcome ? (
+                        <p style={{ fontSize: 14, color: "#8C7A70", margin: 0 }}>Got it. We'll check back later.</p>
+                      ) : (
                         <div>
                           <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
                             {weighInCount > 0
@@ -2387,13 +2376,13 @@ const DecisionCard = ({
                               : "How'd it go?"}
                           </p>
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => sizeOptions.length ? setPickingSize(true) : quickLogOutcome(decision.id, "bought_it")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
-                            <button onClick={() => quickLogOutcome(decision.id, "didnt_buy")} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
+                            <button onClick={() => { setOutcomeInitial("bought_it"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
+                            <button onClick={() => { setOutcomeInitial("didnt_buy"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
                             <button onClick={() => setSnoozedOutcome(true)} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
                           </div>
                         </div>
-                      );
-                    })()}
+                      )
+                    )}
 
                     {activeTab === "mine" && (
                       <button

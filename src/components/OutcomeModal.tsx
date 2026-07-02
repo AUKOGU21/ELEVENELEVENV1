@@ -11,6 +11,9 @@ interface OutcomeModalProps {
     uncertainty_text: string | null;
   };
   onComplete: (outcome: OutcomeType) => void;
+  // When opened from the "Bought it" / "Passed" buttons, pre-seed the outcome so
+  // the flow jumps straight into the decision tree instead of re-asking it.
+  initialOutcome?: OutcomeType | null;
 }
 
 type OutcomeType = "bought_it" | "didnt_buy" | "still_deciding";
@@ -387,7 +390,7 @@ const QUESTION_STYLE: React.CSSProperties = {
   lineHeight: 1.3,
 };
 
-const OutcomeModal = ({ open, onClose, decision, onComplete }: OutcomeModalProps) => {
+const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome }: OutcomeModalProps) => {
   const { user } = useAuth();
 
   const [state, setState] = useState<StepState>({
@@ -412,8 +415,9 @@ const OutcomeModal = ({ open, onClose, decision, onComplete }: OutcomeModalProps
 
   useEffect(() => {
     if (open) {
+      const seeded = initialOutcome && initialOutcome !== "still_deciding" ? initialOutcome : null;
       setState({
-        outcome: null,
+        outcome: seeded,
         tipping_factor: null,
         tipping_factor_other: "",
         size_bought: "",
@@ -423,7 +427,8 @@ const OutcomeModal = ({ open, onClose, decision, onComplete }: OutcomeModalProps
         outcome_detail: null,
         outcome_detail_other: "",
       });
-      setCurrentStepIdx(0);
+      // If pre-seeded, skip the "did you buy?" step and land on the first question.
+      setCurrentStepIdx(seeded ? 1 : 0);
       setSaving(false);
       if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
     }

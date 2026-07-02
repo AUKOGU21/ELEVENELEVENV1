@@ -9,7 +9,7 @@ import { computeMatchScore } from "@/lib/matching";
 import { SILHOUETTE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { DialInFitModal, shouldShowFitPrompt } from "@/components/DialInFitModal";
 import { imageToJpeg } from "@/lib/image";
-import OutcomeModal from "@/components/OutcomeModal";
+import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDetailOptions, FIT_RESULT_OPTIONS } from "@/components/OutcomeModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,10 @@ interface OutcomeRow {
   take: string | null;
   followed_up_at: string | null;
   created_at: string | null;
+  arrival_status: string | null;
+  next_prompt_at: string | null;
+  received_at: string | null;
+  photo_url: string | null;
 }
 
 interface DecisionRow {
@@ -507,7 +511,7 @@ const Feed = () => {
       if (allDecisionIds.length > 0) {
         const { data: outcomesData } = await supabase
           .from("outcomes")
-          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url")
           .in("decision_id", allDecisionIds)
           .order("created_at", { ascending: false });
 
@@ -584,7 +588,7 @@ const Feed = () => {
         if (myDecisionIds.length > 0) {
           const { data: myOutcomesData } = await supabase
             .from("outcomes")
-            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url")
             .in("decision_id", myDecisionIds)
             .order("created_at", { ascending: false });
 
@@ -623,6 +627,48 @@ const Feed = () => {
   // status so the card shows its logged state, and fires the close-the-loop email.
   // The 2-week follow-up: records kept/returned, recommend, ending confidence, and
   // an optional take, and stamps followed_up_at so the card fills in and the nudge stops.
+  // Generic optimistic patch to a decision's outcome row.
+  const updateOutcome = async (id: string, patch: Record<string, any>) => {
+    if (!user) return;
+    const merge = (d: DecisionRow): DecisionRow =>
+      d.id === id ? { ...d, outcomes: [{ ...(d.outcomes?.[0] ?? {} as any), ...patch }] } : d;
+    setDecisions(prev => prev.map(merge));
+    setMyDecisions(prev => prev.map(merge));
+    try {
+      await supabase.from("outcomes").update(patch).eq("decision_id", id);
+    } catch (e) {
+      console.error("outcome update failed:", e);
+    }
+  };
+
+  // "Received it" completion: tailored fit/detail answer + recommend + confidence + optional photo.
+  const submitReceived = async (
+    id: string,
+    data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null },
+  ) => {
+    if (!user) return;
+    let photoUrl: string | null = null;
+    if (data.photoFile) {
+      try {
+        let body: Blob = data.photoFile;
+        try { body = await imageToJpeg(data.photoFile); } catch { /* fall back to raw */ }
+        const path = `outcome-photos/${user.id}/${id}-${Date.now()}.jpg`;
+        const { data: up } = await supabase.storage.from("product-images").upload(path, body, { upsert: true, contentType: "image/jpeg" });
+        if (up) photoUrl = supabase.storage.from("product-images").getPublicUrl(up.path).data.publicUrl;
+      } catch (e) { console.warn("outcome photo upload failed:", e); }
+    }
+    const fitLike = data.primary === "Between sizes" || data.primary === "Will it fit right";
+    await updateOutcome(id, {
+      arrival_status: "received",
+      received_at: new Date().toISOString(),
+      kept: true,
+      recommend: data.recommend,
+      confidence_after: data.confidence,
+      ...(fitLike ? { fit_result: data.detailAnswer } : { outcome_detail: data.detailAnswer }),
+      ...(photoUrl ? { photo_url: photoUrl } : {}),
+    });
+  };
+
   const submitFollowup = async (
     id: string,
     data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null },
@@ -938,9 +984,16 @@ const Feed = () => {
   const followupPending = myDecisions.filter((d) => {
     if (d.status !== "purchased") return false;
     const o = d.outcomes?.[0];
-    if (!o || o.followed_up_at) return false;
-    const age = o.created_at ? (Date.now() - new Date(o.created_at).getTime()) / 86400000 : 0;
-    return age >= 14;
+    if (!o) return false;
+    const arrival = o.arrival_status;
+    if (arrival === "returned") return false;
+    if (!arrival) return true;                         // gate never answered
+    if (arrival === "waiting") return !o.next_prompt_at || Date.now() >= new Date(o.next_prompt_at).getTime();
+    if (arrival === "received" && !o.followed_up_at) { // 2-week lived-experience nudge due
+      const age = o.received_at ? (Date.now() - new Date(o.received_at).getTime()) / 86400000 : 0;
+      return age >= 14;
+    }
+    return false;
   });
   const showFollowupBanner = !!user && activeTab === "feed" && followupPending.length > 0;
 
@@ -1287,6 +1340,8 @@ const Feed = () => {
               setOutcomeInitial={setOutcomeInitial}
               quickLogOutcome={quickLogOutcome}
               submitFollowup={submitFollowup}
+              updateOutcome={updateOutcome}
+              submitReceived={submitReceived}
               startWeighIn={startWeighIn}
               handleDelete={handleDelete}
               handleHelpfulVote={handleHelpfulVote}
@@ -1497,7 +1552,7 @@ const Feed = () => {
                 // if there are multiple rows for the same decision_id.
                 const { data: rows } = await supabase
                   .from("outcomes")
-                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url")
                   .eq("decision_id", id)
                   .order("created_at", { ascending: false })
                   .limit(1);
@@ -1595,6 +1650,8 @@ interface CardProps {
   setOutcomeInitial: (o: "bought_it" | "didnt_buy" | null) => void;
   quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
   submitFollowup: (id: string, data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null }) => void;
+  updateOutcome: (id: string, patch: Record<string, any>) => void;
+  submitReceived: (id: string, data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null }) => void;
   startWeighIn: (id: string) => void;
   handleDelete: (id: string) => void;
   handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
@@ -1618,6 +1675,8 @@ const DecisionCard = ({
   setOutcomeInitial,
   quickLogOutcome,
   submitFollowup,
+  updateOutcome,
+  submitReceived,
   startWeighIn,
   handleDelete,
   handleHelpfulVote,
@@ -1635,13 +1694,17 @@ const DecisionCard = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [snoozedOutcome, setSnoozedOutcome] = useState(false);
   const [pickingSize, setPickingSize] = useState(false);
-  // 2-week follow-up wizard state
-  const [fuStage, setFuStage] = useState<"kept" | "recommend" | "confidence" | "take">("kept");
-  const [fuKept, setFuKept] = useState<boolean | null>(null);
+  // Outcome-lifecycle wizard state (gate → received questions, or returned)
+  const [fuStage, setFuStage] = useState<"gate" | "returned" | "detail" | "recommend" | "confidence" | "photo">("gate");
+  const [fuDetail, setFuDetail] = useState<string | null>(null);
   const [fuRec, setFuRec] = useState<boolean | null>(null);
   const [fuConf, setFuConf] = useState<number | null>(null);
-  const [fuTake, setFuTake] = useState("");
-  const [fuSnoozed, setFuSnoozed] = useState(false);
+  const [fuReturnNote, setFuReturnNote] = useState("");
+  const [fuTwoWeek, setFuTwoWeek] = useState("");
+  const [fuPhoto, setFuPhoto] = useState<File | null>(null);
+  const [fuDismiss, setFuDismiss] = useState(false);
+  const [fuThanks, setFuThanks] = useState(false);
+  const fuPhotoRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -2029,30 +2092,54 @@ const DecisionCard = ({
                   </div>
                 )}
 
-                {/* 2-week follow-up prompt — owner only, once the purchase is 14+ days old */}
+                {/* Outcome lifecycle — owner only: gate → received questions (or returned) */}
                 {isOwn && decision.status === "purchased" && (() => {
                   const o = decision.outcomes?.[0] ?? null;
-                  const ageDays = o?.created_at ? (Date.now() - new Date(o.created_at).getTime()) / 86400000 : 0;
-                  if (!o || o.followed_up_at || ageDays < 14 || fuSnoozed) return null;
+                  if (!o) return null;
+                  const arrival = o.arrival_status;
+                  if (arrival === "received" || arrival === "returned" || fuDismiss) return null;
+                  if (arrival === "waiting" && o.next_prompt_at && Date.now() < new Date(o.next_prompt_at).getTime()) return null;
+
                   const itemName = [decision.brand_name, decision.product_name].filter(Boolean).join(" ").trim() || "your pick";
+                  const primary = parsePrimaryUncertainty(decision.uncertainty_text);
+                  const fitLike = primary === "Between sizes" || primary === "Will it fit right";
+                  const detailQ = fitLike ? "How did it fit?" : outcomeDetailQuestion(primary, "bought_it");
+                  const detailOpts = fitLike ? FIT_RESULT_OPTIONS : outcomeDetailOptions(primary);
+
                   const heading = (t: string) => <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>{t}</p>;
-                  const dark: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" };
-                  const outline: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" };
-                  const ghost: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+                  const dark: React.CSSProperties = { flex: 1, padding: "11px 6px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 13.5, fontWeight: 600, cursor: "pointer", textAlign: "center" };
+                  const outline: React.CSSProperties = { flex: 1, padding: "11px 8px", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 13.5, fontWeight: 600, cursor: "pointer", textAlign: "center" };
+                  const ta: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" };
                   const wrap = (inner: React.ReactNode) => <div style={{ background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 12, padding: 14, marginBottom: 16 }}>{inner}</div>;
-                  if (fuStage === "kept") return wrap(
+
+                  if (fuStage === "gate") return wrap(
                     <div>
-                      {heading(`It's been 2 weeks — how did the ${itemName} hold up?`)}
+                      {heading(`Ready to tell us how the ${itemName} went?`)}
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button style={dark} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Kept it</button>
-                        <button style={outline} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returned it</button>
-                        <button style={ghost} onClick={() => setFuSnoozed(true)}>Later</button>
+                        <button style={outline} onClick={() => { updateOutcome(decision.id, { arrival_status: "waiting", next_prompt_at: new Date(Date.now() + 3 * 86400000).toISOString() }); setFuDismiss(true); }}>Still waiting</button>
+                        <button style={outline} onClick={() => setFuStage("returned")}>Returned / canceled</button>
+                        <button style={dark} onClick={() => setFuStage("detail")}>Received it</button>
+                      </div>
+                    </div>
+                  );
+                  if (fuStage === "returned") return wrap(
+                    <div>
+                      {heading("What went wrong? (optional)")}
+                      <textarea value={fuReturnNote} onChange={(e) => setFuReturnNote(e.target.value)} rows={2} placeholder="e.g. ran huge, fabric felt cheap, changed my mind" style={ta} />
+                      <button style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }} onClick={() => updateOutcome(decision.id, { arrival_status: "returned", kept: false, take: fuReturnNote.trim() || null, followed_up_at: new Date().toISOString() })}>Done</button>
+                    </div>
+                  );
+                  if (fuStage === "detail") return wrap(
+                    <div>
+                      {heading(detailQ)}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {detailOpts.map((opt) => <button key={opt} style={{ ...outline, flex: "unset" }} onClick={() => { setFuDetail(opt); setFuStage("recommend"); }}>{opt}</button>)}
                       </div>
                     </div>
                   );
                   if (fuStage === "recommend") return wrap(
                     <div>
-                      {heading("Would you recommend it to someone like you?")}
+                      {heading("Would you recommend it to women like you?")}
                       <div style={{ display: "flex", gap: 8 }}>
                         <button style={dark} onClick={() => { setFuRec(true); setFuStage("confidence"); }}>Yes</button>
                         <button style={outline} onClick={() => { setFuRec(false); setFuStage("confidence"); }}>No</button>
@@ -2061,21 +2148,42 @@ const DecisionCard = ({
                   );
                   if (fuStage === "confidence") return wrap(
                     <div>
-                      {heading("How do you feel about the decision now?")}
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {Array.from({ length: 10 }).map((_, i) => {
-                          const n = i + 1;
-                          return <button key={n} onClick={() => { setFuConf(n); setFuStage("take"); }} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", color: "#1A1A1A", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{n}</button>;
-                        })}
+                      {heading("Post-purchase confidence?")}
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {Array.from({ length: 10 }).map((_, i) => { const n = i + 1; return <button key={n} onClick={() => { setFuConf(n); setFuStage("photo"); }} style={{ flex: 1, padding: "9px 0", borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", color: "#1A1A1A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{n}</button>; })}
                       </div>
                       <p style={{ fontSize: 12, color: "#8C7A70", margin: "8px 0 0" }}>1 = wish I hadn't, 10 = so glad I did</p>
                     </div>
                   );
                   return wrap(
                     <div>
-                      {heading("Anything you'd tell someone like you? (optional)")}
-                      <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={2} placeholder="e.g. runs small, sized up and so glad I did" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
-                      <button onClick={() => submitFollowup(decision.id, { kept: fuKept ?? true, recommend: fuRec, confidenceAfter: fuConf, take: fuTake })} style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }}>Done</button>
+                      {heading("Add a photo (optional)")}
+                      <p style={{ fontSize: 12.5, color: "#8C7A70", margin: "0 0 10px" }}>Show how they looked on you so the next woman doesn't have to guess.</p>
+                      <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
+                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset" }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo"}</button>
+                      <button onClick={() => { submitReceived(decision.id, { primary, detailAnswer: fuDetail, recommend: fuRec, confidence: fuConf, photoFile: fuPhoto }); setFuThanks(true); }} style={{ ...dark, width: "100%", marginTop: 8, padding: "12px 0" }}>Done</button>
+                    </div>
+                  );
+                })()}
+
+                {/* Reinforcement message, right after they log what happened */}
+                {isOwn && fuThanks && (
+                  <div style={{ background: "#1C1712", color: "#F4EEE6", borderRadius: 12, padding: 16, textAlign: "center", fontSize: 13.5, lineHeight: 1.5, marginBottom: 16 }}>
+                    Your experience is now part of ELEVENELEVEN.<br />It will help women like you shop with more confidence.
+                  </div>
+                )}
+
+                {/* 2-week nudge — lived experience, appends to Her take */}
+                {isOwn && decision.status === "purchased" && !fuThanks && (() => {
+                  const o = decision.outcomes?.[0] ?? null;
+                  if (!o || o.arrival_status !== "received" || o.followed_up_at || fuDismiss) return null;
+                  const age = o.received_at ? (Date.now() - new Date(o.received_at).getTime()) / 86400000 : 0;
+                  if (age < 14) return null;
+                  return (
+                    <div style={{ background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+                      <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>Now that you've worn it a bit, anything you'd add?</p>
+                      <textarea value={fuTwoWeek} onChange={(e) => setFuTwoWeek(e.target.value)} rows={2} placeholder="e.g. holds up great after a few washes" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+                      <button onClick={() => { updateOutcome(decision.id, { take: [o.take, fuTwoWeek.trim()].filter(Boolean).join(" — ") || null, followed_up_at: new Date().toISOString() }); setFuDismiss(true); }} style={{ width: "100%", marginTop: 10, padding: "12px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Done</button>
                     </div>
                   );
                 })()}

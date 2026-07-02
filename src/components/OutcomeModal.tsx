@@ -56,7 +56,7 @@ function normalizePrimary(raw: string): string {
   return raw;
 }
 
-function parsePrimaryUncertainty(uncertaintyText: string | null): string {
+export function parsePrimaryUncertainty(uncertaintyText: string | null): string {
   if (!uncertaintyText) return "Other";
   const parts = uncertaintyText.split(",").map((s) => s.trim());
   for (const priority of UNCERTAINTY_PRIORITY) {
@@ -73,13 +73,13 @@ function buildSteps(outcome: OutcomeType | null, primary: string): StepId[] {
   const base: StepId[] = ["outcome", "tipping_factor"];
 
   if (outcome === "bought_it") {
+    // Purchase time captures only what gave her the confidence to buy (+ which size
+    // she ordered, if between sizes). Fit / quality / recommend / confidence / photo
+    // are captured later, once she's Received it (the on-card lifecycle flow).
     if (primary === "Between sizes" || primary === "Will it fit right") {
-      return [...base, "size_bought", "fit_result", "size_recommendation", "complete"];
+      return [...base, "size_bought", "complete"];
     }
-    if (primary === "Other") {
-      return [...base, "complete"];
-    }
-    return [...base, "outcome_detail", "complete"];
+    return [...base, "complete"];
   }
 
   return [...base, "complete"];
@@ -242,7 +242,7 @@ function tippingFactorOptions(outcome: OutcomeType, primary: string): string[] {
   return ["Something else"];
 }
 
-function outcomeDetailQuestion(primary: string, outcome: OutcomeType): string {
+export function outcomeDetailQuestion(primary: string, outcome: OutcomeType): string {
   if (primary === "Will it flatter me") {
     return "How did it actually look/feel on?";
   }
@@ -261,7 +261,7 @@ function outcomeDetailQuestion(primary: string, outcome: OutcomeType): string {
   return "How did it turn out?";
 }
 
-function outcomeDetailOptions(primary: string): string[] {
+export function outcomeDetailOptions(primary: string): string[] {
   if (primary === "Will it flatter me") {
     return [
       "Better than expected",
@@ -313,7 +313,7 @@ function isNegativeAnswer(option: string): boolean {
   );
 }
 
-const FIT_RESULT_OPTIONS = [
+export const FIT_RESULT_OPTIONS = [
   "Fit perfectly",
   "OK fit, but not perfect",
   "Not at all what I expected",

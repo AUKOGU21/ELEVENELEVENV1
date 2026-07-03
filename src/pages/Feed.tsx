@@ -1706,6 +1706,7 @@ const DecisionCard = ({
   const [fuThanks, setFuThanks] = useState(false);
   const fuPhotoRef = useRef<HTMLInputElement>(null);
   const [imgIdx, setImgIdx] = useState(0);
+  const imgTouchX = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -1935,9 +1936,16 @@ const DecisionCard = ({
           const oPhoto = decision.outcomes?.[0]?.photo_url ?? null;
           const imgs = [decision.product_image_url, decision.product_image_url_2, oPhoto].filter(Boolean) as string[];
           const idx = Math.min(imgIdx, imgs.length - 1);
+          const multi = imgs.length > 1;
           const showingOutcome = !!oPhoto && imgs[idx] === oPhoto;
+          const go = (dir: number) => setImgIdx((imgs.length + idx + dir) % imgs.length);
+          const arrow: React.CSSProperties = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(28,23,18,0.55)", color: "#fff", fontSize: 20, lineHeight: "30px", textAlign: "center", cursor: "pointer", zIndex: 3, padding: 0 };
           return (
-            <div style={{ position: "relative", width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2" }}>
+            <div
+              style={{ position: "relative", width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2", overflow: "hidden" }}
+              onTouchStart={(e) => { imgTouchX.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => { if (imgTouchX.current == null || !multi) return; const dx = e.changedTouches[0].clientX - imgTouchX.current; if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); imgTouchX.current = null; }}
+            >
               <img
                 src={imgs[idx]}
                 alt={decision.product_name ?? "Product"}
@@ -1945,21 +1953,27 @@ const DecisionCard = ({
                 onClick={() => setLightboxUrl(imgs[idx])}
               />
               {showingOutcome && (
-                <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(28,23,18,0.82)", color: "#F4EEE6", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em" }}>✦ On her</span>
+                <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(28,23,18,0.82)", color: "#F4EEE6", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em", zIndex: 3 }}>✦ On her</span>
               )}
-              {imgs.length > 1 && (
-                <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 6 }}>
-                  {imgs.map((_, i) => (
-                    <button key={i} onClick={(e) => { e.stopPropagation(); setImgIdx(i); }} aria-label={`image ${i + 1}`} style={{ width: 7, height: 7, borderRadius: "50%", border: "none", padding: 0, cursor: "pointer", background: i === idx ? "#fff" : "rgba(255,255,255,0.5)", boxShadow: "0 0 3px rgba(0,0,0,0.45)" }} />
-                  ))}
-                </div>
+              {multi && (
+                <>
+                  <span style={{ position: "absolute", top: 10, right: 10, background: "rgba(28,23,18,0.6)", color: "#fff", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "2px 9px", zIndex: 3 }}>{idx + 1} / {imgs.length}</span>
+                  {!isMobile ? (
+                    <>
+                      <button aria-label="Previous image" onClick={(e) => { e.stopPropagation(); go(-1); }} style={{ ...arrow, left: 8 }}>‹</button>
+                      <button aria-label="Next image" onClick={(e) => { e.stopPropagation(); go(1); }} style={{ ...arrow, right: 8 }}>›</button>
+                    </>
+                  ) : (
+                    <span style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.62)", color: "#fff", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 100, padding: "3px 12px", zIndex: 3, display: "flex", alignItems: "center", gap: 5 }}>swipe <span style={{ fontSize: 13 }}>→</span></span>
+                  )}
+                </>
               )}
               {decision.product_url && (
                 <a
                   href={decision.product_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#5A4A42", textDecoration: "none" }}
+                  style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#5A4A42", textDecoration: "none", zIndex: 2 }}
                 >
                   <ExternalLink style={{ width: 11, height: 11 }} /> View
                 </a>

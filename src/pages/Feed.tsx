@@ -1705,6 +1705,7 @@ const DecisionCard = ({
   const [fuDismiss, setFuDismiss] = useState(false);
   const [fuThanks, setFuThanks] = useState(false);
   const fuPhotoRef = useRef<HTMLInputElement>(null);
+  const [imgIdx, setImgIdx] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -1930,44 +1931,42 @@ const DecisionCard = ({
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "stretch", borderRadius: "0 0 20px 20px", overflow: "hidden" }}>
 
         {/* ── Product image ── */}
-        {decision.product_image_url && (
-          <div style={{ position: "relative", width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2" }}>
-            {decision.product_image_url_2 ? (
-              <>
-                <img
-                  src={decision.product_image_url}
-                  alt={decision.product_name ?? "Product"}
-                  style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }}
-                  onClick={() => setLightboxUrl(decision.product_image_url!)}
-                />
-                <img
-                  src={decision.product_image_url_2}
-                  alt={decision.product_name ?? "Product"}
-                  style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in", borderTop: "2px solid #F5EFEA" }}
-
-                  onClick={() => setLightboxUrl(decision.product_image_url_2!)}
-                />
-              </>
-            ) : (
+        {decision.product_image_url && (() => {
+          const oPhoto = decision.outcomes?.[0]?.photo_url ?? null;
+          const imgs = [decision.product_image_url, decision.product_image_url_2, oPhoto].filter(Boolean) as string[];
+          const idx = Math.min(imgIdx, imgs.length - 1);
+          const showingOutcome = !!oPhoto && imgs[idx] === oPhoto;
+          return (
+            <div style={{ position: "relative", width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2" }}>
               <img
-                src={decision.product_image_url}
+                src={imgs[idx]}
                 alt={decision.product_name ?? "Product"}
                 style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }}
-                onClick={() => setLightboxUrl(decision.product_image_url!)}
+                onClick={() => setLightboxUrl(imgs[idx])}
               />
-            )}
-            {decision.product_url && (
-              <a
-                href={decision.product_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#5A4A42", textDecoration: "none" }}
-              >
-                <ExternalLink style={{ width: 11, height: 11 }} /> View
-              </a>
-            )}
-          </div>
-        )}
+              {showingOutcome && (
+                <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(28,23,18,0.82)", color: "#F4EEE6", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em" }}>✦ On her</span>
+              )}
+              {imgs.length > 1 && (
+                <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 6 }}>
+                  {imgs.map((_, i) => (
+                    <button key={i} onClick={(e) => { e.stopPropagation(); setImgIdx(i); }} aria-label={`image ${i + 1}`} style={{ width: 7, height: 7, borderRadius: "50%", border: "none", padding: 0, cursor: "pointer", background: i === idx ? "#fff" : "rgba(255,255,255,0.5)", boxShadow: "0 0 3px rgba(0,0,0,0.45)" }} />
+                  ))}
+                </div>
+              )}
+              {decision.product_url && (
+                <a
+                  href={decision.product_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#5A4A42", textDecoration: "none" }}
+                >
+                  <ExternalLink style={{ width: 11, height: 11 }} /> View
+                </a>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Right: all card data ── */}
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "14px 14px 16px" : "20px 22px 24px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 0, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(4px)" }}>
@@ -2133,7 +2132,7 @@ const DecisionCard = ({
                     <div>
                       {heading(detailQ)}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {detailOpts.map((opt) => <button key={opt} style={{ ...outline, flex: "unset" }} onClick={() => { setFuDetail(opt); setFuStage("recommend"); }}>{opt}</button>)}
+                        {detailOpts.map((opt) => <button key={opt} style={{ ...outline, minWidth: 90 }} onClick={() => { setFuDetail(opt); setFuStage("recommend"); }}>{opt}</button>)}
                       </div>
                     </div>
                   );

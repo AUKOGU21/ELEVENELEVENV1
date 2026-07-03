@@ -155,16 +155,28 @@ const Profile = () => {
   };
 
   const fetchStats = async () => {
-    const [{ count: dCount }, { count: rCount }, { data: votes }, { data: recent }] = await Promise.all([
+    const [{ count: dCount }, { count: rCount }, { data: myResponses }, { data: recent }] = await Promise.all([
       supabase.from("decisions").select("*", { count: "exact", head: true }).eq("user_id", user!.id).is("deleted_at", null),
       supabase.from("responses").select("*", { count: "exact", head: true }).eq("user_id", user!.id),
-      supabase.from("responses").select("helpfulness_votes").eq("user_id", user!.id),
+      supabase.from("responses").select("id").eq("user_id", user!.id),
       supabase.from("decisions")
         .select("id, product_name, brand_name, status, created_at, product_image_url, uncertainty_text, context_note")
         .eq("user_id", user!.id).is("deleted_at", null)
         .order("created_at", { ascending: false }).limit(4),
     ]);
-    const totalVotes = (votes ?? []).reduce((s: number, r: any) => s + (r.helpfulness_votes ?? 0), 0);
+    // Count helpful votes from the source of truth (response_votes). The cached
+    // responses.helpfulness_votes column can't be written by non-owners (RLS), so it
+    // goes stale and always read 0 here.
+    const respIds = (myResponses ?? []).map((r: any) => r.id);
+    let totalVotes = 0;
+    if (respIds.length) {
+      const { count: hv } = await supabase
+        .from("response_votes")
+        .select("*", { count: "exact", head: true })
+        .eq("vote_type", "helpful")
+        .in("response_id", respIds);
+      totalVotes = hv ?? 0;
+    }
     setStats({ decisions: dCount ?? 0, responses: rCount ?? 0, helpfulVotes: totalVotes });
     if (recent) setRecentDecisions(recent);
   };

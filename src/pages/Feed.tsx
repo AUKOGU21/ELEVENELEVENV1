@@ -2090,7 +2090,7 @@ const DecisionCard = ({
                     <p style={{ ...LBL, marginBottom: 8 }}>Her take</p>
                     <div style={{ display: "flex", gap: 8 }}>
                       <span style={{ fontSize: 26, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
-                      <p style={{ fontSize: 15, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}</p>
+                      <p style={{ fontSize: 15, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}<span style={{ color: "#C2B9A6", fontWeight: 700 }}>&rdquo;</span></p>
                     </div>
                   </div>
                 )}

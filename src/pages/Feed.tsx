@@ -11,6 +11,33 @@ import { DialInFitModal, shouldShowFitPrompt } from "@/components/DialInFitModal
 import { imageToJpeg } from "@/lib/image";
 import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDetailOptions, FIT_RESULT_OPTIONS } from "@/components/OutcomeModal";
 
+// ─── Product-link helpers ───────────────────────────────────────────────────
+// Normalize a user-pasted URL (add https:// if the scheme is missing) and
+// validate it's a real http(s) link. Returns null for anything unusable, so
+// callers can treat "no valid link" and "empty" the same way.
+function normalizeProductUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (!u.hostname.includes(".")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+// Clean label for a product link chip — the bare domain, e.g. "skims.com".
+function prettyHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ResponseRow {
@@ -18,6 +45,7 @@ interface ResponseRow {
   recommendation: "buy" | "do_not_buy" | "need_more_info";
   reasoning: string;
   photo_url: string | null;
+  product_url: string | null;
   match_score: number | null;
   helpfulness_votes: number;
   user_id: string;
@@ -345,6 +373,7 @@ const Feed = () => {
   const [context, setContext] = useState<string | null>(null);
   const [vote, setVote] = useState<"buy" | "do_not_buy" | "need_more_info" | null>(null);
   const [take, setTake] = useState("");
+  const [takeLink, setTakeLink] = useState("");
   const [takePhoto, setTakePhoto] = useState<File | null>(null);
   const [takePhotoPreview, setTakePhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -463,7 +492,7 @@ const Feed = () => {
       price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
       profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
-        id, recommendation, reasoning, photo_url, match_score,
+        id, recommendation, reasoning, photo_url, product_url, match_score,
         helpfulness_votes, user_id, created_at,
         profiles ( display_name, avatar_url )
       )
@@ -621,6 +650,7 @@ const Feed = () => {
     setContext(null);
     setVote(null);
     setTake("");
+    setTakeLink("");
   };
 
   // One-tap outcome log from the card prompt: saves the core signal, flips
@@ -727,6 +757,7 @@ const Feed = () => {
     setContext(null);
     setVote(null);
     setTake("");
+    setTakeLink("");
     if (wasCompleted && user && shouldShowFitPrompt(user.id)) {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
@@ -771,6 +802,8 @@ const Feed = () => {
       }
     }
 
+    const responseProductUrl = normalizeProductUrl(takeLink);
+
     await supabase.from("responses").insert({
       decision_id: weighingIn,
       user_id: user.id,
@@ -780,6 +813,7 @@ const Feed = () => {
       match_score: matchScore,
       match_breakdown: matchBreakdown,
       ...(responsePhotoUrl ? { photo_url: responsePhotoUrl } : {}),
+      ...(responseProductUrl ? { product_url: responseProductUrl } : {}),
     });
 
     // Email the post owner that someone weighed in (fire-and-forget; the
@@ -793,6 +827,7 @@ const Feed = () => {
     setSubmitting(false);
     setTakePhoto(null);
     setTakePhotoPreview(null);
+    setTakeLink("");
     weighInCompletedRef.current = true;
     setWeighInStep("done");
   };
@@ -1462,6 +1497,33 @@ const Feed = () => {
                       color: "#1A1A1A",
                     }}
                   />
+
+                  {/* Optional product link */}
+                  <div style={{ position: "relative", marginBottom: 12 }}>
+                    <ExternalLink style={{ width: 15, height: 15, color: "#8C7A70", position: "absolute", left: 14, top: 15, pointerEvents: "none" }} />
+                    <input
+                      value={takeLink}
+                      onChange={(e) => setTakeLink(e.target.value)}
+                      placeholder="Link a product (optional)"
+                      type="url"
+                      inputMode="url"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="w-full rounded-full text-base focus:outline-none"
+                      style={{
+                        background: "rgba(0,0,0,0.04)",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        color: "#1A1A1A",
+                        padding: "11px 16px 11px 40px",
+                      }}
+                    />
+                    {takeLink.trim().length > 0 && !normalizeProductUrl(takeLink) && (
+                      <p style={{ fontSize: 13, color: "#c0392b", margin: "6px 4px 0" }}>
+                        That doesn't look like a valid link.
+                      </p>
+                    )}
+                  </div>
 
                   {/* Photo attachment */}
                   <div style={{ marginBottom: 16 }}>
@@ -2235,6 +2297,14 @@ const DecisionCard = ({
                         {/* Reasoning */}
                         <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
 
+                        {resp.product_url && (
+                          <a href={resp.product_url} target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 7, maxWidth: "100%", padding: "7px 13px", marginBottom: 10, borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "rgba(0,0,0,0.02)", color: "#3A3530", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                            <ExternalLink style={{ width: 14, height: 14, flexShrink: 0, color: "#8C7A70" }} />
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prettyHost(resp.product_url)}</span>
+                          </a>
+                        )}
+
                         {resp.photo_url && (
                           <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
                             style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
@@ -2424,6 +2494,13 @@ const DecisionCard = ({
                             </div>
                           </div>
                           <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5A4A42", marginBottom: 10 }}>{resp.reasoning}</p>
+                          {resp.product_url && (
+                            <a href={resp.product_url} target="_blank" rel="noopener noreferrer"
+                              style={{ display: "inline-flex", alignItems: "center", gap: 7, maxWidth: "100%", padding: "7px 13px", marginBottom: 10, borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "rgba(0,0,0,0.02)", color: "#3A3530", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                              <ExternalLink style={{ width: 14, height: 14, flexShrink: 0, color: "#8C7A70" }} />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prettyHost(resp.product_url)}</span>
+                            </a>
+                          )}
                           {resp.photo_url && (
                             <img src={resp.photo_url} alt="response photo" onClick={() => window.open(resp.photo_url!, "_blank")}
                               style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />

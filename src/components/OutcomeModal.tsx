@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -452,35 +453,59 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome }: O
     const odValue = finalState.outcome_detail === "Other" ? null : finalState.outcome_detail;
     const fitNote = finalState.fit_result_note.trim() || null;
 
-    await supabase.from("outcomes").upsert(
-      {
-        decision_id: decision.id,
-        user_id: user.id,
-        did_purchase: finalState.outcome === "bought_it",
-        outcome_type: finalState.outcome,
-        primary_uncertainty: primary,
-        tipping_factor: tf,
-        tipping_factor_other: tfOther,
-        size_bought: finalState.size_bought || null,
-        fit_result: finalState.fit_result,
-        fit_result_note: fitNote,
-        size_recommendation: finalState.size_recommendation,
-        outcome_detail: odValue,
-        outcome_detail_other: odOther,
-      },
-      { onConflict: "decision_id" }
-    );
+    // Persist the outcome. .select() lets us distinguish a real write from a
+    // silent no-op: an RLS-filtered write returns NO error but ALSO no rows, so
+    // checking only `error` would let a blocked save look successful.
+    const { data: outcomeRows, error: outcomeErr } = await supabase
+      .from("outcomes")
+      .upsert(
+        {
+          decision_id: decision.id,
+          user_id: user.id,
+          did_purchase: finalState.outcome === "bought_it",
+          outcome_type: finalState.outcome,
+          primary_uncertainty: primary,
+          tipping_factor: tf,
+          tipping_factor_other: tfOther,
+          size_bought: finalState.size_bought || null,
+          fit_result: finalState.fit_result,
+          fit_result_note: fitNote,
+          size_recommendation: finalState.size_recommendation,
+          outcome_detail: odValue,
+          outcome_detail_other: odOther,
+        },
+        { onConflict: "decision_id" }
+      )
+      .select();
 
-    if (finalState.outcome === "bought_it") {
-      await supabase
+    let statusErr: { message: string } | null = null;
+    let statusRows: unknown[] | null = null;
+    if (finalState.outcome === "bought_it" || finalState.outcome === "didnt_buy") {
+      const newStatus = finalState.outcome === "bought_it" ? "purchased" : "closed";
+      const res = await supabase
         .from("decisions")
-        .update({ status: "purchased" })
-        .eq("id", decision.id);
-    } else if (finalState.outcome === "didnt_buy") {
-      await supabase
-        .from("decisions")
-        .update({ status: "closed" })
-        .eq("id", decision.id);
+        .update({ status: newStatus })
+        .eq("id", decision.id)
+        .select();
+      statusErr = res.error;
+      statusRows = res.data;
+    }
+
+    // A save "failed" if it errored, or if it wrote zero rows (RLS/ownership
+    // blocked it). Surface it instead of faking success — otherwise the card
+    // optimistically flips to closed and then reverts on the next fetch.
+    const outcomeBlocked = !outcomeErr && (!outcomeRows || outcomeRows.length === 0);
+    const statusBlocked =
+      (finalState.outcome === "bought_it" || finalState.outcome === "didnt_buy") &&
+      !statusErr && (!statusRows || statusRows.length === 0);
+
+    if (outcomeErr || statusErr || outcomeBlocked || statusBlocked) {
+      console.error("Outcome save failed:", { outcomeErr, statusErr, outcomeBlocked, statusBlocked });
+      setSaving(false);
+      const detail = outcomeErr?.message || statusErr?.message
+        || "the change didn't save (you may not have permission on this post)";
+      toast.error(`Couldn't close this decision — ${detail}`);
+      return; // do NOT advance to the success step or call onComplete
     }
 
     // Close the loop: email everyone who weighed in (fire-and-forget; the

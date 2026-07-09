@@ -2049,7 +2049,7 @@ const DecisionCard = ({
                   transition={{ y: { repeat: Infinity, duration: 1.8, ease: "easeInOut" }, opacity: { duration: 0.3 } }}
                   style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.86)", color: "#F4EEE6", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", borderRadius: 100, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6, zIndex: 4, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", whiteSpace: "nowrap" }}
                 >
-                  ✦ See it on a real body <span style={{ fontSize: 14 }}>→</span>
+                  ✦ See it IRL <span style={{ fontSize: 14 }}>→</span>
                 </motion.button>
               )}
               {multi && (
@@ -2255,10 +2255,10 @@ const DecisionCard = ({
                   );
                   if (fuStage === "keep") return wrap(
                     <div>
-                      {heading("Did you end up keeping it?")}
+                      {heading("Will you keep it, or return it?")}
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button style={dark} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Kept it</button>
-                        <button style={outline} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returned it</button>
+                        <button style={dark} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Keeping it</button>
+                        <button style={outline} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returning it</button>
                       </div>
                     </div>
                   );

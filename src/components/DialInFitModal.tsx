@@ -6,15 +6,25 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const doneKey = (userId: string) => `eleven_fit_prompt_done_${userId}`;
+const snoozeKey = (userId: string) => `eleven_fit_prompt_snooze_${userId}`;
+const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000; // stay quiet for 2 weeks after a skip/dismiss
 
-// Show the fit prompt until the user has successfully saved their fit once — then never again.
-// (No time-based return; only a real save marks it done.)
+// Show the fit prompt until the user saves their fit once (then never again), and
+// stay quiet for a while after they skip or dismiss it so it doesn't nag on every action.
 export function shouldShowFitPrompt(userId: string): boolean {
-  return !localStorage.getItem(doneKey(userId));
+  if (localStorage.getItem(doneKey(userId))) return false;
+  const snoozed = localStorage.getItem(snoozeKey(userId));
+  if (snoozed && Date.now() - Number(snoozed) < SNOOZE_MS) return false;
+  return true;
 }
 
 export function markFitPromptDone(userId: string): void {
   localStorage.setItem(doneKey(userId), "1");
+}
+
+// Skipped or closed without saving → don't auto-prompt again for SNOOZE_MS.
+export function snoozeFitPrompt(userId: string): void {
+  localStorage.setItem(snoozeKey(userId), String(Date.now()));
 }
 
 interface Props {
@@ -29,6 +39,9 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
   const [saving, setSaving] = useState(false);
   // Holds non-answer meta keys from fit_details (e.g. `_fit_photos`) so saving answers doesn't wipe them
   const metaRef = useRef<Record<string, unknown>>({});
+
+  // Closing without saving snoozes the prompt so it stops reappearing on every action.
+  const handleDismiss = () => { if (user) snoozeFitPrompt(user.id); onClose(); };
 
   useEffect(() => {
     if (!open || !user) return;
@@ -130,7 +143,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
           >
             {/* Close */}
             <button
-              onClick={onClose}
+              onClick={handleDismiss}
               style={{
                 position: "absolute", top: 18, right: 20,
                 width: 32, height: 32, borderRadius: "50%",
@@ -252,7 +265,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
                 {!saving && <ArrowRight style={{ width: 16, height: 16 }} />}
               </button>
               <button
-                onClick={onClose}
+                onClick={handleDismiss}
                 style={{
                   width: "100%",
                   marginTop: 14,

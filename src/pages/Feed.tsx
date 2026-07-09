@@ -406,6 +406,7 @@ const Feed = () => {
   const weighInCompletedRef = useRef(false);
   // Fit-prompt modal: track its pending timer so it can't fire at a stale moment
   const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fitPromptShownRef = useRef(false); // at most one fit prompt per session
   const fitPromptHandledRef = useRef(false);
 
   // ─── Effects ────────────────────────────────────────────────────────────────
@@ -423,12 +424,13 @@ const Feed = () => {
     // Show fit modal after posting a decision (navigated here with state) — exactly once,
     // even if this effect re-runs when `user` changes (auth resolve / token refresh).
     const variant = (location.state as any)?.fitPromptVariant;
-    if (variant && !fitPromptHandledRef.current) {
+    if (variant && !fitPromptHandledRef.current && !fitPromptShownRef.current && user && shouldShowFitPrompt(user.id)) {
       fitPromptHandledRef.current = true;
       window.history.replaceState({}, "");
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
         fitTimerRef.current = null;
+        fitPromptShownRef.current = true;
         setFitModalVariant("post_decision");
         setShowFitModal(true);
       }, 4000);
@@ -760,10 +762,11 @@ const Feed = () => {
     setVote(null);
     setTake("");
     setTakeLink("");
-    if (wasCompleted && user && shouldShowFitPrompt(user.id)) {
+    if (wasCompleted && user && !fitPromptShownRef.current && shouldShowFitPrompt(user.id)) {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
         fitTimerRef.current = null;
+        fitPromptShownRef.current = true;
         setFitModalVariant("weigh_in");
         setShowFitModal(true);
       }, 3500);
@@ -2082,7 +2085,10 @@ const DecisionCard = ({
             const sizeBought = outcome?.size_bought ?? null;
             const confidenceAfter = outcome?.confidence_after ?? null;
             // Prefer the dedicated take; fall back to legacy write-ins so old outcomes still read well.
-            const take = outcome?.take || outcome?.fit_result_note || outcome?.outcome_detail_other || outcome?.tipping_factor_other || null;
+            // Show her reasoning no matter what: free-text take first, then any
+            // write-in, then the preset reason she picked (so "didn't buy" cards
+            // always surface why — not only when she chose "Something else").
+            const take = outcome?.take || outcome?.fit_result_note || outcome?.outcome_detail_other || outcome?.tipping_factor_other || outcome?.tipping_factor || null;
             const followedUp = !!outcome?.followed_up_at;
             const kept = outcome?.kept;
             const recommend = outcome?.recommend;
@@ -2150,7 +2156,7 @@ const DecisionCard = ({
                     <p style={{ ...LBL, marginBottom: 8 }}>Her take</p>
                     <div style={{ display: "flex", gap: 8 }}>
                       <span style={{ fontSize: 26, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
-                      <p style={{ fontSize: 15, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}<span style={{ color: "#C2B9A6", fontWeight: 700 }}>&rdquo;</span></p>
+                      <p style={{ fontSize: 15, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}<span style={{ fontSize: 26, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span></p>
                     </div>
                   </div>
                 )}

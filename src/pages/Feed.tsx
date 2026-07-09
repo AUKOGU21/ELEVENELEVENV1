@@ -674,7 +674,7 @@ const Feed = () => {
   // "Received it" completion: tailored fit/detail answer + recommend + confidence + optional photo.
   const submitReceived = async (
     id: string,
-    data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null },
+    data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null },
   ) => {
     if (!user) return;
     let photoUrl: string | null = null;
@@ -695,6 +695,7 @@ const Feed = () => {
       recommend: data.recommend,
       confidence_after: data.confidence,
       ...(fitLike ? { fit_result: data.detailAnswer } : { outcome_detail: data.detailAnswer }),
+      ...(data.take && data.take.trim() ? { take: data.take.trim() } : {}),
       ...(photoUrl ? { photo_url: photoUrl } : {}),
     });
   };
@@ -1713,7 +1714,7 @@ interface CardProps {
   quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
   submitFollowup: (id: string, data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null }) => void;
   updateOutcome: (id: string, patch: Record<string, any>) => void;
-  submitReceived: (id: string, data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null }) => void;
+  submitReceived: (id: string, data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null }) => void;
   startWeighIn: (id: string) => void;
   handleDelete: (id: string) => void;
   handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
@@ -1762,7 +1763,7 @@ const DecisionCard = ({
   const [fuRec, setFuRec] = useState<boolean | null>(null);
   const [fuConf, setFuConf] = useState<number | null>(null);
   const [fuReturnNote, setFuReturnNote] = useState("");
-  const [fuTwoWeek, setFuTwoWeek] = useState("");
+  const [fuTake, setFuTake] = useState("");
   const [fuPhoto, setFuPhoto] = useState<File | null>(null);
   const [fuDismiss, setFuDismiss] = useState(false);
   const [fuThanks, setFuThanks] = useState(false);
@@ -2232,11 +2233,12 @@ const DecisionCard = ({
                   );
                   return wrap(
                     <div>
-                      {heading("Add a photo (optional)")}
-                      <p style={{ fontSize: 12.5, color: "#8C7A70", margin: "0 0 10px" }}>Show how they looked on you so the next woman doesn't have to guess.</p>
+                      {heading("Anything you'd tell a woman like you?")}
+                      <p style={{ fontSize: 12.5, color: "#8C7A70", margin: "0 0 10px" }}>Optional — how it really fits, wears, or holds up (e.g. runs big, super wrinkly by end of day, the denim gives after a few wears).</p>
+                      <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={3} placeholder="Share what the photos can't show..." style={ta} />
                       <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
-                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset" }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo"}</button>
-                      <button onClick={() => { submitReceived(decision.id, { primary, detailAnswer: fuDetail, recommend: fuRec, confidence: fuConf, photoFile: fuPhoto }); setFuThanks(true); }} style={{ ...dark, width: "100%", marginTop: 8, padding: "12px 0" }}>Done</button>
+                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo (optional)"}</button>
+                      <button onClick={() => { submitReceived(decision.id, { primary, detailAnswer: fuDetail, recommend: fuRec, confidence: fuConf, photoFile: fuPhoto, take: fuTake }); setFuThanks(true); }} style={{ ...dark, width: "100%", marginTop: 8, padding: "12px 0" }}>Done</button>
                     </div>
                   );
                 })()}
@@ -2248,20 +2250,9 @@ const DecisionCard = ({
                   </div>
                 )}
 
-                {/* 2-week nudge — lived experience, appends to Her take */}
-                {isOwn && decision.status === "purchased" && !fuThanks && (() => {
-                  const o = decision.outcomes?.[0] ?? null;
-                  if (!o || o.arrival_status !== "received" || o.followed_up_at || fuDismiss) return null;
-                  const age = o.received_at ? (Date.now() - new Date(o.received_at).getTime()) / 86400000 : 0;
-                  if (age < 14) return null;
-                  return (
-                    <div style={{ background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-                      <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>Now that you've worn it a bit, anything you'd add?</p>
-                      <textarea value={fuTwoWeek} onChange={(e) => setFuTwoWeek(e.target.value)} rows={2} placeholder="e.g. holds up great after a few washes" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
-                      <button onClick={() => { updateOutcome(decision.id, { take: [o.take, fuTwoWeek.trim()].filter(Boolean).join(" — ") || null, followed_up_at: new Date().toISOString() }); setFuDismiss(true); }} style={{ width: "100%", marginTop: 10, padding: "12px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Done</button>
-                    </div>
-                  );
-                })()}
+                {/* The 2-week "how is it holding up" reminder is delivered as a
+                    separate log-outcome notification, not a second on-card flow —
+                    the received-it flow above already captures Her take. */}
 
                 {/* Responses — collapsed by default on closed cards so the outcome lands first */}
                 {sortedResponses.length > 0 && (() => {

@@ -772,6 +772,23 @@ const Feed = () => {
     }
   };
 
+  // "Still deciding": a living, paused state — no status change, the decision stays
+  // open and its buttons stay live. We only keep a lightweight note that she paused
+  // here so we can see how often decisions stall.
+  const quickStillDeciding = async (id: string) => {
+    if (!user) return;
+    const outcomeRow = { did_purchase: false, outcome_type: "still_deciding" };
+    const merge = (d: DecisionRow): DecisionRow =>
+      d.id === id ? { ...d, outcomes: [{ ...(d.outcomes?.[0] ?? {} as any), ...outcomeRow }] } : d;
+    setDecisions(prev => prev.map(merge));
+    setMyDecisions(prev => prev.map(merge));
+    try {
+      await supabase.from("outcomes").upsert({ decision_id: id, user_id: user.id, ...outcomeRow }, { onConflict: "decision_id" });
+    } catch (e) {
+      console.error("still-deciding note failed:", e);
+    }
+  };
+
   const closeWeighIn = () => {
     const wasCompleted = weighInCompletedRef.current;
     weighInCompletedRef.current = false;
@@ -1394,6 +1411,7 @@ const Feed = () => {
               setTrackingId={setTrackingId}
               setOutcomeInitial={setOutcomeInitial}
               quickLogOutcome={quickLogOutcome}
+              quickStillDeciding={quickStillDeciding}
               submitFollowup={submitFollowup}
               updateOutcome={updateOutcome}
               submitReceived={submitReceived}
@@ -1732,6 +1750,7 @@ interface CardProps {
   setTrackingId: (id: string | null) => void;
   setOutcomeInitial: (o: "bought_it" | "didnt_buy" | null) => void;
   quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
+  quickStillDeciding: (id: string) => void;
   submitFollowup: (id: string, data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null }) => void;
   updateOutcome: (id: string, patch: Record<string, any>) => void;
   submitReceived: (id: string, data: { primary: string; detailAnswer: string | null; kept: boolean | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null }) => void;
@@ -1758,6 +1777,7 @@ const DecisionCard = ({
   setTrackingId,
   setOutcomeInitial,
   quickLogOutcome,
+  quickStillDeciding,
   submitFollowup,
   updateOutcome,
   submitReceived,
@@ -1778,6 +1798,12 @@ const DecisionCard = ({
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [snoozedOutcome, setSnoozedOutcome] = useState(false);
+  // The "still deciding" acknowledgment auto-reverts so the decision buttons pop back up.
+  useEffect(() => {
+    if (!snoozedOutcome) return;
+    const t = setTimeout(() => setSnoozedOutcome(false), 2600);
+    return () => clearTimeout(t);
+  }, [snoozedOutcome]);
   const [pickingSize, setPickingSize] = useState(false);
   // Outcome-lifecycle wizard state (gate → received questions, or returned)
   const [fuStage, setFuStage] = useState<"gate" | "returned" | "detail" | "keep" | "recommend" | "confidence" | "photo">("gate");
@@ -2612,9 +2638,11 @@ const DecisionCard = ({
                   <div style={{ width: "100%" }}>
                     {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
                       snoozedOutcome ? (
-                        <p style={{ fontSize: 14, color: "#8C7A70", margin: 0 }}>Got it. We'll check back later.</p>
+                        <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ fontSize: 15, fontWeight: 600, color: "#6E7A44", margin: "4px 0", lineHeight: 1.4 }}>
+                          Sounds good — we'll circle back. ✦
+                        </motion.p>
                       ) : (
-                        <div>
+                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
                           <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
                             {weighInCount > 0
                               ? `${weighInCount} ${weighInCount === 1 ? "woman" : "women"} weighed in. Don't leave ${weighInCount === 1 ? "her" : "them"} hanging, spill.`
@@ -2623,9 +2651,9 @@ const DecisionCard = ({
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => { setOutcomeInitial("bought_it"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
                             <button onClick={() => { setOutcomeInitial("didnt_buy"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
-                            <button onClick={() => setSnoozedOutcome(true)} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
+                            <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
                           </div>
-                        </div>
+                        </motion.div>
                       )
                     )}
 

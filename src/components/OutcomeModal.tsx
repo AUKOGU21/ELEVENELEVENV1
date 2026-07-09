@@ -83,6 +83,7 @@ function buildSteps(outcome: OutcomeType | null, primary: string): StepId[] {
     return [...base, "complete"];
   }
 
+  if (outcome === "still_deciding") return ["outcome", "complete"];
   return [...base, "complete"];
 }
 
@@ -330,7 +331,7 @@ const SIZE_RECOMMENDATION_OPTIONS = [
 function completeMessage(outcome: OutcomeType): string {
   if (outcome === "bought_it") return "Got it. This helps us understand what you need.";
   if (outcome === "didnt_buy") return "Makes sense. We're using this to get you more relevant input.";
-  return "Thanks. This helps us sharpen future matches.";
+  return "Sounds good — we'll circle back.";
 }
 
 const OPTION_BASE: React.CSSProperties = {
@@ -526,6 +527,11 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome }: O
   const handleOutcomeSelect = (outcome: OutcomeType) => {
     const next = { ...state, outcome };
     setState(next);
+    // Still deciding is a paused state — skip the follow-up questions, just note it.
+    if (outcome === "still_deciding") {
+      saveAndComplete(next);
+      return;
+    }
     const nextSteps = buildSteps(outcome, primary);
     if (nextSteps.length > 1) {
       setCurrentStepIdx(1);

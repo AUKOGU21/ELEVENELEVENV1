@@ -762,9 +762,18 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome }: O
                   />
                   <button
                     style={CONTINUE_BTN}
-                    onClick={advance}
+                    disabled={saving}
+                    onClick={() => {
+                      const nextSteps = buildSteps(state.outcome, primary);
+                      const nextIdx = currentStepIdx + 1;
+                      if (nextSteps[nextIdx] === "complete") {
+                        saveAndComplete(state);
+                      } else {
+                        advance();
+                      }
+                    }}
                   >
-                    Continue →
+                    {saving ? "Saving..." : "Continue →"}
                   </button>
                 </div>
               )}

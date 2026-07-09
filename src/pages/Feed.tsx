@@ -691,6 +691,7 @@ const Feed = () => {
     await updateOutcome(id, {
       arrival_status: "received",
       received_at: new Date().toISOString(),
+      followed_up_at: new Date().toISOString(),
       kept: true,
       recommend: data.recommend,
       confidence_after: data.confidence,
@@ -1016,20 +1017,16 @@ const Feed = () => {
   const showActivation = !!user && activeTab === "feed"
     && myDecisions.length === 0 && hasWeighedIn === false && !!activationTarget;
 
-  // Purchases that hit the 2-week mark and still need their follow-up (drives the banner).
+  // Purchases still owed their received-it log — drives the top-of-feed banner.
   const followupPending = myDecisions.filter((d) => {
     if (d.status !== "purchased") return false;
     const o = d.outcomes?.[0];
     if (!o) return false;
     const arrival = o.arrival_status;
     if (arrival === "returned") return false;
-    if (!arrival) return true;                         // gate never answered
+    if (!arrival) return true;                         // "did you receive it?" not answered yet
     if (arrival === "waiting") return !o.next_prompt_at || Date.now() >= new Date(o.next_prompt_at).getTime();
-    if (arrival === "received" && !o.followed_up_at) { // 2-week lived-experience nudge due
-      const age = o.received_at ? (Date.now() - new Date(o.received_at).getTime()) / 86400000 : 0;
-      return age >= 14;
-    }
-    return false;
+    return false;                                       // received → fully logged (incl. Her take); nothing pending
   });
   const showFollowupBanner = !!user && activeTab === "feed" && followupPending.length > 0;
 

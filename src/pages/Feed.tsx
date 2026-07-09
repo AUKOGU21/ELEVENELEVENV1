@@ -673,33 +673,52 @@ const Feed = () => {
     }
   };
 
-  // "Received it" completion: tailored fit/detail answer + recommend + confidence + optional photo.
+  // Upload an outcome photo to storage and return its public URL. Shared by the
+  // received-it and returned flows. Returns null if there's no file or it fails.
+  const uploadOutcomePhoto = async (id: string, file: File | null): Promise<string | null> => {
+    if (!file || !user) return null;
+    try {
+      let body: Blob = file;
+      try { body = await imageToJpeg(file); } catch { /* fall back to raw */ }
+      const path = `outcome-photos/${user.id}/${id}-${Date.now()}.jpg`;
+      const { data: up } = await supabase.storage.from("product-images").upload(path, body, { upsert: true, contentType: "image/jpeg" });
+      if (up) return supabase.storage.from("product-images").getPublicUrl(up.path).data.publicUrl;
+    } catch (e) { console.warn("outcome photo upload failed:", e); }
+    return null;
+  };
+
+  // "Received it" completion: tailored fit/detail answer + kept + recommend + confidence + optional photo.
   const submitReceived = async (
     id: string,
-    data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null },
+    data: { primary: string; detailAnswer: string | null; kept: boolean | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null },
   ) => {
     if (!user) return;
-    let photoUrl: string | null = null;
-    if (data.photoFile) {
-      try {
-        let body: Blob = data.photoFile;
-        try { body = await imageToJpeg(data.photoFile); } catch { /* fall back to raw */ }
-        const path = `outcome-photos/${user.id}/${id}-${Date.now()}.jpg`;
-        const { data: up } = await supabase.storage.from("product-images").upload(path, body, { upsert: true, contentType: "image/jpeg" });
-        if (up) photoUrl = supabase.storage.from("product-images").getPublicUrl(up.path).data.publicUrl;
-      } catch (e) { console.warn("outcome photo upload failed:", e); }
-    }
+    const photoUrl = await uploadOutcomePhoto(id, data.photoFile);
     const fitLike = data.primary === "Between sizes" || data.primary === "Will it fit right";
     await updateOutcome(id, {
       arrival_status: "received",
       received_at: new Date().toISOString(),
       followed_up_at: new Date().toISOString(),
-      kept: true,
+      kept: data.kept,
       recommend: data.recommend,
       confidence_after: data.confidence,
       ...(fitLike ? { fit_result: data.detailAnswer } : { outcome_detail: data.detailAnswer }),
       ...(data.take && data.take.trim() ? { take: data.take.trim() } : {}),
       ...(photoUrl ? { photo_url: photoUrl } : {}),
+    });
+  };
+
+  // "Returned / canceled" completion: mark not kept, save the reason + an optional
+  // photo (even a bad outcome helps the next woman see why).
+  const submitReturned = async (id: string, data: { note: string | null; photoFile: File | null }) => {
+    if (!user) return;
+    const photoUrl = await uploadOutcomePhoto(id, data.photoFile);
+    await updateOutcome(id, {
+      arrival_status: "returned",
+      kept: false,
+      take: data.note && data.note.trim() ? data.note.trim() : null,
+      ...(photoUrl ? { photo_url: photoUrl } : {}),
+      followed_up_at: new Date().toISOString(),
     });
   };
 
@@ -1378,6 +1397,7 @@ const Feed = () => {
               submitFollowup={submitFollowup}
               updateOutcome={updateOutcome}
               submitReceived={submitReceived}
+              submitReturned={submitReturned}
               startWeighIn={startWeighIn}
               handleDelete={handleDelete}
               handleHelpfulVote={handleHelpfulVote}
@@ -1714,7 +1734,8 @@ interface CardProps {
   quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
   submitFollowup: (id: string, data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null }) => void;
   updateOutcome: (id: string, patch: Record<string, any>) => void;
-  submitReceived: (id: string, data: { primary: string; detailAnswer: string | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null }) => void;
+  submitReceived: (id: string, data: { primary: string; detailAnswer: string | null; kept: boolean | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null }) => void;
+  submitReturned: (id: string, data: { note: string | null; photoFile: File | null }) => void;
   startWeighIn: (id: string) => void;
   handleDelete: (id: string) => void;
   handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
@@ -1740,6 +1761,7 @@ const DecisionCard = ({
   submitFollowup,
   updateOutcome,
   submitReceived,
+  submitReturned,
   startWeighIn,
   handleDelete,
   handleHelpfulVote,
@@ -1758,8 +1780,9 @@ const DecisionCard = ({
   const [snoozedOutcome, setSnoozedOutcome] = useState(false);
   const [pickingSize, setPickingSize] = useState(false);
   // Outcome-lifecycle wizard state (gate → received questions, or returned)
-  const [fuStage, setFuStage] = useState<"gate" | "returned" | "detail" | "recommend" | "confidence" | "photo">("gate");
+  const [fuStage, setFuStage] = useState<"gate" | "returned" | "detail" | "keep" | "recommend" | "confidence" | "photo">("gate");
   const [fuDetail, setFuDetail] = useState<string | null>(null);
+  const [fuKept, setFuKept] = useState<boolean | null>(null);
   const [fuRec, setFuRec] = useState<boolean | null>(null);
   const [fuConf, setFuConf] = useState<number | null>(null);
   const [fuReturnNote, setFuReturnNote] = useState("");
@@ -2018,6 +2041,17 @@ const DecisionCard = ({
               {showingOutcome && (
                 <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(28,23,18,0.82)", color: "#F4EEE6", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em", zIndex: 3 }}>✦ On her</span>
               )}
+              {oPhoto && !showingOutcome && (
+                <motion.button
+                  onClick={(e) => { e.stopPropagation(); setImgIdx(imgs.indexOf(oPhoto)); }}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: [0, -3, 0] }}
+                  transition={{ y: { repeat: Infinity, duration: 1.8, ease: "easeInOut" }, opacity: { duration: 0.3 } }}
+                  style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.86)", color: "#F4EEE6", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", borderRadius: 100, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6, zIndex: 4, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", whiteSpace: "nowrap" }}
+                >
+                  ✦ See it on a real body <span style={{ fontSize: 14 }}>→</span>
+                </motion.button>
+              )}
               {multi && (
                 <>
                   <span style={{ position: "absolute", top: 10, right: 10, background: "rgba(28,23,18,0.6)", color: "#fff", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "2px 9px", zIndex: 3 }}>{idx + 1} / {imgs.length}</span>
@@ -2026,9 +2060,9 @@ const DecisionCard = ({
                       <button aria-label="Previous image" onClick={(e) => { e.stopPropagation(); go(-1); }} style={{ ...arrow, left: 8 }}>‹</button>
                       <button aria-label="Next image" onClick={(e) => { e.stopPropagation(); go(1); }} style={{ ...arrow, right: 8 }}>›</button>
                     </>
-                  ) : (
+                  ) : (!oPhoto || showingOutcome) ? (
                     <span style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.62)", color: "#fff", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 100, padding: "3px 12px", zIndex: 3, display: "flex", alignItems: "center", gap: 5 }}>swipe <span style={{ fontSize: 13 }}>→</span></span>
-                  )}
+                  ) : null}
                 </>
               )}
               {decision.product_url && (
@@ -2205,14 +2239,26 @@ const DecisionCard = ({
                     <div>
                       {heading("What went wrong? (optional)")}
                       <textarea value={fuReturnNote} onChange={(e) => setFuReturnNote(e.target.value)} rows={2} placeholder="e.g. ran huge, fabric felt cheap, changed my mind" style={ta} />
-                      <button style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }} onClick={() => updateOutcome(decision.id, { arrival_status: "returned", kept: false, take: fuReturnNote.trim() || null, followed_up_at: new Date().toISOString() })}>Done</button>
+                      <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
+                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo (optional)"}</button>
+                      <p style={{ fontSize: 12, color: "#8C7A70", margin: "8px 0 0" }}>Even if it didn't work out, a photo shows the next woman why.</p>
+                      <button style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }} onClick={() => { submitReturned(decision.id, { note: fuReturnNote, photoFile: fuPhoto }); setFuThanks(true); }}>Done</button>
                     </div>
                   );
                   if (fuStage === "detail") return wrap(
                     <div>
                       {heading(detailQ)}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {detailOpts.map((opt) => <button key={opt} style={{ ...outline, minWidth: 90 }} onClick={() => { setFuDetail(opt); setFuStage("recommend"); }}>{opt}</button>)}
+                        {detailOpts.map((opt) => <button key={opt} style={{ ...outline, minWidth: 90 }} onClick={() => { setFuDetail(opt); setFuStage("keep"); }}>{opt}</button>)}
+                      </div>
+                    </div>
+                  );
+                  if (fuStage === "keep") return wrap(
+                    <div>
+                      {heading("Did you end up keeping it?")}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button style={dark} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Kept it</button>
+                        <button style={outline} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returned it</button>
                       </div>
                     </div>
                   );
@@ -2241,7 +2287,7 @@ const DecisionCard = ({
                       <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={3} placeholder="Share what the photos can't show..." style={ta} />
                       <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
                       <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo (optional)"}</button>
-                      <button onClick={() => { submitReceived(decision.id, { primary, detailAnswer: fuDetail, recommend: fuRec, confidence: fuConf, photoFile: fuPhoto, take: fuTake }); setFuThanks(true); }} style={{ ...dark, width: "100%", marginTop: 8, padding: "12px 0" }}>Done</button>
+                      <button onClick={() => { submitReceived(decision.id, { primary, detailAnswer: fuDetail, kept: fuKept, recommend: fuRec, confidence: fuConf, photoFile: fuPhoto, take: fuTake }); setFuThanks(true); }} style={{ ...dark, width: "100%", marginTop: 8, padding: "12px 0" }}>Done</button>
                     </div>
                   );
                 })()}

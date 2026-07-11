@@ -252,8 +252,11 @@ Do not include any explanation, just the JSON.`,
       const brandCand = firstGood([f.ldBrand, titleBrand]);
       const brand = brandCand && !WAF.test(brandCand) ? brandCand : domainBrand;
 
-      // Image: JSON-LD → OG/Twitter → Jina/Microlink, made absolute; Zara CDN last resort.
-      const imageUrl = absolutize(f.ldImage || f.ogImage || f.image, origin) || zaraFallback(body.url);
+      // Image: first REAL (non-data:) candidate, JSON-LD → OG/Twitter → Jina/Microlink,
+      // made absolute; Zara CDN last resort. isRealImg rejects lazy-load placeholder
+      // pixels from ANY source (incl. the Jina-merged ld/og fields), so we never
+      // surface a blank data: gif.
+      const imageUrl = absolutize([f.ldImage, f.ogImage, f.image].find(isRealImg) || "", origin) || zaraFallback(body.url);
 
       // Price: JSON-LD → meta. Parse to a number and round to 2 decimals to kill
       // float artifacts (e.g. "22921.800001" → "22921.8").

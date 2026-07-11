@@ -85,6 +85,9 @@ interface DecisionRow {
   product_image_url_2: string | null;
   product_url: string | null;
   product_url_2?: string | null;
+  product_name_2?: string | null;
+  brand_name_2?: string | null;
+  price_note_2?: string | null;
   product_category: string | null;
   price_note: string | null;
   sizes_note: string | null;
@@ -491,7 +494,7 @@ const Feed = () => {
     // No outcomes join here — we fetch outcomes separately below to avoid
     // PostgREST FK detection issues causing the join to silently return null.
     const query = `
-      id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_category,
+      id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_name_2, brand_name_2, price_note_2, product_category,
       price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
       profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
@@ -1820,6 +1823,20 @@ const DecisionCard = ({
   const fuPhotoRef = useRef<HTMLInputElement>(null);
   const [imgIdx, setImgIdx] = useState(0);
   const imgTouchX = useRef<number | null>(null);
+
+  // Shared swipe state so the card text (brand/name/price) can track whichever
+  // option is currently in view. Closed decisions lead with the IRL outcome photo,
+  // then the website image(s); open decisions just show the website image(s).
+  const outcomePhoto = decision.outcomes?.[0]?.photo_url ?? null;
+  const swipeImgs = (outcomePhoto
+    ? [outcomePhoto, decision.product_image_url, decision.product_image_url_2]
+    : [decision.product_image_url, decision.product_image_url_2]
+  ).filter(Boolean) as string[];
+  const curSwipeIdx = swipeImgs.length ? Math.min(imgIdx, swipeImgs.length - 1) : 0;
+  const showingSecondProduct = !!decision.product_image_url_2 && swipeImgs[curSwipeIdx] === decision.product_image_url_2;
+  const dispBrand = showingSecondProduct ? (decision.brand_name_2 || decision.brand_name) : decision.brand_name;
+  const dispName = showingSecondProduct ? (decision.product_name_2 || decision.product_name) : decision.product_name;
+  const dispPrice = showingSecondProduct ? (decision.price_note_2 || decision.price_note) : decision.price_note;
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -2046,14 +2063,9 @@ const DecisionCard = ({
 
         {/* ── Product image ── */}
         {decision.product_image_url && (() => {
-          const oPhoto = decision.outcomes?.[0]?.photo_url ?? null;
-          // Closed decisions lead with the real-life outcome photo (IRL first), then
-          // the website image(s). Open decisions just show the website image(s).
-          const imgs = (oPhoto
-            ? [oPhoto, decision.product_image_url, decision.product_image_url_2]
-            : [decision.product_image_url, decision.product_image_url_2]
-          ).filter(Boolean) as string[];
-          const idx = Math.min(imgIdx, imgs.length - 1);
+          const oPhoto = outcomePhoto;
+          const imgs = swipeImgs;
+          const idx = curSwipeIdx;
           const multi = imgs.length > 1;
           const showingOutcome = !!oPhoto && imgs[idx] === oPhoto;
           // Each option's image links to its own product page; the IRL photo has none.
@@ -2118,22 +2130,22 @@ const DecisionCard = ({
         {/* ── Right: all card data ── */}
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "14px 14px 16px" : "20px 22px 24px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 0, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(4px)" }}>
 
-          {/* Brand + product name */}
-          {(decision.brand_name || decision.product_name) && (
+          {/* Brand + product name — tracks the swiped option */}
+          {(dispBrand || dispName) && (
             <div style={{ marginBottom: 4 }}>
-              {decision.brand_name && (
+              {dispBrand && (
                 <p style={{ fontSize: isMobile ? 16 : 19, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
-                  {decision.brand_name}
+                  {dispBrand}
                 </p>
               )}
-              {decision.product_name && (
+              {dispName && (
                 <p style={{ fontSize: isMobile ? 11 : 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8C7A70" }}>
-                  {decision.product_name}
+                  {dispName}
                 </p>
               )}
-              {decision.price_note && (
+              {dispPrice && (
                 <p style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#1A1A1A", marginTop: 5 }}>
-                  {decision.price_note.startsWith("$") ? decision.price_note : `$${decision.price_note}`}
+                  {dispPrice.startsWith("$") ? dispPrice : `$${dispPrice}`}
                 </p>
               )}
               {!decision.product_image_url && decision.product_url && (

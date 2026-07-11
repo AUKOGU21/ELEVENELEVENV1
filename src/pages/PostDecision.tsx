@@ -82,7 +82,7 @@ const PostDecision = () => {
   const [secondUrlInput, setSecondUrlInput] = useState("");
   const [extractingSecond, setExtractingSecond] = useState(false);
   const [secondUrlError, setSecondUrlError] = useState<string | null>(null);
-  const [secondProduct, setSecondProduct] = useState<{ image_url: string | null; source_url: string; name: string; brand: string; category: string | null } | null>(null);
+  const [secondProduct, setSecondProduct] = useState<{ image_url: string | null; source_url: string; name: string; brand: string; category: string | null; price: string | null } | null>(null);
 
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -265,6 +265,7 @@ const PostDecision = () => {
         name: data.name ?? "",
         brand: data.brand ?? "",
         category: secondCategory,
+        price: data.price ? `$${String(data.price).replace(/[^0-9.]/g, "")}` : null,
       });
       // If the first product didn't yield a category, fall back to this one's so the
       // decision still gets categorized (and the picker shows it filled).
@@ -335,6 +336,9 @@ const PostDecision = () => {
       product_image_url_2: finalImageUrl2 ?? null,
       product_url: product.source_url || null,
       product_url_2: secondProduct?.source_url ?? null,
+      product_name_2: secondProduct?.name || null,
+      brand_name_2: secondProduct?.brand || null,
+      price_note_2: secondProduct?.price || null,
       product_category: product.category || secondProduct?.category || null,
       product_price: product.price ? (parseFloat(String(product.price).replace(/[^0-9.]/g, "")) || null) : null,
       confidence_score: confidence,

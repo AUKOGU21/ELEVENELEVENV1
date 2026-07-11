@@ -164,6 +164,13 @@ Do not include any explanation, just the JSON.`,
       // Twitter / itemprop meta → <title> / URL slug / description.
       let f = extractFields(html);
 
+      // A data: URI is a lazy-load placeholder pixel, not a real image — blank it
+      // so the Jina/Microlink fallbacks still run and we never return an empty pixel.
+      const isRealImg = (s: string) => !!s && !s.startsWith("data:");
+      if (!isRealImg(f.ldImage)) f.ldImage = "";
+      if (!isRealImg(f.ogImage)) f.ogImage = "";
+      if (!isRealImg(f.image)) f.image = "";
+
       // If the direct fetch was blocked (Cloudflare/Akamai) or returned a JS
       // shell, we'll have no image and/or only a junk name. Re-fetch through
       // Jina Reader, which renders JS and proxies past most bot walls, then
@@ -196,7 +203,7 @@ Do not include any explanation, just the JSON.`,
               ogImage: f.ogImage || jf.ogImage,
               ogDesc: f.ogDesc || jf.ogDesc,
               ogPrice: f.ogPrice || jf.ogPrice,
-              image: f.image || jf.image,
+              image: f.image || (isRealImg(jf.image) ? jf.image : ""),
             };
             console.log("Jina fallback applied — image:", !!f.image, "name:", !isJunkName(f.ldName) || !isJunkName(f.ogTitle));
           } else {

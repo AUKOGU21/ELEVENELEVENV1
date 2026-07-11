@@ -15,6 +15,9 @@ interface OutcomeModalProps {
   // When opened from the "Bought it" / "Passed" buttons, pre-seed the outcome so
   // the flow jumps straight into the decision tree instead of re-asking it.
   initialOutcome?: OutcomeType | null;
+  // For a two-option "deciding between" decision: which she chose ('first' |
+  // 'second' | 'both'), recorded on the outcome so the card reflects the winner.
+  initialChosenOption?: string | null;
 }
 
 type OutcomeType = "bought_it" | "didnt_buy" | "still_deciding";
@@ -392,7 +395,7 @@ const QUESTION_STYLE: React.CSSProperties = {
   lineHeight: 1.3,
 };
 
-const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome }: OutcomeModalProps) => {
+const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, initialChosenOption }: OutcomeModalProps) => {
   const { user } = useAuth();
 
   const [state, setState] = useState<StepState>({
@@ -464,6 +467,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome }: O
           decision_id: decision.id,
           user_id: user.id,
           did_purchase: finalState.outcome === "bought_it",
+          chosen_option: initialChosenOption ?? null,
           outcome_type: finalState.outcome,
           primary_uncertainty: primary,
           tipping_factor: tf,

@@ -75,6 +75,7 @@ interface OutcomeRow {
   next_prompt_at: string | null;
   received_at: string | null;
   photo_url: string | null;
+  chosen_option?: string | null;
 }
 
 interface DecisionRow {
@@ -387,6 +388,8 @@ const Feed = () => {
   const [trackingId, setTrackingId] = useState<string | null>(null);
   // Pre-seeds the outcome modal when opened from the Bought it / Passed buttons.
   const [outcomeInitial, setOutcomeInitial] = useState<"bought_it" | "didnt_buy" | null>(null);
+  // For two-option decisions: which option she chose when logging the outcome.
+  const [outcomeChosen, setOutcomeChosen] = useState<"first" | "second" | "both" | null>(null);
   const [loggedOutcomeIds, setLoggedOutcomeIds] = useState<Set<string>>(new Set());
   const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -546,7 +549,7 @@ const Feed = () => {
       if (allDecisionIds.length > 0) {
         const { data: outcomesData } = await supabase
           .from("outcomes")
-          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option")
           .in("decision_id", allDecisionIds)
           .order("created_at", { ascending: false });
 
@@ -623,7 +626,7 @@ const Feed = () => {
         if (myDecisionIds.length > 0) {
           const { data: myOutcomesData } = await supabase
             .from("outcomes")
-            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option")
             .in("decision_id", myDecisionIds)
             .order("created_at", { ascending: false });
 
@@ -1414,6 +1417,7 @@ const Feed = () => {
               setLightboxUrl={setLightboxUrl}
               setTrackingId={setTrackingId}
               setOutcomeInitial={setOutcomeInitial}
+              setOutcomeChosen={setOutcomeChosen}
               quickLogOutcome={quickLogOutcome}
               quickStillDeciding={quickStillDeciding}
               submitFollowup={submitFollowup}
@@ -1631,7 +1635,8 @@ const Feed = () => {
       <OutcomeModal
         open={trackingId !== null}
         initialOutcome={outcomeInitial}
-        onClose={() => { setTrackingId(null); setOutcomeInitial(null); }}
+        initialChosenOption={outcomeChosen}
+        onClose={() => { setTrackingId(null); setOutcomeInitial(null); setOutcomeChosen(null); }}
         decision={decisions.find(d => d.id === trackingId) ?? myDecisions.find(d => d.id === trackingId) ?? { id: trackingId ?? '', uncertainty_text: null }}
         onComplete={(outcome) => {
           if (outcome !== "still_deciding" && trackingId) {
@@ -1657,7 +1662,7 @@ const Feed = () => {
                 // if there are multiple rows for the same decision_id.
                 const { data: rows } = await supabase
                   .from("outcomes")
-                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option")
                   .eq("decision_id", id)
                   .order("created_at", { ascending: false })
                   .limit(1);
@@ -1753,6 +1758,7 @@ interface CardProps {
   setLightboxUrl: (url: string | null) => void;
   setTrackingId: (id: string | null) => void;
   setOutcomeInitial: (o: "bought_it" | "didnt_buy" | null) => void;
+  setOutcomeChosen: (o: "first" | "second" | "both" | null) => void;
   quickLogOutcome: (id: string, outcome: "bought_it" | "didnt_buy", sizeBought?: string) => void;
   quickStillDeciding: (id: string) => void;
   submitFollowup: (id: string, data: { kept: boolean; recommend: boolean | null; confidenceAfter: number | null; take: string | null }) => void;
@@ -1780,6 +1786,7 @@ const DecisionCard = ({
   setLightboxUrl,
   setTrackingId,
   setOutcomeInitial,
+  setOutcomeChosen,
   quickLogOutcome,
   quickStillDeciding,
   submitFollowup,
@@ -1828,10 +1835,15 @@ const DecisionCard = ({
   // option is currently in view. Closed decisions lead with the IRL outcome photo,
   // then the website image(s); open decisions just show the website image(s).
   const outcomePhoto = decision.outcomes?.[0]?.photo_url ?? null;
-  const swipeImgs = (outcomePhoto
-    ? [outcomePhoto, decision.product_image_url, decision.product_image_url_2]
-    : [decision.product_image_url, decision.product_image_url_2]
-  ).filter(Boolean) as string[];
+  const chosenOpt = decision.outcomes?.[0]?.chosen_option ?? null;
+  const hasTwoOptions = !!(decision.product_image_url_2 || decision.product_url_2);
+  const optAName = decision.brand_name || decision.product_name || "Option A";
+  const optBName = decision.brand_name_2 || decision.product_name_2 || "Option B";
+  // Website image order: lead with the chosen option once decided; IRL photo leads on closed cards.
+  const webImgs = chosenOpt === "second"
+    ? [decision.product_image_url_2, decision.product_image_url]
+    : [decision.product_image_url, decision.product_image_url_2];
+  const swipeImgs = (outcomePhoto ? [outcomePhoto, ...webImgs] : webImgs).filter(Boolean) as string[];
   const curSwipeIdx = swipeImgs.length ? Math.min(imgIdx, swipeImgs.length - 1) : 0;
   const showingSecondProduct = !!decision.product_image_url_2 && swipeImgs[curSwipeIdx] === decision.product_image_url_2;
   const dispBrand = showingSecondProduct ? (decision.brand_name_2 || decision.brand_name) : decision.brand_name;
@@ -2189,7 +2201,7 @@ const DecisionCard = ({
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={LBL}>Final decision</p>
-                      <p style={{ fontWeight: 800, fontSize: 24, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, whiteSpace: "nowrap" }}>{bought ? "Bought it" : "Didn't buy it"}</p>
+                      <p style={{ fontWeight: 800, fontSize: 24, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, whiteSpace: "nowrap" }}>{bought ? (chosenOpt === "both" ? "Bought both" : "Bought it") : (hasTwoOptions ? "Didn't buy either" : "Didn't buy it")}</p>
                     </div>
                   </div>
                   {bought && sizeBought && (
@@ -2666,15 +2678,31 @@ const DecisionCard = ({
                       ) : (
                         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
                           <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
-                            {weighInCount > 0
+                            {hasTwoOptions
+                              ? "Which did you go with?"
+                              : weighInCount > 0
                               ? `${weighInCount} ${weighInCount === 1 ? "woman" : "women"} weighed in. Don't leave ${weighInCount === 1 ? "her" : "them"} hanging, spill.`
                               : "How'd it go?"}
                           </p>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => { setOutcomeInitial("bought_it"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
-                            <button onClick={() => { setOutcomeInitial("didnt_buy"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
-                            <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
-                          </div>
+                          {hasTwoOptions ? (
+                            <>
+                              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("first"); setTrackingId(decision.id); }} style={{ flex: 1, minWidth: 0, padding: "11px 8px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 13.5, fontWeight: 600, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optAName}</button>
+                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("second"); setTrackingId(decision.id); }} style={{ flex: 1, minWidth: 0, padding: "11px 8px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 13.5, fontWeight: 600, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optBName}</button>
+                              </div>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("both"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Both</button>
+                                <button onClick={() => { setOutcomeInitial("didnt_buy"); setOutcomeChosen(null); setTrackingId(decision.id); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Neither</button>
+                                <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button onClick={() => { setOutcomeInitial("bought_it"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
+                              <button onClick={() => { setOutcomeInitial("didnt_buy"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
+                              <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
+                            </div>
+                          )}
                         </motion.div>
                       )
                     )}

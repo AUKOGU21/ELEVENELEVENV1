@@ -2046,7 +2046,12 @@ const DecisionCard = ({
         {/* ── Product image ── */}
         {decision.product_image_url && (() => {
           const oPhoto = decision.outcomes?.[0]?.photo_url ?? null;
-          const imgs = [decision.product_image_url, decision.product_image_url_2, oPhoto].filter(Boolean) as string[];
+          // Closed decisions lead with the real-life outcome photo (IRL first), then
+          // the website image(s). Open decisions just show the website image(s).
+          const imgs = (oPhoto
+            ? [oPhoto, decision.product_image_url, decision.product_image_url_2]
+            : [decision.product_image_url, decision.product_image_url_2]
+          ).filter(Boolean) as string[];
           const idx = Math.min(imgIdx, imgs.length - 1);
           const multi = imgs.length > 1;
           const showingOutcome = !!oPhoto && imgs[idx] === oPhoto;

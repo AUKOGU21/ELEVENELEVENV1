@@ -171,10 +171,19 @@ Do not include any explanation, just the JSON.`,
       const weak = !f.image || (isJunkName(f.ldName) && isJunkName(f.ogTitle));
       if (weak) {
         try {
+          // Jina Reader now requires an API key (unauthenticated calls 401). With
+          // the key it renders JS and proxies past bot walls (Revolve/Akamai etc.),
+          // which is what gets us a clean product image on sites that block us.
+          const JINA_KEY = Deno.env.get("JINA_API_KEY");
           const jr = await fetch(`https://r.jina.ai/${body.url}`, {
-            headers: { "x-return-format": "html", "x-timeout": "15" },
+            headers: {
+              "x-return-format": "html",
+              "x-timeout": "15",
+              ...(JINA_KEY ? { Authorization: `Bearer ${JINA_KEY}` } : {}),
+            },
             signal: AbortSignal.timeout(22000),
           });
+          console.log("Jina status:", jr.status, "keyed:", !!JINA_KEY);
           if (jr.ok) {
             const jf = extractFields(await jr.text());
             f = {

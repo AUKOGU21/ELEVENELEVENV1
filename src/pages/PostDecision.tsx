@@ -82,7 +82,7 @@ const PostDecision = () => {
   const [secondUrlInput, setSecondUrlInput] = useState("");
   const [extractingSecond, setExtractingSecond] = useState(false);
   const [secondUrlError, setSecondUrlError] = useState<string | null>(null);
-  const [secondProduct, setSecondProduct] = useState<{ image_url: string | null; source_url: string; name: string; brand: string } | null>(null);
+  const [secondProduct, setSecondProduct] = useState<{ image_url: string | null; source_url: string; name: string; brand: string; category: string | null } | null>(null);
 
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -258,12 +258,17 @@ const PostDecision = () => {
         body: { url: parsed.href },
       });
       if (error) throw error;
+      const secondCategory = normalizeCategory(data.category) ?? normalizeCategory(data.name) ?? data.category ?? null;
       setSecondProduct({
         image_url: data.image_url ?? null,
         source_url: parsed.href,
         name: data.name ?? "",
         brand: data.brand ?? "",
+        category: secondCategory,
       });
+      // If the first product didn't yield a category, fall back to this one's so the
+      // decision still gets categorized (and the picker shows it filled).
+      if (secondCategory) setProduct((p) => (p && !p.category ? { ...p, category: secondCategory } : p));
       setShowSecondUrl(false);
       setSecondUrlInput("");
     } catch {
@@ -330,7 +335,7 @@ const PostDecision = () => {
       product_image_url_2: finalImageUrl2 ?? null,
       product_url: product.source_url || null,
       product_url_2: secondProduct?.source_url ?? null,
-      product_category: product.category || null,
+      product_category: product.category || secondProduct?.category || null,
       product_price: product.price ? (parseFloat(String(product.price).replace(/[^0-9.]/g, "")) || null) : null,
       confidence_score: confidence,
       uncertainty_text: uncertainties.join(", "),

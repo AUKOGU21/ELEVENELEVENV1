@@ -77,6 +77,12 @@ const PostDecision = () => {
 
   const [secondPhoto, setSecondPhoto] = useState<File | null>(null);
   const [secondPhotoPreview, setSecondPhotoPreview] = useState<string | null>(null);
+  // Second option to compare (deciding between two): its own extracted image + live link.
+  const [showSecondUrl, setShowSecondUrl] = useState(false);
+  const [secondUrlInput, setSecondUrlInput] = useState("");
+  const [extractingSecond, setExtractingSecond] = useState(false);
+  const [secondUrlError, setSecondUrlError] = useState<string | null>(null);
+  const [secondProduct, setSecondProduct] = useState<{ image_url: string | null; source_url: string; name: string; brand: string } | null>(null);
 
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -238,13 +244,44 @@ const PostDecision = () => {
     setSecondPhotoPreview(URL.createObjectURL(file));
   }, []);
 
+  // ─── Add a second option to compare (extract its image + keep its link) ───
+  const handleSecondUrlSubmit = async () => {
+    const trimmed = secondUrlInput.trim();
+    if (!trimmed) return;
+    let parsed: URL;
+    try { parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`); }
+    catch { setSecondUrlError("Enter a valid link"); return; }
+    setSecondUrlError(null);
+    setExtractingSecond(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-product", {
+        body: { url: parsed.href },
+      });
+      if (error) throw error;
+      setSecondProduct({
+        image_url: data.image_url ?? null,
+        source_url: parsed.href,
+        name: data.name ?? "",
+        brand: data.brand ?? "",
+      });
+      setShowSecondUrl(false);
+      setSecondUrlInput("");
+    } catch {
+      setSecondUrlError("Couldn't read that link — try another");
+    } finally {
+      setExtractingSecond(false);
+    }
+  };
+
   // ─── Submit decision ────────────────────────────────────────────
   const submitDecision = async () => {
     if (!product) return;
     setSubmitting(true);
 
     let finalImageUrl = product.image_url; // prefer clean Microlink image
-    let finalImageUrl2: string | null = null;
+    // The second image comes from a compared link (its extracted image) if present,
+    // otherwise from a manually uploaded second photo.
+    let finalImageUrl2: string | null = secondProduct?.image_url ?? null;
 
     // Only upload the raw screenshot if we don't already have a clean image URL
     if (product.uploaded_file && !product.image_url) {
@@ -263,7 +300,7 @@ const PostDecision = () => {
       }
     }
 
-    if (secondPhoto) {
+    if (!finalImageUrl2 && secondPhoto) {
       let body2: Blob = secondPhoto;
       try { body2 = await imageToJpeg(secondPhoto); } catch (e) { console.warn("second photo convert failed, uploading raw:", e); }
       const path2 = `${Date.now()}_2.jpg`;
@@ -292,6 +329,7 @@ const PostDecision = () => {
       product_image_url: finalImageUrl,
       product_image_url_2: finalImageUrl2 ?? null,
       product_url: product.source_url || null,
+      product_url_2: secondProduct?.source_url ?? null,
       product_category: product.category || null,
       product_price: product.price ? (parseFloat(String(product.price).replace(/[^0-9.]/g, "")) || null) : null,
       confidence_score: confidence,
@@ -514,6 +552,51 @@ const PostDecision = () => {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Compare a second option (deciding between two) */}
+              <div className="mb-6">
+                {secondProduct ? (
+                  <div className="flex items-center gap-3 p-2 rounded-xl border border-border bg-card">
+                    {secondProduct.image_url ? (
+                      <img src={secondProduct.image_url} alt="Second option" className="rounded-lg object-cover bg-muted flex-shrink-0" style={{ width: 44, height: 58 }} />
+                    ) : (
+                      <div className="rounded-lg bg-muted flex-shrink-0 flex items-center justify-center" style={{ width: 44, height: 58 }}><Link className="w-4 h-4 text-muted-foreground" /></div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground" style={{ letterSpacing: "0.1em" }}>Comparing with</p>
+                      <p className="text-base text-foreground truncate">{[secondProduct.brand, secondProduct.name].filter(Boolean).join(" ") || secondProduct.source_url}</p>
+                    </div>
+                    <button onClick={() => setSecondProduct(null)} className="flex-shrink-0 text-muted-foreground hover:text-foreground px-2" aria-label="Remove second option">✕</button>
+                  </div>
+                ) : showSecondUrl ? (
+                  <div>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={secondUrlInput}
+                        onChange={(e) => { setSecondUrlInput(e.target.value); setSecondUrlError(null); }}
+                        onKeyDown={(e) => e.key === "Enter" && handleSecondUrlSubmit()}
+                        placeholder="Paste the other product link"
+                        autoFocus
+                        className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                      />
+                      <button
+                        onClick={handleSecondUrlSubmit}
+                        disabled={extractingSecond || !secondUrlInput.trim()}
+                        className="px-4 rounded-lg text-base font-medium disabled:opacity-40"
+                        style={{ background: "#1C1712", color: "#FDFAF6" }}
+                      >
+                        {extractingSecond ? "…" : "Add"}
+                      </button>
+                    </div>
+                    {secondUrlError && <p className="text-xs mt-1 pl-1" style={{ color: "#c0392b" }}>{secondUrlError}</p>}
+                  </div>
+                ) : (
+                  <button onClick={() => setShowSecondUrl(true)} className="flex items-center gap-1.5 text-base hover:underline" style={{ color: "#C49E64" }}>
+                    <Link className="w-4 h-4" /> Deciding between two? Add the other link
+                  </button>
+                )}
               </div>
 
               {/* Category picker */}

@@ -84,6 +84,7 @@ interface DecisionRow {
   product_image_url: string | null;
   product_image_url_2: string | null;
   product_url: string | null;
+  product_url_2?: string | null;
   product_category: string | null;
   price_note: string | null;
   sizes_note: string | null;
@@ -490,7 +491,7 @@ const Feed = () => {
     // No outcomes join here — we fetch outcomes separately below to avoid
     // PostgREST FK detection issues causing the join to silently return null.
     const query = `
-      id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_category,
+      id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_category,
       price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
       profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
@@ -2055,6 +2056,10 @@ const DecisionCard = ({
           const idx = Math.min(imgIdx, imgs.length - 1);
           const multi = imgs.length > 1;
           const showingOutcome = !!oPhoto && imgs[idx] === oPhoto;
+          // Each option's image links to its own product page; the IRL photo has none.
+          const currentUrl = imgs[idx] === decision.product_image_url ? (decision.product_url ?? null)
+            : imgs[idx] === decision.product_image_url_2 ? (decision.product_url_2 ?? null)
+            : null;
           const go = (dir: number) => setImgIdx((imgs.length + idx + dir) % imgs.length);
           const arrow: React.CSSProperties = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(28,23,18,0.55)", color: "#fff", fontSize: 20, lineHeight: "30px", textAlign: "center", cursor: "pointer", zIndex: 3, padding: 0 };
           return (
@@ -2096,9 +2101,9 @@ const DecisionCard = ({
                   ) : null}
                 </>
               )}
-              {decision.product_url && (
+              {currentUrl && (
                 <a
-                  href={decision.product_url}
+                  href={currentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#5A4A42", textDecoration: "none", zIndex: 2 }}

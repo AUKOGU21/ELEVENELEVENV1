@@ -940,6 +940,22 @@ const Feed = () => {
     fetchDecisions();
   };
 
+  // Owner edits their own post — details / confidence / price / sizes.
+  const saveDecisionEdit = async (
+    id: string,
+    patch: { context_note: string | null; confidence_score: number; price_note: string | null; sizes_note: string | null },
+  ) => {
+    if (!user) return;
+    const merge = (d: DecisionRow): DecisionRow => (d.id === id ? { ...d, ...patch } : d);
+    setDecisions(prev => prev.map(merge));
+    setMyDecisions(prev => prev.map(merge));
+    try {
+      await supabase.from("decisions").update(patch).eq("id", id);
+    } catch (e) {
+      console.error("decision edit failed:", e);
+    }
+  };
+
   const handleOutcome = async (decisionId: string, outcome: string) => {
     if (!user) return;
     const didPurchase = outcome === "Bought it";
@@ -1426,6 +1442,7 @@ const Feed = () => {
               submitReturned={submitReturned}
               startWeighIn={startWeighIn}
               handleDelete={handleDelete}
+              saveDecisionEdit={saveDecisionEdit}
               handleHelpfulVote={handleHelpfulVote}
               activeTab={activeTab}
               onSignIn={() => navigate("/signin")}
@@ -1767,6 +1784,7 @@ interface CardProps {
   submitReturned: (id: string, data: { note: string | null; photoFile: File | null }) => void;
   startWeighIn: (id: string) => void;
   handleDelete: (id: string) => void;
+  saveDecisionEdit: (id: string, patch: { context_note: string | null; confidence_score: number; price_note: string | null; sizes_note: string | null }) => void;
   handleHelpfulVote: (responseId: string, voteType: "helpful" | "not_helpful") => void;
   activeTab: "feed" | "mine";
   onSignIn: () => void;
@@ -1795,6 +1813,7 @@ const DecisionCard = ({
   submitReturned,
   startWeighIn,
   handleDelete,
+  saveDecisionEdit,
   handleHelpfulVote,
   activeTab,
   onSignIn,
@@ -1808,6 +1827,46 @@ const DecisionCard = ({
   const [showAllResponses, setShowAllResponses] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDetails, setEditDetails] = useState<Record<string, string>>({});
+  const [editConf, setEditConf] = useState(5);
+  const [editPrice, setEditPrice] = useState("");
+  const [editSizes, setEditSizes] = useState("");
+
+  const editConsiderations = (decision.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const openEdit = () => {
+    const ctx: Record<string, string> = {};
+    if (decision.context_note) {
+      decision.context_note.split(" · ").forEach((note) => {
+        const i = note.indexOf(": ");
+        if (i > -1) ctx[note.slice(0, i).trim().toLowerCase()] = note.slice(i + 2).trim();
+      });
+    }
+    const details: Record<string, string> = {};
+    editConsiderations.forEach((u) => {
+      const ul = u.toLowerCase();
+      const key = Object.keys(ctx).find((k) => ul.includes(k) || k.includes(ul));
+      details[u] = key ? ctx[key] : "";
+    });
+    setEditDetails(details);
+    setEditConf(decision.confidence_score ?? 5);
+    setEditPrice((decision.price_note ?? "").replace(/^\$/, ""));
+    setEditSizes(decision.sizes_note ?? "");
+    setEditing(true);
+  };
+  const submitEdit = () => {
+    const context_note = editConsiderations
+      .filter((u) => (editDetails[u] ?? "").trim())
+      .map((u) => `${u}: ${editDetails[u].trim()}`)
+      .join(" · ") || null;
+    saveDecisionEdit(decision.id, {
+      context_note,
+      confidence_score: editConf,
+      price_note: editPrice.trim() ? `$${editPrice.trim().replace(/^\$/, "")}` : null,
+      sizes_note: editSizes.trim() || null,
+    });
+    setEditing(false);
+  };
   const [snoozedOutcome, setSnoozedOutcome] = useState(false);
   // The "still deciding" acknowledgment auto-reverts so the decision buttons pop back up.
   useEffect(() => {
@@ -1994,6 +2053,18 @@ const DecisionCard = ({
                   Hide this post
                 </button>
               )}
+              {isOwn && decision.status === "open" && (
+                <button
+                  onClick={() => { setMenuOpen(false); openEdit(); }}
+                  style={{
+                    width: "100%", textAlign: "left",
+                    padding: "12px 16px", background: "none", border: "none",
+                    fontSize: 19, color: "#1A1A1A", cursor: "pointer",
+                  }}
+                >
+                  Edit post
+                </button>
+              )}
               {isOwn && activeTab === "mine" && (
                 <button
                   onClick={() => { setMenuOpen(false); if (confirm("Remove this decision?")) handleDelete(decision.id); }}
@@ -2023,6 +2094,45 @@ const DecisionCard = ({
           )}
         </div>
       </div>
+
+      {/* ── Edit post modal (owner) ───────────────────────────────────────────── */}
+      {editing && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={() => setEditing(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} />
+          <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 460, maxHeight: "88vh", overflowY: "auto", background: "#FDFAF6", borderRadius: 16, padding: 22, boxShadow: "0 12px 40px rgba(0,0,0,0.28)" }}>
+            <p style={{ fontFamily: "Georgia, serif", fontSize: 22, color: "#1A1A1A", margin: "0 0 4px" }}>Edit your post</p>
+            <p style={{ fontSize: 14, color: "#8C7A70", margin: "0 0 18px" }}>Add more context, adjust your confidence, or fix a detail.</p>
+            {editConsiderations.map((u) => (
+              <div key={u} style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>{u}</p>
+                <textarea value={editDetails[u] ?? ""} onChange={(e) => setEditDetails((p) => ({ ...p, [u]: e.target.value }))} rows={2} placeholder="Add context — how you'll wear it, your specific worry..." style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+              </div>
+            ))}
+            {(decision.uncertainty_text ?? "").toLowerCase().includes("between sizes") && (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>Sizes you're deciding between</p>
+                <input value={editSizes} onChange={(e) => setEditSizes(e.target.value)} placeholder="e.g. M, L" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A" }} />
+              </div>
+            )}
+            <div style={{ marginBottom: 14 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>Price</p>
+              <input value={editPrice} onChange={(e) => setEditPrice(e.target.value)} inputMode="decimal" placeholder="e.g. 128" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A" }} />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px" }}>Confidence: {editConf}/10</p>
+              <div style={{ display: "flex", gap: 4 }}>
+                {Array.from({ length: 10 }).map((_, i) => { const n = i + 1; return (
+                  <button key={n} onClick={() => setEditConf(n)} style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: n <= editConf ? "#1C1712" : "#fff", color: n <= editConf ? "#FDFAF6" : "#1A1A1A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{n}</button>
+                ); })}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setEditing(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.15)", background: "transparent", color: "#5A4A42", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={submitEdit} style={{ flex: 2, padding: "12px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Save changes</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Profile dropdown ─────────────────────────────────────────────────── */}
       {profileOpen && decision.profiles && (() => {

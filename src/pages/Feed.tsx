@@ -366,7 +366,7 @@ const Feed = () => {
   // ── Filters
   const [filterBrand, setFilterBrand] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
-  const [filterStatus, setFilterStatus] = useState<"all" | "open">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "open" | "closed">("all");
   const [sortBy, setSortBy] = useState<"newest" | "discussed" | "needs_input" | "relevant">("newest");
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -1038,6 +1038,8 @@ const Feed = () => {
 
     if (filterStatus === "open") {
       filtered = filtered.filter((d) => !d.status || d.status === "open");
+    } else if (filterStatus === "closed") {
+      filtered = filtered.filter((d) => d.status === "purchased" || d.status === "closed");
     }
 
     // Sort
@@ -1307,7 +1309,7 @@ const Feed = () => {
                 {/* Status */}
                 <p className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Status</p>
                 <div className="flex gap-2 mb-4">
-                  {(["all", "open"] as const).map((s) => (
+                  {(["all", "open", "closed"] as const).map((s) => (
                     <button
                       key={s}
                       onClick={() => setFilterStatus(s)}
@@ -1318,7 +1320,7 @@ const Feed = () => {
                           : { background: "rgba(28,23,18,0.06)", color: "rgba(28,23,18,0.55)", border: "1px solid rgba(28,23,18,0.10)" }
                       }
                     >
-                      {s === "all" ? "All" : "Open only"}
+                      {s === "all" ? "All" : s === "open" ? "Open only" : "Closed"}
                     </button>
                   ))}
                 </div>

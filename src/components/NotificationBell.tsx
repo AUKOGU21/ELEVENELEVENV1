@@ -115,7 +115,7 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
       </button>
 
       {open && (
-        <div style={{
+        <div className="no-scrollbar" style={{
           position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 60,
           width: isMobile ? "min(300px, 88vw)" : 340, maxHeight: 420, overflowY: "auto",
           background: "#FDFAF6", borderRadius: 16, border: "1px solid rgba(0,0,0,0.08)",

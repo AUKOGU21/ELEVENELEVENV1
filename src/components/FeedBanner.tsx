@@ -18,7 +18,7 @@ export default function FeedBanner({ onDecision, onLookingFor, isMobile }: Props
     <div style={{
       position: "relative", zIndex: 1,
       background: "#F5EFEA", borderRadius: 20, padding: isMobile ? "20px 16px" : "26px 28px",
-      boxShadow: "0 6px 24px rgba(0,0,0,0.06)", marginBottom: 20, border: "1px solid rgba(0,0,0,0.04)",
+      boxShadow: "0 6px 24px rgba(0,0,0,0.06)", marginTop: isMobile ? 18 : 34, marginBottom: 20, border: "1px solid rgba(0,0,0,0.04)",
     }}>
       <div style={{ textAlign: "center", marginBottom: isMobile ? 18 : 22 }}>
         <p style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 22 : 28, color: INK, margin: 0, lineHeight: 1.15, letterSpacing: "-0.01em" }}>
@@ -55,7 +55,7 @@ export default function FeedBanner({ onDecision, onLookingFor, isMobile }: Props
             Get real opinions from women like you before you buy.
           </p>
           <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", borderRadius: 100, padding: "11px 0", fontSize: 14.5, fontWeight: 600, marginTop: 2 }}>
-            Share a decision <ArrowRight style={{ width: 16, height: 16 }} />
+            Post a decision <ArrowRight style={{ width: 16, height: 16 }} />
           </span>
         </button>
 

@@ -1376,7 +1376,7 @@ const Feed = () => {
       {/* ── Feed scroll container ─────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
-        className="w-full max-w-[1160px]"
+        className="w-full max-w-[1160px] no-scrollbar"
         style={{
           overflowY: "scroll",
           paddingTop: 72,

@@ -75,7 +75,7 @@ export default function SideDrawer({ open, onClose, title, subtitle, pinned, foo
             </div>
 
             {/* Scrollable body */}
-            <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+            <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
               {pinned && (
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(0,0,0,0.015)" }}>
                   {pinned}

@@ -122,3 +122,12 @@
     @apply tracking-tight;
   }
 }
+
+/* Hide scrollbars while keeping scroll functionality (feed, drawers). */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;            /* Chrome/Safari */
+}

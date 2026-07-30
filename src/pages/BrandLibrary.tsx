@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, ChevronRight, X, Plus, RefreshCw, Check } from "lucide-react";
+import { Search, ChevronRight, X, Plus, RefreshCw, Check, Bookmark, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { imageToJpeg } from "@/lib/image";
@@ -225,13 +225,13 @@ function BrandDetail({ brand, insights, recent, onBack, onPick, user, navigate, 
         </div>
 
         {/* Section 1 — What women have learned */}
-        <Section title="What women have learned">
+        <Section title="What women have learned" icon={<Users style={{ width: 16, height: 16, color: MUTED }} />}>
           {brand.whatWomenLearned.map((t, i) => <InsightRow key={i} text={t} />)}
         </Section>
 
         {/* Section 2 — Things to know before you buy (titled cards + community insights) */}
-        <Section title="Things to know before you buy">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 20 }}>
+        <Section title="Things to know before you buy" icon={<Bookmark style={{ width: 16, height: 16, color: MUTED }} />}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
             {brand.thingsToKnow.map((c, i) => <KnowCard key={`s${i}`} title={c.title} body={c.body} />)}
             {insights.map((ins) => (
               <KnowCard key={ins.id} title={ins.category || "From the community"} body={ins.learned}
@@ -281,10 +281,10 @@ function BrandDetail({ brand, insights, recent, onBack, onPick, user, navigate, 
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: "18px 20px", marginBottom: 20 }}>
-      <p style={{ fontSize: 15, fontWeight: 700, color: INK, margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>{title}</p>
+      <p style={{ fontSize: 15, fontWeight: 700, color: INK, margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>{icon}{title}</p>
       {children}
     </div>
   );
@@ -306,10 +306,10 @@ function InsightRow({ text, meta }: { text: string; meta?: string }) {
 
 function KnowCard({ title, body, meta }: { title: string; body: string; meta?: string }) {
   return (
-    <div>
-      <p style={{ fontSize: 14, fontWeight: 700, color: INK, margin: "0 0 5px" }}>{title}</p>
+    <div style={{ background: "#FAF7F2", border: `1px solid rgba(0,0,0,0.06)`, borderRadius: 12, padding: "14px 15px" }}>
+      <p style={{ fontSize: 14, fontWeight: 700, color: INK, margin: "0 0 6px" }}>{title}</p>
       <p style={{ fontSize: 14, color: MUTED, margin: 0, lineHeight: 1.5 }}>{body}</p>
-      {meta && <p style={{ fontSize: 12, color: MUTED, margin: "6px 0 0", textTransform: "capitalize", opacity: 0.75 }}>{meta}</p>}
+      {meta && <p style={{ fontSize: 12, color: MUTED, margin: "7px 0 0", textTransform: "capitalize", opacity: 0.75 }}>{meta}</p>}
     </div>
   );
 }

@@ -16,6 +16,7 @@ interface Props {
 export default function FeedBanner({ onDecision, onLookingFor, isMobile }: Props) {
   return (
     <div style={{
+      position: "relative", zIndex: 1,
       background: "#F5EFEA", borderRadius: 20, padding: isMobile ? "20px 16px" : "26px 28px",
       boxShadow: "0 6px 24px rgba(0,0,0,0.06)", marginBottom: 20, border: "1px solid rgba(0,0,0,0.04)",
     }}>

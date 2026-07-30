@@ -420,7 +420,7 @@ function SuggestBrandBlock({ user, navigate }: { user: any; navigate: any }) {
           <RefreshCw style={{ width: 18, height: 18, color: MUTED }} />
           <div>
             <p style={{ fontSize: 15, fontWeight: 700, color: INK, margin: 0 }}>Didn't find the brand you're looking for?</p>
-            <p style={{ fontSize: 13, color: MUTED, margin: "2px 0 0" }}>Suggest a brand and help build the library.</p>
+            <p style={{ fontSize: 13, color: MUTED, margin: "2px 0 0" }}>Suggest a brand and help add to the library.</p>
           </div>
         </div>
         <button onClick={() => (user ? setOpen(true) : navigate("/signin"))} style={{ padding: "10px 20px", borderRadius: 100, border: "none", background: GOLD, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Suggest a brand</button>
@@ -466,7 +466,7 @@ function SuggestBrandModal({ user, onClose }: { user: any; onClose: () => void }
         ) : (
           <div>
             <p style={{ fontFamily: "Georgia, serif", fontSize: 22, color: INK, margin: "0 0 18px" }}>Suggest a brand</p>
-            <p style={sectionLbl}>What brand should we build next?</p>
+            <p style={sectionLbl}>What brand should we add next?</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Type the brand name" style={{ ...field, marginBottom: 18 }} />
             <p style={sectionLbl}>What would you want to know before buying this brand?</p>
             <textarea value={want} onChange={(e) => setWant(e.target.value)} rows={3} placeholder="Fit, quality, sizing, fabric…" style={{ ...field, resize: "none" }} />

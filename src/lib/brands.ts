@@ -10,8 +10,9 @@ export interface Brand {
   growing?: boolean;
   // Broad observations — "what would someone benefit from knowing before they buy?"
   whatWomenLearned: string[];
-  // Practical purchase guidance. Community insights get appended here at runtime.
-  thingsToKnow: string[];
+  // Practical purchase guidance, shown as titled cards. Community insights get
+  // appended here at runtime (their category becomes the card title).
+  thingsToKnow: { title: string; body: string }[];
   // Feed brand_name values that map to this brand (case-insensitive contains).
   matchNames: string[];
 }
@@ -29,9 +30,9 @@ export const BRANDS: Brand[] = [
       "Their archive is exceptionally cohesive and mixes well across seasons.",
     ],
     thingsToKnow: [
-      "Don't size down expecting a fitted silhouette.",
-      "Great for relaxed, structured dressing.",
-      "Weekly styling classes are worth watching if you're new to the brand.",
+      { title: "Fit", body: "Don't size down expecting a fitted silhouette." },
+      { title: "Best for", body: "Great for relaxed, structured dressing." },
+      { title: "New to the brand", body: "Their weekly styling classes are worth watching." },
     ],
   },
   {
@@ -43,7 +44,7 @@ export const BRANDS: Brand[] = [
       "Value for money comes up frequently in community discussions, particularly around the Whipped collection.",
     ],
     thingsToKnow: [
-      "Several shoppers felt comparable alternatives offered similar quality at a lower price.",
+      { title: "Value", body: "Several shoppers felt comparable alternatives offered similar quality at a lower price." },
     ],
   },
   {
@@ -58,9 +59,9 @@ export const BRANDS: Brand[] = [
       "Known for oversized silhouettes and streetwear-inspired fits.",
     ],
     thingsToKnow: [
-      "Jeans and sweatpants often hit the floor on women who are 5'11\"+.",
-      "Most pants lean low rise with a baggy fit.",
-      "Many shoppers size down if they want a less oversized look.",
+      { title: "Length", body: "Jeans and sweatpants often hit the floor on women who are 5'11\"+." },
+      { title: "Rise & fit", body: "Most pants lean low rise with a baggy fit." },
+      { title: "Sizing", body: "Many shoppers size down if they want a less oversized look." },
     ],
   },
 ];

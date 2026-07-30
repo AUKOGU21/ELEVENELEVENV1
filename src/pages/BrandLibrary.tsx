@@ -10,6 +10,7 @@ import { BRANDS, brandBySlug, seededCount, INSIGHT_CATEGORIES, INSIGHT_CONTEXTS,
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
 const GOLD = "#B8956A";
+const GREEN = "#5DA35D";
 const CREAM = "#FDFAF6";
 const LINE = "rgba(28,23,18,0.10)";
 
@@ -193,7 +194,6 @@ function BrandDetail({ brand, insights, recent, onBack, onPick, user, navigate, 
   onBack: () => void; onPick: (s: string) => void; user: any; navigate: any; reload: () => void;
 }) {
   const [shareOpen, setShareOpen] = useState(false);
-  const communityKnows = brand.thingsToKnow; // seeded practical guidance
   const totalCount = seededCount(brand) + insights.length;
 
   return (
@@ -229,13 +229,15 @@ function BrandDetail({ brand, insights, recent, onBack, onPick, user, navigate, 
           {brand.whatWomenLearned.map((t, i) => <InsightRow key={i} text={t} />)}
         </Section>
 
-        {/* Section 2 — Things to know before you buy (+ community insights) */}
+        {/* Section 2 — Things to know before you buy (titled cards + community insights) */}
         <Section title="Things to know before you buy">
-          {communityKnows.map((t, i) => <InsightRow key={`s${i}`} text={t} />)}
-          {insights.map((ins) => (
-            <InsightRow key={ins.id} text={ins.learned}
-              meta={[ins.contexts?.length ? ins.contexts.join(", ") : null, ins.category].filter(Boolean).join(" · ") || undefined} />
-          ))}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 20 }}>
+            {brand.thingsToKnow.map((c, i) => <KnowCard key={`s${i}`} title={c.title} body={c.body} />)}
+            {insights.map((ins) => (
+              <KnowCard key={ins.id} title={ins.category || "From the community"} body={ins.learned}
+                meta={ins.contexts?.length ? ins.contexts.join(", ") : undefined} />
+            ))}
+          </div>
         </Section>
 
         {/* Section 3 — Recent decisions */}
@@ -291,13 +293,23 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function InsightRow({ text, meta }: { text: string; meta?: string }) {
   return (
     <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 12 }}>
-      <span style={{ width: 18, height: 18, borderRadius: "50%", border: `1.5px solid ${GOLD}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
-        <Check style={{ width: 11, height: 11, color: GOLD }} />
+      <span style={{ width: 18, height: 18, borderRadius: "50%", background: GREEN, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+        <Check style={{ width: 11, height: 11, color: "#fff" }} />
       </span>
       <div>
         <p style={{ fontSize: 15, color: "#3A3530", margin: 0, lineHeight: 1.5 }}>{text}</p>
         {meta && <p style={{ fontSize: 12, color: MUTED, margin: "2px 0 0", textTransform: "capitalize" }}>{meta}</p>}
       </div>
+    </div>
+  );
+}
+
+function KnowCard({ title, body, meta }: { title: string; body: string; meta?: string }) {
+  return (
+    <div>
+      <p style={{ fontSize: 14, fontWeight: 700, color: INK, margin: "0 0 5px" }}>{title}</p>
+      <p style={{ fontSize: 14, color: MUTED, margin: 0, lineHeight: 1.5 }}>{body}</p>
+      {meta && <p style={{ fontSize: 12, color: MUTED, margin: "6px 0 0", textTransform: "capitalize", opacity: 0.75 }}>{meta}</p>}
     </div>
   );
 }

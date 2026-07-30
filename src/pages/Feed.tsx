@@ -353,6 +353,10 @@ const Feed = () => {
   const [decisions, setDecisions] = useState<DecisionRow[]>([]);
   const [myDecisions, setMyDecisions] = useState<DecisionRow[]>([]);
   const [activeTab, setActiveTab] = useState<"feed" | "mine">("feed");
+  // Honor a tab hint passed via navigation (e.g. "Mine" clicked from Brand Library).
+  useEffect(() => {
+    if ((location.state as any)?.tab === "mine") setActiveTab("mine");
+  }, [location.state]);
   useEffect(() => {
     if (!scrollTargetId || activeTab !== "mine") return;
     const t = setTimeout(() => {
@@ -1186,6 +1190,13 @@ const Feed = () => {
             }}
           >
             Feed
+          </button>
+          <button
+            onClick={() => navigate("/brands")}
+            className="rounded-full font-medium transition-all"
+            style={{ fontSize: isMobile ? 13 : 14, padding: isMobile ? "4px 14px" : "6px 16px", color: "rgba(28,23,18,0.45)" }}
+          >
+            Brands
           </button>
           <button
             onClick={() => setActiveTab("mine")}

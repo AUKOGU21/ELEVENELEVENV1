@@ -9,6 +9,7 @@ import Index from "./pages/Index.tsx";
 import Onboarding from "./pages/Onboarding.tsx";
 import PostDecision from "./pages/PostDecision.tsx";
 import Feed from "./pages/Feed.tsx";
+import BrandLibrary from "./pages/BrandLibrary.tsx";
 import SignIn from "./pages/SignIn.tsx";
 import CheckEmail from "./pages/CheckEmail.tsx";
 import Profile from "./pages/Profile.tsx";
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/signin" element={<SignIn />} />
             <Route path="/post" element={<PostDecision />} />
             <Route path="/feed" element={<Feed />} />
+            <Route path="/brands" element={<BrandLibrary />} />
             <Route path="/check-email" element={<CheckEmail />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<PublicProfile />} />

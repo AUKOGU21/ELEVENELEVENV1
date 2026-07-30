@@ -13,6 +13,9 @@ import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDe
 import ResponsesDrawer from "@/components/ResponsesDrawer";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBell from "@/components/NotificationBell";
+import LookingForCard from "@/components/LookingForCard";
+import RecommendationsDrawer from "@/components/RecommendationsDrawer";
+import RecommendationModal, { RecommendationDraft } from "@/components/RecommendationModal";
 import { toast } from "sonner";
 
 // ─── Product-link helpers ───────────────────────────────────────────────────
@@ -102,6 +105,14 @@ interface DecisionRow {
   status: string;
   user_id: string;
   created_at: string;
+  // Looking For (post_type === "looking_for") — otherwise a normal decision.
+  post_type?: string;
+  lf_title?: string | null;
+  lf_budget?: string | null;
+  lf_occasion?: string | null;
+  lf_priorities?: string[] | null;
+  lf_context?: string | null;
+  recommendations?: any[];
   matchScore?: number | null;
   responses: ResponseRow[];
   outcomes: OutcomeRow[] | null;
@@ -403,6 +414,10 @@ const Feed = () => {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   // Which decision's responses drawer is open (right-side sliding panel).
   const [responsesOpenId, setResponsesOpenId] = useState<string | null>(null);
+  // Looking For: which post's recommendations drawer is open, and the recommend modal.
+  const [recsOpenId, setRecsOpenId] = useState<string | null>(null);
+  const [recModalFor, setRecModalFor] = useState<string | null>(null);
+  const [submittingRec, setSubmittingRec] = useState(false);
 
   // ── User meta
   const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
@@ -435,6 +450,7 @@ const Feed = () => {
       .channel("feed-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "decisions" }, () => fetchDecisions())
       .on("postgres_changes", { event: "*", schema: "public", table: "responses" }, () => fetchDecisions())
+      .on("postgres_changes", { event: "*", schema: "public", table: "recommendations" }, () => fetchDecisions())
       .on("postgres_changes", { event: "*", schema: "public", table: "outcomes" }, () => fetchDecisions())
       .subscribe();
 
@@ -504,11 +520,60 @@ const Feed = () => {
   const fetchDecisions = async () => {
     setLoading(true);
 
+    // Attach community recommendations (+ their helpful votes) to Looking For posts.
+    // Fetched separately from the main feed query so a recommendations hiccup can
+    // never 400 the whole feed (column-first discipline).
+    const attachRecs = async (rows: DecisionRow[]): Promise<DecisionRow[]> => {
+      const lfIds = rows.filter((r) => r.post_type === "looking_for").map((r) => r.id);
+      if (lfIds.length === 0) return rows.map((r) => ({ ...r, recommendations: r.recommendations ?? [] }));
+      try {
+        const { data: recsRaw } = await supabase
+          .from("recommendations")
+          .select("id, looking_for_id, recommendation, reasoning, fit_note, who_for, product_url, product_name, brand_name, price_note, product_image_url, match_score, user_id, created_at")
+          .in("looking_for_id", lfIds)
+          .order("created_at", { ascending: false });
+        const recs = recsRaw ?? [];
+        // Attach recommender profiles separately — recommendations has no PostgREST
+        // FK to profiles, so an embed would 400 the whole select.
+        const recUserIds = [...new Set(recs.map((r: any) => r.user_id))];
+        if (recUserIds.length > 0) {
+          const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", recUserIds);
+          const profMap: Record<string, any> = {};
+          (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url }; });
+          recs.forEach((r: any) => { r.profiles = profMap[r.user_id] ?? null; });
+        }
+        const byLf: Record<string, any[]> = {};
+        recs.forEach((rec: any) => { (byLf[rec.looking_for_id] ??= []).push(rec); });
+        const recIds = recs.map((r: any) => r.id);
+        if (recIds.length > 0) {
+          const { data: allRV } = await supabase.from("recommendation_votes").select("recommendation_id, vote_type").in("recommendation_id", recIds);
+          if (allRV) {
+            const counts: Record<string, { helpful: number; not_helpful: number }> = {};
+            allRV.forEach((v: any) => { (counts[v.recommendation_id] ??= { helpful: 0, not_helpful: 0 })[v.vote_type === "helpful" ? "helpful" : "not_helpful"]++; });
+            setVoteCounts((prev) => ({ ...prev, ...counts }));
+          }
+          if (user) {
+            const { data: myRV } = await supabase.from("recommendation_votes").select("recommendation_id, vote_type").eq("voter_id", user.id).in("recommendation_id", recIds);
+            if (myRV) {
+              const map: Record<string, "helpful" | "not_helpful"> = {};
+              myRV.forEach((v: any) => { map[v.recommendation_id] = v.vote_type; });
+              setUserVotes((prev) => ({ ...prev, ...map }));
+            }
+          }
+        }
+        return rows.map((r) => ({ ...r, recommendations: byLf[r.id] ?? [] }));
+      } catch (e) {
+        console.error("recommendations fetch failed:", e);
+        return rows.map((r) => ({ ...r, recommendations: r.recommendations ?? [] }));
+      }
+    };
+
     // No outcomes join here — we fetch outcomes separately below to avoid
     // PostgREST FK detection issues causing the join to silently return null.
     const query = `
       id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_name_2, brand_name_2, price_note_2, product_category,
       price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
+      post_type, lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
       profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
         id, recommendation, reasoning, photo_url, product_url, match_score,
@@ -586,6 +651,7 @@ const Feed = () => {
         });
       }
 
+      rows = await attachRecs(rows);
       setDecisions(user ? rows : [...localFormatted, ...rows]);
 
       const allResponseIds = rows.flatMap((d) => d.responses?.map((r) => r.id) ?? []);
@@ -650,6 +716,7 @@ const Feed = () => {
           }
         }
 
+        myRows = await attachRecs(myRows);
         setMyDecisions(myRows);
       }
     } else {
@@ -938,6 +1005,71 @@ const Feed = () => {
       .from("responses")
       .update({ helpfulness_votes: count ?? 0 })
       .eq("id", responseId);
+  };
+
+  // Helpful vote on a recommendation — shares the vote-count maps (rec ids are
+  // distinct from response ids) but writes to recommendation_votes.
+  const handleRecHelpfulVote = async (recId: string) => {
+    if (!user) return;
+    const isToggleOff = userVotes[recId] === "helpful";
+    const newUserVotes = { ...userVotes };
+    const newVoteCounts = { ...voteCounts, [recId]: { ...(voteCounts[recId] ?? { helpful: 0, not_helpful: 0 }) } };
+    if (isToggleOff) {
+      delete newUserVotes[recId];
+      newVoteCounts[recId].helpful = Math.max(0, (newVoteCounts[recId].helpful ?? 1) - 1);
+    } else {
+      newUserVotes[recId] = "helpful";
+      newVoteCounts[recId].helpful = (newVoteCounts[recId].helpful ?? 0) + 1;
+    }
+    setUserVotes(newUserVotes);
+    setVoteCounts(newVoteCounts);
+    try {
+      if (isToggleOff) {
+        await supabase.from("recommendation_votes").delete().eq("recommendation_id", recId).eq("voter_id", user.id);
+      } else {
+        await supabase.from("recommendation_votes").upsert({ recommendation_id: recId, voter_id: user.id, vote_type: "helpful" }, { onConflict: "recommendation_id,voter_id" });
+      }
+    } catch (e) { console.error("rec vote failed:", e); }
+  };
+
+  // Submit a product recommendation on a Looking For post.
+  const submitRecommendation = async (lookingForId: string, draft: RecommendationDraft) => {
+    if (!user) { navigate("/signin"); return; }
+    setSubmittingRec(true);
+    const target = [...decisions, ...myDecisions].find((d) => d.id === lookingForId);
+    let matchScore: number | null = null;
+    if (target) {
+      const [{ data: recProfile }, { data: posterProfile }] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("profiles").select("*").eq("id", target.user_id).single(),
+      ]);
+      if (recProfile && posterProfile) matchScore = computeMatchScore(posterProfile, recProfile).total;
+    }
+    try {
+      await supabase.from("recommendations").insert({
+        looking_for_id: lookingForId,
+        user_id: user.id,
+        recommendation: draft.recommendation,
+        reasoning: draft.reasoning,
+        fit_note: draft.fit_note,
+        who_for: draft.who_for,
+        product_url: draft.product_url,
+        product_name: draft.product_name,
+        brand_name: draft.brand_name,
+        price_note: draft.price_note,
+        product_image_url: draft.product_image_url,
+        match_score: matchScore,
+      });
+      supabase.functions
+        .invoke("notify-recommendation", { body: { looking_for_id: lookingForId, recommender_id: user.id } })
+        .catch((e) => console.warn("recommendation notify failed:", e));
+      await fetchDecisions();
+      setRecModalFor(null);
+      setRecsOpenId(lookingForId); // show the drawer so they see their pick land
+    } catch (e) {
+      console.error("recommendation insert failed:", e);
+    }
+    setSubmittingRec(false);
   };
 
   const handleDelete = async (decisionId: string) => {
@@ -1390,7 +1522,7 @@ const Feed = () => {
           <FeedBanner
             isMobile={isMobile}
             onDecision={() => navigate(user ? "/post" : "/signin")}
-            onLookingFor={() => toast("Looking For is coming soon ✦", { description: "You'll be able to ask the community for product recommendations." })}
+            onLookingFor={() => navigate(user ? "/looking-for" : "/signin")}
           />
         )}
         {loading ? (
@@ -1441,8 +1573,25 @@ const Feed = () => {
               </button>
             )}
             {showActivation && renderActivationCard()}
+            {/* Feed items: Looking For posts render a LookingForCard, decisions a DecisionCard. */}
             {displayList.map((decision) => (
             <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80 }}>
+            {decision.post_type === "looking_for" ? (
+              <LookingForCard
+                decision={decision as any}
+                user={user}
+                isMobile={isMobile}
+                activeTab={activeTab}
+                isSaved={savedDecisionIds.has(decision.id)}
+                onSave={() => toggleSave(decision.id)}
+                onHide={() => hideDecision(decision.id)}
+                navigate={navigate}
+                handleDelete={handleDelete}
+                onOpenRecommendations={() => setRecsOpenId(decision.id)}
+                onAddRecommendation={() => (user ? setRecModalFor(decision.id) : navigate("/signin"))}
+                onSignIn={() => navigate("/signin")}
+              />
+            ) : (
             <DecisionCard
               decision={decision}
               user={user}
@@ -1472,6 +1621,7 @@ const Feed = () => {
               isMobile={isMobile}
               onOpenResponses={() => setResponsesOpenId(decision.id)}
             />
+            )}
             </div>
             ))}
           </>
@@ -1790,6 +1940,26 @@ const Feed = () => {
         onHelpful={(rid) => handleHelpfulVote(rid, "helpful")}
         onAddThoughts={(id) => startWeighIn(id)}
         onSignIn={() => navigate("/signin")}
+      />
+
+      {/* ── Looking For: recommendations drawer + recommend modal ──────────────── */}
+      <RecommendationsDrawer
+        open={!!recsOpenId}
+        onClose={() => setRecsOpenId(null)}
+        lookingFor={[...decisions, ...myDecisions].find((d) => d.id === recsOpenId) as any ?? null}
+        user={user}
+        voteCounts={voteCounts}
+        userVotes={userVotes}
+        onHelpful={handleRecHelpfulVote}
+        onAddRecommendation={(id) => (user ? setRecModalFor(id) : navigate("/signin"))}
+        onSignIn={() => navigate("/signin")}
+      />
+      <RecommendationModal
+        open={!!recModalFor}
+        lookingForTitle={([...decisions, ...myDecisions].find((d) => d.id === recModalFor)?.lf_title) ?? null}
+        submitting={submittingRec}
+        onClose={() => setRecModalFor(null)}
+        onSubmit={(draft) => recModalFor && submitRecommendation(recModalFor, draft)}
       />
 
       {/* Secondary floating + Post — the banner is the primary entry point */}

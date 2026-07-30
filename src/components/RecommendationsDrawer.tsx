@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import SideDrawer from "./SideDrawer";
 import RecommendationCard, { RecommendationData } from "./RecommendationCard";
+import { formatBudget } from "@/lib/format";
 
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
@@ -66,7 +67,7 @@ export default function RecommendationsDrawer({
       {(lookingFor.lf_budget || (lookingFor.lf_priorities && lookingFor.lf_priorities.length > 0)) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
           {lookingFor.lf_budget && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#5A4A42", background: "rgba(0,0,0,0.05)", borderRadius: 100, padding: "3px 10px" }}>{lookingFor.lf_budget}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#5A4A42", background: "rgba(0,0,0,0.05)", borderRadius: 100, padding: "3px 10px" }}>{formatBudget(lookingFor.lf_budget)}</span>
           )}
           {(lookingFor.lf_priorities ?? []).map((p) => (
             <span key={p} style={{ fontSize: 12, fontWeight: 600, color: LF, background: "rgba(122,106,174,0.12)", border: "1px solid rgba(122,106,174,0.25)", borderRadius: 100, padding: "3px 10px" }}>{p}</span>

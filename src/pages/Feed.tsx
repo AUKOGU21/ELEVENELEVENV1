@@ -2543,9 +2543,26 @@ const DecisionCard = ({
             const uncertainties = (decision.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
             const sizeChips = (decision.sizes_note ?? "").split(",").map((s) => s.trim()).filter(Boolean);
             const LBL: React.CSSProperties = { fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: 0 };
+            // Prominent section title — the deciding-about question is the point of the card.
+            const LBL_STRONG: React.CSSProperties = { fontSize: 13.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "#1A1A1A", fontWeight: 700, margin: 0 };
 
             return (
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+
+                {/* Was deciding about — the core question, up top */}
+                {(uncertainties.length > 0 || sizeChips.length > 0) && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ ...LBL_STRONG, marginBottom: 10 }}>Was deciding about</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                      {uncertainties.map((u, i) => (
+                        <span key={`u${i}`} style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "6px 13px", whiteSpace: "nowrap" }}>{u}</span>
+                      ))}
+                      {sizeChips.map((s) => (
+                        <span key={`s${s}`} style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.14)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "6px 13px", whiteSpace: "nowrap" }}>{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Final decision panel */}
                 <div style={{ background: "rgba(0,0,0,0.035)", borderRadius: 12, padding: "16px 14px", display: "flex", alignItems: "flex-start", marginBottom: 16 }}>
@@ -2569,34 +2586,44 @@ const DecisionCard = ({
                   )}
                 </div>
 
-                {/* Confidence journey */}
-                <div style={{ marginBottom: 16 }}>
-                  <p style={{ ...LBL, marginBottom: 9 }}>Confidence journey</p>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: 15, color: "#3A3530" }}>Started <strong style={{ fontSize: 17 }}>{confidence}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
-                    <span style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.22)" }} />
-                    {confidenceAfter != null ? (
-                      <span style={{ fontSize: 15, color: "#3A3530" }}>Ended <strong style={{ fontSize: 17, color: "#6E7A44" }}>{confidenceAfter}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
-                    ) : (
-                      <span style={{ fontSize: 13, color: "#B0A498", fontStyle: "italic" }}>pending</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Was deciding about */}
-                {(uncertainties.length > 0 || sizeChips.length > 0) && (
-                  <div style={{ marginBottom: 16 }}>
-                    <p style={{ ...LBL, marginBottom: 9 }}>Was deciding about</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                      {uncertainties.map((u, i) => (
-                        <span key={`u${i}`} style={{ fontSize: 13, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "5px 12px", whiteSpace: "nowrap" }}>{u}</span>
-                      ))}
-                      {sizeChips.map((s) => (
-                        <span key={`s${s}`} style={{ fontSize: 13, color: "#3A3530", background: "rgba(184,149,106,0.14)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "5px 12px", whiteSpace: "nowrap" }}>{s}</span>
-                      ))}
+                {/* Confidence journey — directional progress bar (green = grew, rose = dropped) */}
+                {(() => {
+                  const before = confidence;
+                  const after = confidenceAfter;
+                  const hasAfter = after != null;
+                  const up = hasAfter ? (after as number) >= before : true;
+                  const beforePct = Math.max(0, Math.min(100, (before / 10) * 100));
+                  const afterPct = hasAfter ? Math.max(0, Math.min(100, ((after as number) / 10) * 100)) : beforePct;
+                  const lo = Math.min(beforePct, afterPct);
+                  const hi = Math.max(beforePct, afterPct);
+                  const delta = hasAfter ? (after as number) - before : 0;
+                  const strong = hasAfter ? (up ? "#6E7A44" : "#B5544A") : "rgba(0,0,0,0.18)";
+                  const faint = !hasAfter ? "rgba(0,0,0,0.10)" : up ? "rgba(110,122,68,0.30)" : "rgba(181,84,74,0.26)";
+                  return (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <p style={LBL}>Confidence journey</p>
+                        {hasAfter && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 700, color: delta === 0 ? "#8C7A70" : up ? "#6E7A44" : "#B5544A", background: delta === 0 ? "rgba(0,0,0,0.05)" : up ? "rgba(110,122,68,0.12)" : "rgba(181,84,74,0.12)", borderRadius: 100, padding: "2px 9px" }}>
+                            {delta === 0 ? "No change" : `${up ? "▲ +" : "▼ −"}${Math.abs(delta)}`}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ position: "relative", height: 10, borderRadius: 100, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${lo}%`, background: faint }} />
+                        <div style={{ position: "absolute", left: `${lo}%`, top: 0, bottom: 0, width: `${hi - lo}%`, background: strong }} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                        <span style={{ fontSize: 13.5, color: "#3A3530" }}>Started <strong style={{ fontSize: 15 }}>{before}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
+                        {hasAfter ? (
+                          <span style={{ fontSize: 13.5, color: "#3A3530" }}>Ended <strong style={{ fontSize: 15, color: up ? "#6E7A44" : "#B5544A" }}>{after}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
+                        ) : (
+                          <span style={{ fontSize: 12.5, color: "#B0A498", fontStyle: "italic" }}>pending</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Her take — only once she's written one */}
                 {take && (
@@ -2738,8 +2765,8 @@ const DecisionCard = ({
               <div style={{ display: "flex", gap: 12, padding: "10px 0" }}>
                 {/* Decision block — one card per uncertainty */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, letterSpacing: isMobile ? "0.02em" : "0.3em", whiteSpace: "nowrap", textTransform: "uppercase", color: "#8C7A70", marginBottom: 10 }}>
-                    Decisions / Considerations
+                  <p style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: isMobile ? "0.02em" : "0.08em", whiteSpace: "nowrap", textTransform: "uppercase", color: "#1A1A1A", marginBottom: 10 }}>
+                    Deciding about
                   </p>
                   {(() => {
                     const uncertainties = decision.uncertainty_text

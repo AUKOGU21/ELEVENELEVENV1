@@ -5,7 +5,7 @@
 // Decision card (violet accent) but part of the same product.
 import { useState, useRef, useEffect } from "react";
 import { Bookmark, MoreHorizontal, ArrowRight, Search, Users } from "lucide-react";
-import { formatName, getInitials, timeAgo } from "@/lib/format";
+import { formatName, getInitials, timeAgo, formatBudget } from "@/lib/format";
 import MatchBadge from "./MatchBadge";
 import type { RecommendationData } from "./RecommendationCard";
 
@@ -144,7 +144,7 @@ export default function LookingForCard({
           {decision.lf_context && <p style={{ fontSize: 14.5, lineHeight: 1.5, color: "#5A4A42", margin: "10px 0 0" }}>{decision.lf_context}</p>}
 
           <div style={{ marginTop: 14, background: "rgba(0,0,0,0.03)", borderRadius: 12, padding: "6px 14px" }}>
-            {decision.lf_budget && statRow("Budget", decision.lf_budget)}
+            {decision.lf_budget && statRow("Budget", formatBudget(decision.lf_budget))}
             {decision.lf_occasion && statRow("Occasion", decision.lf_occasion)}
             {priorities.length > 0 && statRow("Priorities", (
               <span style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

@@ -32,6 +32,15 @@ export const recommendationLabel = (rec: string): string => {
   return "Depends";
 };
 
+// Budget shows as "$XX" when it's a bare number; descriptive budgets
+// ("Under $150", "$100–200") are left untouched.
+export const formatBudget = (s: string | null | undefined): string => {
+  const t = (s || "").trim();
+  if (!t) return "";
+  if (/^\d[\d,]*(\.\d+)?$/.test(t)) return `$${t}`;
+  return t;
+};
+
 export const prettyHost = (url: string): string => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");

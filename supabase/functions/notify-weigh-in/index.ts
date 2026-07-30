@@ -185,6 +185,14 @@ Deno.serve(async (req) => {
 
   const item = [decision.brand_name, decision.product_name].filter(Boolean).join(" ").trim() || "your pick";
 
+  // In-app notification (drives the header bell). Fire-and-forget — the email
+  // below is the primary channel, so a notification hiccup must not block it.
+  await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+    method: "POST",
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ user_id: ownerId, type: "weigh_in", decision_id: decisionId, data: { actor_name: responderName, item }, email_sent: true }),
+  }).catch((e) => console.error("notification insert failed:", e));
+
   if (!RESEND_API_KEY) return json({ error: "RESEND_API_KEY not set" }, 500);
 
   const html = TEMPLATE

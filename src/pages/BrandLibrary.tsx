@@ -441,6 +441,8 @@ function SuggestBrandModal({ user, onClose }: { user: any; onClose: () => void }
     setSaving(true);
     try {
       await supabase.from("brand_suggestions").insert({ brand_name: name.trim(), want_to_know: want.trim() || null, user_id: user.id });
+      // Fire-and-forget founder alert — never block the thank-you on it.
+      supabase.functions.invoke("notify-brand-suggestion", { body: { brand_name: name.trim(), want_to_know: want.trim() || null } }).catch(() => {});
       setDone(true);
     } catch (e) { console.error("suggestion failed:", e); setSaving(false); }
   };

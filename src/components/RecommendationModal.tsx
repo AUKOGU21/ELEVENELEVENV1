@@ -90,13 +90,12 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
   return createPortal(
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}
-            style={{ position: "fixed", inset: 0, background: "rgba(28,23,18,0.5)", zIndex: 320 }} />
-          <motion.div
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}
+          style={{ position: "fixed", inset: 0, background: "rgba(28,23,18,0.5)", zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          <motion.div onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.98 }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            style={{ position: "fixed", zIndex: 321, left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(500px, 94vw)", maxHeight: "90vh", overflowY: "auto", background: CREAM, borderRadius: 18, boxShadow: "0 24px 64px rgba(0,0,0,0.32)" }}
+            style={{ position: "relative", width: "min(500px, 100%)", maxHeight: "90vh", overflowY: "auto", background: CREAM, borderRadius: 18, boxShadow: "0 24px 64px rgba(0,0,0,0.32)", boxSizing: "border-box" }}
             className="no-scrollbar"
           >
             <div style={{ padding: "18px 20px 22px" }}>
@@ -171,7 +170,7 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
               )}
             </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,

@@ -40,13 +40,13 @@ export default function ReferralPopup({ open, code, onDismiss }: Props) {
   return createPortal(
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onDismiss} style={{ position: "fixed", inset: 0, background: "rgba(28,23,18,0.5)", zIndex: 340, backdropFilter: "blur(2px)" }} />
-          <motion.div key="card"
-            initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        <motion.div key="wrap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={onDismiss}
+          style={{ position: "fixed", inset: 0, zIndex: 340, background: "rgba(28,23,18,0.5)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, boxSizing: "border-box" }}>
+          <motion.div key="card" onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.97 }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            style={{ position: "fixed", zIndex: 341, left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(430px, 92vw)", background: CREAM, borderRadius: 22, boxShadow: "0 24px 64px rgba(28,23,18,0.34)", padding: "30px 28px 26px", textAlign: "center" }}>
+            style={{ position: "relative", width: "min(430px, 100%)", maxHeight: "90vh", overflowY: "auto", background: CREAM, borderRadius: 22, boxShadow: "0 24px 64px rgba(28,23,18,0.34)", padding: "30px 28px 26px", textAlign: "center", boxSizing: "border-box" }}>
             <button onClick={onDismiss} aria-label="Close" style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", cursor: "pointer", color: MUTED }}>
               <X style={{ width: 18, height: 18 }} />
             </button>
@@ -69,7 +69,7 @@ export default function ReferralPopup({ open, code, onDismiss }: Props) {
               Maybe Later
             </button>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,

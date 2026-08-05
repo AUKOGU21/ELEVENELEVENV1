@@ -1395,14 +1395,14 @@ const Feed = () => {
       {/* ── Floating header ───────────────────────────────────────────────────── */}
       <header
         className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between py-3"
-        style={{ background: "rgba(235,230,222,0.96)", backdropFilter: "blur(12px)", padding: isMobile ? "10px 12px" : "16px 40px" }}
+        style={{ background: "rgba(235,230,222,0.96)", backdropFilter: "blur(12px)", padding: isMobile ? "9px 10px" : "16px 40px", gap: isMobile ? 6 : 0 }}
       >
         {/* Left: Logo */}
         <div className="flex items-center" style={{ flexShrink: 0 }}>
           <button
             onClick={() => navigate("/")}
             className="font-sans uppercase select-none"
-            style={{ letterSpacing: isMobile ? "0.18em" : "0.32em", fontSize: isMobile ? 13 : 18, color: "#1C1712" }}
+            style={{ letterSpacing: isMobile ? "0.05em" : "0.32em", fontSize: isMobile ? 11 : 18, color: "#1C1712", whiteSpace: "nowrap" }}
           >
             <span style={{ fontWeight: 700 }}>ELEVEN</span>
             <span style={{ fontWeight: 300 }}>ELEVEN</span>
@@ -1418,8 +1418,8 @@ const Feed = () => {
             onClick={() => setActiveTab("feed")}
             className="rounded-full font-medium transition-all"
             style={{
-              fontSize: isMobile ? 13 : 14,
-              padding: isMobile ? "4px 14px" : "6px 16px",
+              fontSize: isMobile ? 12 : 14,
+              padding: isMobile ? "4px 9px" : "6px 16px",
               ...(activeTab === "feed"
                 ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
                 : { color: "rgba(28,23,18,0.45)" })
@@ -1430,7 +1430,7 @@ const Feed = () => {
           <button
             onClick={() => navigate("/brands")}
             className="rounded-full font-medium transition-all"
-            style={{ fontSize: isMobile ? 13 : 14, padding: isMobile ? "4px 14px" : "6px 16px", color: "rgba(28,23,18,0.45)" }}
+            style={{ fontSize: isMobile ? 12 : 14, padding: isMobile ? "4px 9px" : "6px 16px", color: "rgba(28,23,18,0.45)" }}
           >
             Brands
           </button>
@@ -1438,8 +1438,8 @@ const Feed = () => {
             onClick={() => setActiveTab("mine")}
             className="rounded-full font-medium transition-all"
             style={{
-              fontSize: isMobile ? 13 : 14,
-              padding: isMobile ? "4px 14px" : "6px 16px",
+              fontSize: isMobile ? 12 : 14,
+              padding: isMobile ? "4px 9px" : "6px 16px",
               ...(activeTab === "mine"
                 ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
                 : { color: "rgba(28,23,18,0.45)" })

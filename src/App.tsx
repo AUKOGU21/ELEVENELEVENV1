@@ -9,6 +9,7 @@ import Index from "./pages/Index.tsx";
 import Onboarding from "./pages/Onboarding.tsx";
 import PostDecision from "./pages/PostDecision.tsx";
 import LookingFor from "./pages/LookingFor.tsx";
+import InvitePage from "./pages/InvitePage.tsx";
 import Feed from "./pages/Feed.tsx";
 import BrandLibrary from "./pages/BrandLibrary.tsx";
 import SignIn from "./pages/SignIn.tsx";
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/signin" element={<SignIn />} />
             <Route path="/post" element={<PostDecision />} />
             <Route path="/looking-for" element={<LookingFor />} />
+            <Route path="/invite/:code" element={<InvitePage />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/brands" element={<BrandLibrary />} />
             <Route path="/check-email" element={<CheckEmail />} />

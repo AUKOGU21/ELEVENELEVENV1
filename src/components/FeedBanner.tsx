@@ -1,7 +1,7 @@
 // ── FeedBanner ────────────────────────────────────────────────────────────────
 // The primary posting surface at the top of the feed. Replaces the old floating
 // "+ Post" as the main entry point. Decision dominates; Looking For is secondary.
-import { ShoppingBag, Search, ArrowRight } from "lucide-react";
+import { ShoppingBag, Search, ArrowRight, Users } from "lucide-react";
 
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
@@ -10,10 +10,11 @@ const GOLD = "#C49E64";
 interface Props {
   onDecision: () => void;
   onLookingFor: () => void;
+  onInvite?: () => void;
   isMobile: boolean;
 }
 
-export default function FeedBanner({ onDecision, onLookingFor, isMobile }: Props) {
+export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobile }: Props) {
   return (
     <div style={{
       position: "relative", zIndex: 1,
@@ -87,6 +88,14 @@ export default function FeedBanner({ onDecision, onLookingFor, isMobile }: Props
           </span>
         </button>
       </div>
+
+      {onInvite && (
+        <div style={{ textAlign: "center", marginTop: isMobile ? 14 : 18 }}>
+          <button onClick={onInvite} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: MUTED, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Users style={{ width: 14, height: 14 }} /> Invite your shopping circle
+          </button>
+        </div>
+      )}
     </div>
   );
 }

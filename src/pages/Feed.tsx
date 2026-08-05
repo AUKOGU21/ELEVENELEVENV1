@@ -16,6 +16,8 @@ import NotificationBell from "@/components/NotificationBell";
 import LookingForCard from "@/components/LookingForCard";
 import RecommendationsDrawer from "@/components/RecommendationsDrawer";
 import RecommendationModal, { RecommendationDraft } from "@/components/RecommendationModal";
+import ReferralPopup from "@/components/ReferralPopup";
+import { ensureInviteCode, ensureReferral } from "@/lib/referral";
 import { toast } from "sonner";
 
 // ─── Product-link helpers ───────────────────────────────────────────────────
@@ -421,9 +423,13 @@ const Feed = () => {
   const [recsOpenId, setRecsOpenId] = useState<string | null>(null);
   const [recModalFor, setRecModalFor] = useState<string | null>(null);
   const [submittingRec, setSubmittingRec] = useState(false);
+  // Referral / Shopping Circle: one-time invite prompt.
+  const [showReferral, setShowReferral] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const referralArmedRef = useRef(false);
 
   // ── User meta
-  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
+  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null } | null>(null);
 
   // ── Activation nudge: surface one matched decision to brand-new users.
   // Persists until they weigh in once — no manual dismiss.
@@ -627,7 +633,7 @@ const Feed = () => {
     ]);
 
     const myProfileData = (profileResult as any).data ?? null;
-    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url });
+    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url, invite_code: myProfileData.invite_code ?? null, referral_prompt_dismissed_at: myProfileData.referral_prompt_dismissed_at ?? null });
 
     const local = JSON.parse(localStorage.getItem("eleven_decisions") || "[]");
     const localFormatted: DecisionRow[] = local.map((d: any) => ({
@@ -1094,6 +1100,35 @@ const Feed = () => {
       await fetchDecisions();
     } catch (e) { console.error("delete reply failed:", e); }
   };
+
+  // ── Referral / Shopping Circle ──────────────────────────────────────────────
+  const dismissReferral = async () => {
+    setShowReferral(false);
+    if (!user) return;
+    const now = new Date().toISOString();
+    setMyProfile((p) => (p ? { ...p, referral_prompt_dismissed_at: now } : p));
+    try { await supabase.from("profiles").update({ referral_prompt_dismissed_at: now }).eq("id", user.id); } catch { /* ignore */ }
+  };
+  const openReferralManually = async () => {
+    if (user && !inviteCode) setInviteCode(await ensureInviteCode(user.id, myProfile?.display_name ?? null, myProfile?.invite_code ?? null));
+    setShowReferral(true);
+  };
+  // If this user arrived via an invite link, store the shopping-circle relationship.
+  useEffect(() => { if (user) ensureReferral(user.id).catch(() => {}); }, [user]);
+  // Show the invite prompt once — after ~12s or a natural scroll through the feed.
+  useEffect(() => {
+    if (!user || !myProfile || myProfile.referral_prompt_dismissed_at || referralArmedRef.current) return;
+    referralArmedRef.current = true;
+    ensureInviteCode(user.id, myProfile.display_name, myProfile.invite_code ?? null).then(setInviteCode);
+    let done = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const scroller = scrollRef.current;
+    const fire = () => { if (done) return; done = true; clearTimeout(timer); scroller?.removeEventListener("scroll", onScroll); setShowReferral(true); };
+    const onScroll = () => { if ((scroller?.scrollTop ?? 0) > 600) fire(); };
+    timer = setTimeout(fire, 12000);
+    scroller?.addEventListener("scroll", onScroll, { passive: true });
+    return () => { clearTimeout(timer); scroller?.removeEventListener("scroll", onScroll); };
+  }, [user, myProfile]);
 
   // Submit a product recommendation on a Looking For post.
   const submitRecommendation = async (lookingForId: string, draft: RecommendationDraft) => {
@@ -1586,6 +1621,7 @@ const Feed = () => {
             isMobile={isMobile}
             onDecision={() => navigate(user ? "/post" : "/signin")}
             onLookingFor={() => navigate(user ? "/looking-for" : "/signin")}
+            onInvite={user ? openReferralManually : undefined}
           />
         )}
         {loading ? (
@@ -2028,6 +2064,9 @@ const Feed = () => {
         onClose={() => setRecModalFor(null)}
         onSubmit={(draft) => recModalFor && submitRecommendation(recModalFor, draft)}
       />
+
+      {/* Referral / Shopping Circle invite prompt */}
+      <ReferralPopup open={showReferral} code={inviteCode} onDismiss={dismissReferral} />
 
       {/* Secondary floating + Post — the banner is the primary entry point */}
       {user && (

@@ -6,6 +6,8 @@ import { STEPS, SIZE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { computeMatchScore } from "@/lib/matching";
+import { ensureReferral, pendingReferrer } from "@/lib/referral";
+import { Users } from "lucide-react";
 
 // ─── Match label helper ───────────────────────────────────────────────────────
 function getMatchLabel(mine: Record<string, any>, them: Record<string, any>): string {
@@ -80,6 +82,8 @@ const Onboarding = () => {
   const [fitAnswers, setFitAnswers]     = useState<Record<string, string>>({});
   const [authLoading, setAuthLoading]   = useState(false);
   const [quickWinPhase, setQuickWinPhase] = useState<"loading" | "ready">("loading");
+  // If they arrived via an invite link, the inviter's name for the circle confirmation.
+  const [circleInviter, setCircleInviter] = useState<string | null>(null);
   const [onboardingMatches, setOnboardingMatches] = useState<any[]>([]);
 
   // ─── City autocomplete ──────────────────────────────────────────────────────
@@ -264,6 +268,11 @@ const Onboarding = () => {
       setStep(step + 1);
     } else {
       localStorage.removeItem("eleven_signup_name");
+      // Arrived via an invite? Store the shopping-circle link, then celebrate it.
+      if (user && pendingReferrer()) {
+        const res = await ensureReferral(user.id);
+        if (res?.inviterName) { setCircleInviter(res.inviterName); return; }
+      }
       navigate("/feed");
     }
   };
@@ -299,6 +308,28 @@ const Onboarding = () => {
     top_size:    topSizeValue    || null,
     bottom_size: bottomSizeValue || null,
   };
+
+  // Shopping-circle confirmation (shown after onboarding when invited by a friend).
+  if (circleInviter) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#FDFAF6", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", textAlign: "center" }}>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} style={{ maxWidth: 440, width: "100%" }}>
+          <div style={{ width: 62, height: 62, borderRadius: "50%", margin: "0 auto 22px", background: "rgba(196,158,100,0.14)", border: "1px solid #C49E64", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Users style={{ width: 28, height: 28, color: "#A07848" }} />
+          </div>
+          <h1 style={{ fontFamily: "Georgia, serif", fontSize: 32, lineHeight: 1.15, color: "#1C1712", margin: "0 0 14px", letterSpacing: "-0.01em" }}>
+            You're now part of {circleInviter}'s shopping circle.
+          </h1>
+          <p style={{ fontSize: 16, lineHeight: 1.6, color: "#5A4A42", margin: "0 0 32px" }}>
+            Your take now helps {circleInviter} — and every woman like you — shop with more confidence.
+          </p>
+          <button onClick={() => navigate("/feed")} style={{ width: "100%", maxWidth: 320, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, background: "#1C1712", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "16px 0", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
+            Continue to Feed <ArrowRight style={{ width: 17, height: 17 }} />
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

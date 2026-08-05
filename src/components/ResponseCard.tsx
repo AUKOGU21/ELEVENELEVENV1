@@ -4,7 +4,7 @@
 // inline composer; replies render nested beneath, one level deep only. Replies are
 // a KNOWLEDGE feature (Q → clarification), not a conversation thread.
 import { useState, useRef, useEffect } from "react";
-import { ThumbsUp, Check, ExternalLink, CornerDownRight } from "lucide-react";
+import { ThumbsUp, Check, ExternalLink, CornerDownRight, MoreHorizontal } from "lucide-react";
 import MatchBadge from "./MatchBadge";
 import { formatName, getInitials, recommendationLabel, prettyHost, timeAgo } from "@/lib/format";
 
@@ -37,6 +37,8 @@ interface Props {
   onHelpful: (responseId: string) => void;
   user: { id: string } | null;
   onSubmitReply: (responseId: string, body: string) => Promise<void>;
+  onDeleteReply: (replyId: string) => Promise<void>;
+  onEditReply: (replyId: string, body: string) => Promise<void>;
   onSignIn: () => void;
   focused?: boolean;
 }
@@ -44,7 +46,7 @@ interface Props {
 const MUTED = "#8C7A70";
 const MAXLEN = 250;
 
-export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful, user, onSubmitReply, onSignIn, focused }: Props) {
+export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful, user, onSubmitReply, onDeleteReply, onEditReply, onSignIn, focused }: Props) {
   const isBuy = resp.recommendation === "buy";
   const isNoBuy = resp.recommendation === "do_not_buy";
   const replies = resp.replies ?? [];
@@ -52,6 +54,28 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // Per-reply edit/delete menu + inline edit state.
+  const [menuReplyId, setMenuReplyId] = useState<string | null>(null);
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuReplyId) return;
+    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuReplyId(null); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [menuReplyId]);
+
+  const saveEdit = async (replyId: string) => {
+    const body = editText.trim();
+    if (!body || savingEdit) return;
+    setSavingEdit(true);
+    try { await onEditReply(replyId, body.slice(0, MAXLEN)); setEditingReplyId(null); }
+    catch (e) { console.error("edit reply failed:", e); }
+    setSavingEdit(false);
+  };
 
   // Deep-link from a reply notification: scroll to + briefly highlight the thread.
   const [flash, setFlash] = useState(false);
@@ -143,20 +167,47 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
       {/* Replies — nested, one level, quieter than the response (annotations) */}
       {replies.length > 0 && (
         <div style={{ marginTop: 12, marginLeft: 4, paddingLeft: 12, borderLeft: "2px solid rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: 12 }}>
-          {replies.map((rp) => (
-            <div key={rp.id} style={{ display: "flex", gap: 8 }}>
-              <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#8C7A70", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white", fontWeight: 700 }}>
-                {rp.profiles?.avatar_url ? <img src={rp.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : getInitials(rp.profiles?.display_name ?? null)}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#3A3530" }}>{formatName(rp.profiles?.display_name ?? null)}</span>
-                  <span style={{ fontSize: 11, color: MUTED }}>{timeAgo(rp.created_at)}</span>
+          {replies.map((rp) => {
+            const isMine = !!user && rp.user_id === user.id;
+            const editing = editingReplyId === rp.id;
+            return (
+              <div key={rp.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#8C7A70", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white", fontWeight: 700 }}>
+                  {rp.profiles?.avatar_url ? <img src={rp.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : getInitials(rp.profiles?.display_name ?? null)}
                 </div>
-                <p style={{ fontSize: 13, lineHeight: 1.5, color: "#5A4A42", margin: "1px 0 0" }}>{rp.body}</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#3A3530" }}>{formatName(rp.profiles?.display_name ?? null)}</span>
+                    <span style={{ fontSize: 11, color: MUTED }}>{timeAgo(rp.created_at)}</span>
+                  </div>
+                  {editing ? (
+                    <div style={{ marginTop: 4 }}>
+                      <textarea autoFocus value={editText} maxLength={MAXLEN} onChange={(e) => setEditText(e.target.value)} rows={2} style={{ width: "100%", boxSizing: "border-box", borderRadius: 8, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "7px 9px", fontSize: 13, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 5 }}>
+                        <button onClick={() => setEditingReplyId(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: MUTED }}>Cancel</button>
+                        <button onClick={() => saveEdit(rp.id)} disabled={!editText.trim() || savingEdit} style={{ background: editText.trim() && !savingEdit ? "#1C1712" : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "5px 13px", fontSize: 12.5, fontWeight: 600, cursor: editText.trim() && !savingEdit ? "pointer" : "default" }}>{savingEdit ? "Saving…" : "Save"}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 13, lineHeight: 1.5, color: "#5A4A42", margin: "1px 0 0" }}>{rp.body}</p>
+                  )}
+                </div>
+                {isMine && !editing && (
+                  <div style={{ position: "relative", flexShrink: 0 }} ref={menuReplyId === rp.id ? menuRef : undefined}>
+                    <button onClick={() => setMenuReplyId(menuReplyId === rp.id ? null : rp.id)} aria-label="Reply options" style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 2, lineHeight: 0 }}>
+                      <MoreHorizontal style={{ width: 15, height: 15 }} />
+                    </button>
+                    {menuReplyId === rp.id && (
+                      <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: "#FDFAF6", borderRadius: 10, border: "1px solid rgba(0,0,0,0.10)", boxShadow: "0 8px 22px rgba(0,0,0,0.14)", minWidth: 110, zIndex: 5, overflow: "hidden" }}>
+                        <button onClick={() => { setEditingReplyId(rp.id); setEditText(rp.body); setMenuReplyId(null); }} style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 13, color: "#1A1A1A", cursor: "pointer" }}>Edit</button>
+                        <button onClick={() => { setMenuReplyId(null); onDeleteReply(rp.id); }} style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 13, color: "#c0392b", cursor: "pointer", borderTop: "1px solid rgba(0,0,0,0.06)" }}>Delete</button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

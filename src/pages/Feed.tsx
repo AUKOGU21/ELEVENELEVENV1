@@ -1079,6 +1079,22 @@ const Feed = () => {
     }
   };
 
+  // Edit / delete a reply — RLS allows only the reply's own author.
+  const editReply = async (replyId: string, body: string) => {
+    if (!user) return;
+    try {
+      await supabase.from("response_replies").update({ body }).eq("id", replyId).eq("user_id", user.id);
+      await fetchDecisions();
+    } catch (e) { console.error("edit reply failed:", e); throw e; }
+  };
+  const deleteReply = async (replyId: string) => {
+    if (!user) return;
+    try {
+      await supabase.from("response_replies").delete().eq("id", replyId).eq("user_id", user.id);
+      await fetchDecisions();
+    } catch (e) { console.error("delete reply failed:", e); }
+  };
+
   // Submit a product recommendation on a Looking For post.
   const submitRecommendation = async (lookingForId: string, draft: RecommendationDraft) => {
     if (!user) { navigate("/signin"); return; }
@@ -1988,6 +2004,8 @@ const Feed = () => {
         onAddThoughts={(id) => startWeighIn(id)}
         onSignIn={() => navigate("/signin")}
         onSubmitReply={submitReply}
+        onDeleteReply={deleteReply}
+        onEditReply={editReply}
         focusResponseId={focusResponseId}
       />
 

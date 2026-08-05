@@ -17,13 +17,14 @@ interface NotificationRow {
   read_at: string | null;
   type: string | null;
   decision_id: string | null;
+  response_id: string | null;
   data: Record<string, any> | null;
 }
 
 interface Props {
   user: { id: string } | null;
   isMobile: boolean;
-  onOpenDecision?: (decisionId: string) => void;
+  onOpenDecision?: (decisionId: string, responseId?: string | null) => void;
 }
 
 function messageFor(n: NotificationRow): string {
@@ -33,6 +34,7 @@ function messageFor(n: NotificationRow): string {
   switch (n.type) {
     case "weigh_in": return `${who} weighed in on ${item}`;
     case "recommendation": return `${who} recommended a product for “${item}”`;
+    case "reply": return `${who} replied to your take on ${item}`;
     case "outcome": return `${who} shared how it turned out`;
     case "save": return `${who} saved your decision`;
     case "helpful": return `${who} found your take helpful`;
@@ -51,7 +53,7 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
     try {
       const { data } = await supabase
         .from("notifications")
-        .select("id, created_at, read_at, type, decision_id, data")
+        .select("id, created_at, read_at, type, decision_id, response_id, data")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(30);
@@ -134,7 +136,7 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
             items.map((n) => (
               <button
                 key={n.id}
-                onClick={() => { if (n.decision_id && onOpenDecision) onOpenDecision(n.decision_id); setOpen(false); }}
+                onClick={() => { if (n.decision_id && onOpenDecision) onOpenDecision(n.decision_id, n.response_id); setOpen(false); }}
                 style={{
                   width: "100%", textAlign: "left", cursor: n.decision_id ? "pointer" : "default",
                   display: "flex", gap: 10, alignItems: "flex-start",

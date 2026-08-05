@@ -1,9 +1,20 @@
 // ── ResponseCard ──────────────────────────────────────────────────────────────
-// One weigh-in, rendered identically wherever it appears (currently the responses
-// drawer). Mirrors the card markup that used to live inline in Feed.tsx.
-import { ThumbsUp, Check, ExternalLink } from "lucide-react";
+// One weigh-in, rendered identically wherever it appears (the responses drawer).
+// Supports lightweight clarifying Replies: a subtle "Reply" text button opens an
+// inline composer; replies render nested beneath, one level deep only. Replies are
+// a KNOWLEDGE feature (Q → clarification), not a conversation thread.
+import { useState, useRef, useEffect } from "react";
+import { ThumbsUp, Check, ExternalLink, CornerDownRight } from "lucide-react";
 import MatchBadge from "./MatchBadge";
 import { formatName, getInitials, recommendationLabel, prettyHost, timeAgo } from "@/lib/format";
+
+export interface ReplyData {
+  id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  profiles: { display_name: string | null; avatar_url?: string | null } | null;
+}
 
 export interface ResponseCardData {
   id: string;
@@ -15,6 +26,7 @@ export interface ResponseCardData {
   user_id: string;
   created_at: string;
   profiles: { display_name: string | null; avatar_url?: string | null } | null;
+  replies?: ReplyData[];
 }
 
 interface Props {
@@ -23,14 +35,54 @@ interface Props {
   myVote: "helpful" | "not_helpful" | undefined;
   canVote: boolean;
   onHelpful: (responseId: string) => void;
+  user: { id: string } | null;
+  onSubmitReply: (responseId: string, body: string) => Promise<void>;
+  onSignIn: () => void;
+  focused?: boolean;
 }
 
-export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful }: Props) {
+const MUTED = "#8C7A70";
+const MAXLEN = 250;
+
+export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful, user, onSubmitReply, onSignIn, focused }: Props) {
   const isBuy = resp.recommendation === "buy";
   const isNoBuy = resp.recommendation === "do_not_buy";
+  const replies = resp.replies ?? [];
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Deep-link from a reply notification: scroll to + briefly highlight the thread.
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (!focused) return;
+    wrapRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setFlash(true);
+    const t = setTimeout(() => setFlash(false), 1600);
+    return () => clearTimeout(t);
+  }, [focused]);
+
+  const openComposer = () => {
+    if (!user) { onSignIn(); return; }
+    setComposerOpen(true);
+  };
+
+  const submit = async () => {
+    const body = text.trim();
+    if (!body || posting) return;
+    setPosting(true);
+    try {
+      await onSubmitReply(resp.id, body.slice(0, MAXLEN));
+      setText("");
+      setComposerOpen(false);
+    } catch (e) { console.error("reply failed:", e); }
+    setPosting(false);
+  };
+
   return (
-    <div style={{ background: "rgba(0,0,0,0.035)", borderRadius: 14, padding: "13px 15px", border: "1px solid rgba(0,0,0,0.06)" }}>
-      {/* Header: avatar + name + match + rec badge */}
+    <div ref={wrapRef} style={{ background: "rgba(0,0,0,0.035)", borderRadius: 14, padding: "13px 15px", border: `1px solid ${flash ? "rgba(196,158,100,0.7)" : "rgba(0,0,0,0.06)"}`, boxShadow: flash ? "0 0 0 3px rgba(196,158,100,0.18)" : "none", transition: "box-shadow 0.4s, border-color 0.4s" }}>
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "white", fontWeight: 700 }}>
@@ -66,26 +118,71 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful 
           style={{ height: 120, width: 96, objectFit: "cover", objectPosition: "top", borderRadius: 10, display: "block", marginBottom: 10, cursor: "zoom-in" }} />
       )}
 
-      {/* Footer: helpful + date */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      {/* Footer: helpful + reply + date */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button
           onClick={() => canVote && onHelpful(resp.id)}
           style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "5px 13px", borderRadius: 100,
+            display: "flex", alignItems: "center", gap: 6, padding: "5px 13px", borderRadius: 100,
             border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
             background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
             color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
-            cursor: canVote ? "pointer" : "default",
-            fontSize: 13, fontWeight: 600, transition: "all 0.15s",
-            opacity: canVote ? 1 : 0.55,
+            cursor: canVote ? "pointer" : "default", fontSize: 13, fontWeight: 600, opacity: canVote ? 1 : 0.55,
           }}
         >
           {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
           <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
         </button>
-        <span style={{ fontSize: 13, color: "#8C7A70" }}>{timeAgo(resp.created_at)}</span>
+        {/* Reply — deliberately a quiet text button, never dominant */}
+        <button onClick={openComposer} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, fontWeight: 600, color: MUTED }}>
+          Reply
+        </button>
+        <span style={{ marginLeft: "auto", fontSize: 13, color: MUTED }}>{timeAgo(resp.created_at)}</span>
       </div>
+
+      {/* Replies — nested, one level, quieter than the response (annotations) */}
+      {replies.length > 0 && (
+        <div style={{ marginTop: 12, marginLeft: 4, paddingLeft: 12, borderLeft: "2px solid rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: 12 }}>
+          {replies.map((rp) => (
+            <div key={rp.id} style={{ display: "flex", gap: 8 }}>
+              <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#8C7A70", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white", fontWeight: 700 }}>
+                {rp.profiles?.avatar_url ? <img src={rp.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : getInitials(rp.profiles?.display_name ?? null)}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#3A3530" }}>{formatName(rp.profiles?.display_name ?? null)}</span>
+                  <span style={{ fontSize: 11, color: MUTED }}>{timeAgo(rp.created_at)}</span>
+                </div>
+                <p style={{ fontSize: 13, lineHeight: 1.5, color: "#5A4A42", margin: "1px 0 0" }}>{rp.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Inline composer */}
+      {composerOpen && (
+        <div style={{ marginTop: 12, marginLeft: 4, paddingLeft: 12, borderLeft: "2px solid rgba(196,158,100,0.4)" }}>
+          <textarea
+            autoFocus
+            value={text}
+            maxLength={MAXLEN}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Ask a follow-up..."
+            rows={2}
+            style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "9px 11px", fontSize: 13.5, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }}
+          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: MUTED }}>{text.length}/{MAXLEN}</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { setComposerOpen(false); setText(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: MUTED, padding: "6px 8px" }}>Cancel</button>
+              <button onClick={submit} disabled={!text.trim() || posting} style={{ background: text.trim() && !posting ? "#1C1712" : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: text.trim() && !posting ? "pointer" : "default", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <CornerDownRight style={{ width: 13, height: 13 }} /> {posting ? "Posting…" : "Post"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

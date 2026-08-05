@@ -32,12 +32,14 @@ interface Props {
   onHelpful: (responseId: string) => void;
   onAddThoughts: (decisionId: string) => void;
   onSignIn: () => void;
+  onSubmitReply: (responseId: string, body: string) => Promise<void>;
+  focusResponseId?: string | null;
 }
 
 type FilterKey = "all" | "buy" | "do_not_buy";
 
 export default function ResponsesDrawer({
-  open, onClose, decision, user, voteCounts, userVotes, onHelpful, onAddThoughts, onSignIn,
+  open, onClose, decision, user, voteCounts, userVotes, onHelpful, onAddThoughts, onSignIn, onSubmitReply, focusResponseId,
 }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
 
@@ -144,6 +146,10 @@ export default function ResponsesDrawer({
               myVote={userVotes[resp.id]}
               canVote={!!user && resp.user_id !== user.id}
               onHelpful={onHelpful}
+              user={user}
+              onSubmitReply={onSubmitReply}
+              onSignIn={onSignIn}
+              focused={focusResponseId === resp.id}
             />
           ))}
         </div>

@@ -58,6 +58,7 @@ interface ResponseRow {
   user_id: string;
   created_at: string;
   profiles: { display_name: string | null; avatar_url?: string | null } | null;
+  replies?: { id: string; user_id: string; body: string; created_at: string; profiles: { display_name: string | null; avatar_url?: string | null } | null }[];
 }
 
 interface OutcomeRow {
@@ -414,6 +415,8 @@ const Feed = () => {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   // Which decision's responses drawer is open (right-side sliding panel).
   const [responsesOpenId, setResponsesOpenId] = useState<string | null>(null);
+  // Response to auto-expand/scroll to when the drawer opens (reply deep-link).
+  const [focusResponseId, setFocusResponseId] = useState<string | null>(null);
   // Looking For: which post's recommendations drawer is open, and the recommend modal.
   const [recsOpenId, setRecsOpenId] = useState<string | null>(null);
   const [recModalFor, setRecModalFor] = useState<string | null>(null);
@@ -450,6 +453,7 @@ const Feed = () => {
       .channel("feed-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "decisions" }, () => fetchDecisions())
       .on("postgres_changes", { event: "*", schema: "public", table: "responses" }, () => fetchDecisions())
+      .on("postgres_changes", { event: "*", schema: "public", table: "response_replies" }, () => fetchDecisions())
       .on("postgres_changes", { event: "*", schema: "public", table: "recommendations" }, () => fetchDecisions())
       .on("postgres_changes", { event: "*", schema: "public", table: "outcomes" }, () => fetchDecisions())
       .subscribe();
@@ -568,6 +572,32 @@ const Feed = () => {
       }
     };
 
+    // Attach clarifying replies to each response (separate fetch — no FK embed dep).
+    const attachReplies = async (rows: DecisionRow[]): Promise<DecisionRow[]> => {
+      const respIds = rows.flatMap((d) => (d.responses ?? []).map((r) => r.id));
+      if (respIds.length === 0) return rows;
+      try {
+        const { data: repliesRaw } = await supabase
+          .from("response_replies")
+          .select("id, response_id, user_id, body, created_at")
+          .in("response_id", respIds)
+          .order("created_at", { ascending: true });
+        const rep = repliesRaw ?? [];
+        const uids = [...new Set(rep.map((r: any) => r.user_id))];
+        const profMap: Record<string, any> = {};
+        if (uids.length) {
+          const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", uids);
+          (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url }; });
+        }
+        const byResp: Record<string, any[]> = {};
+        rep.forEach((r: any) => { (byResp[r.response_id] ??= []).push({ ...r, profiles: profMap[r.user_id] ?? null }); });
+        return rows.map((d) => ({ ...d, responses: (d.responses ?? []).map((r) => ({ ...r, replies: byResp[r.id] ?? [] })) }));
+      } catch (e) {
+        console.error("replies fetch failed:", e);
+        return rows;
+      }
+    };
+
     // No outcomes join here — we fetch outcomes separately below to avoid
     // PostgREST FK detection issues causing the join to silently return null.
     const query = `
@@ -652,6 +682,7 @@ const Feed = () => {
       }
 
       rows = await attachRecs(rows);
+      rows = await attachReplies(rows);
       setDecisions(user ? rows : [...localFormatted, ...rows]);
 
       const allResponseIds = rows.flatMap((d) => d.responses?.map((r) => r.id) ?? []);
@@ -717,6 +748,7 @@ const Feed = () => {
         }
 
         myRows = await attachRecs(myRows);
+        myRows = await attachReplies(myRows);
         setMyDecisions(myRows);
       }
     } else {
@@ -1030,6 +1062,21 @@ const Feed = () => {
         await supabase.from("recommendation_votes").upsert({ recommendation_id: recId, voter_id: user.id, vote_type: "helpful" }, { onConflict: "recommendation_id,voter_id" });
       }
     } catch (e) { console.error("rec vote failed:", e); }
+  };
+
+  // Post a clarifying reply on a response (one level deep). Notifies the thread.
+  const submitReply = async (responseId: string, body: string) => {
+    if (!user) { navigate("/signin"); return; }
+    try {
+      await supabase.from("response_replies").insert({ response_id: responseId, user_id: user.id, body });
+      supabase.functions
+        .invoke("notify-reply", { body: { response_id: responseId, replier_id: user.id } })
+        .catch((e) => console.warn("reply notify failed:", e));
+      await fetchDecisions();
+    } catch (e) {
+      console.error("reply insert failed:", e);
+      throw e;
+    }
   };
 
   // Submit a product recommendation on a Looking For post.
@@ -1375,7 +1422,7 @@ const Feed = () => {
             <NotificationBell
               user={user}
               isMobile={isMobile}
-              onOpenDecision={(id) => setResponsesOpenId(id)}
+              onOpenDecision={(id, responseId) => { setResponsesOpenId(id); setFocusResponseId(responseId ?? null); }}
             />
           )}
 
@@ -1932,7 +1979,7 @@ const Feed = () => {
       {/* ── Responses drawer (right-side, keeps feed context) ─────────────────── */}
       <ResponsesDrawer
         open={!!responsesOpenId}
-        onClose={() => setResponsesOpenId(null)}
+        onClose={() => { setResponsesOpenId(null); setFocusResponseId(null); }}
         decision={[...decisions, ...myDecisions].find((d) => d.id === responsesOpenId) ?? null}
         user={user}
         voteCounts={voteCounts}
@@ -1940,6 +1987,8 @@ const Feed = () => {
         onHelpful={(rid) => handleHelpfulVote(rid, "helpful")}
         onAddThoughts={(id) => startWeighIn(id)}
         onSignIn={() => navigate("/signin")}
+        onSubmitReply={submitReply}
+        focusResponseId={focusResponseId}
       />
 
       {/* ── Looking For: recommendations drawer + recommend modal ──────────────── */}

@@ -65,7 +65,7 @@ for r in targets:
     if DRY:
         print(f"  would invite: {first:<16}{email}")
         continue
-    html = template.replace("{{FIRST_NAME}}", first).replace("{{SITE_URL}}", "https://geteleveneleven.com")
+    html = template.replace("{{FIRST_NAME}}", first).replace("{{SITE_URL}}", "https://geteleveneleven.com/onboarding")
     payload = json.dumps({"from": "ElevenEleven <hello@geteleveneleven.com>", "to": [email],
                           "subject": "you're in.", "html": html,
                           "headers": {"List-Unsubscribe": "<mailto:hello@geteleveneleven.com?subject=Unsubscribe>"}})

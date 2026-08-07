@@ -766,15 +766,41 @@ const Feed = () => {
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
+  // Which decision the in-progress weigh-in draft belongs to (so tapping away and
+  // reopening the same decision resumes the draft instead of wiping it).
+  const weighInDraftIdRef = useRef<string | null>(null);
+
   const startWeighIn = (id: string) => {
     // Starting a new action cancels any pending fit-prompt so it can't pop over this flow
     if (fitTimerRef.current) { clearTimeout(fitTimerRef.current); fitTimerRef.current = null; }
+    // Resume an existing draft for this same decision rather than clearing it.
+    const resuming = weighInDraftIdRef.current === id && (take.trim() || takeLink.trim() || !!vote || !!context);
     setWeighingIn(id);
+    if (!resuming) {
+      weighInDraftIdRef.current = id;
+      setWeighInStep("context");
+      setContext(null);
+      setVote(null);
+      setTake("");
+      setTakeLink("");
+    }
+  };
+
+  // Tapping the scrim just hides the sheet — the draft stays so reopening resumes it.
+  const dismissWeighIn = () => setWeighingIn(null);
+
+  // Explicit Cancel discards the draft (confirm first if there's unsaved text).
+  const cancelWeighIn = () => {
+    if (take.trim() && !confirm("Discard your draft?")) return;
+    weighInDraftIdRef.current = null;
+    setWeighingIn(null);
     setWeighInStep("context");
     setContext(null);
     setVote(null);
     setTake("");
     setTakeLink("");
+    setTakePhoto(null);
+    setTakePhotoPreview(null);
   };
 
   // One-tap outcome log from the card prompt: saves the core signal, flips
@@ -914,6 +940,7 @@ const Feed = () => {
   const closeWeighIn = () => {
     const wasCompleted = weighInCompletedRef.current;
     weighInCompletedRef.current = false;
+    weighInDraftIdRef.current = null;
     setWeighingIn(null);
     setWeighInStep("context");
     setContext(null);
@@ -1738,7 +1765,7 @@ const Feed = () => {
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-50"
               style={{ background: "rgba(0,0,0,0.6)" }}
-              onClick={closeWeighIn}
+              onClick={dismissWeighIn}
             />
             {/* Sheet */}
             <motion.div
@@ -1755,12 +1782,37 @@ const Feed = () => {
 
               {/* Cancel */}
               <button
-                onClick={closeWeighIn}
+                onClick={cancelWeighIn}
                 className="absolute top-6 right-6 text-lg tracking-widest uppercase"
                 style={{ color: "#8C7A70" }}
               >
                 Cancel
               </button>
+
+              {/* What the poster is asking — pinned so you can answer it while you write */}
+              {(weighInStep === "vote" || weighInStep === "take") && (() => {
+                const wd = [...decisions, ...myDecisions].find((d) => d.id === weighingIn);
+                if (!wd) return null;
+                const asks = (wd.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+                if (!asks.length && !wd.brand_name && !wd.product_name) return null;
+                return (
+                  <div style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 14, padding: "12px 14px", marginBottom: 18 }}>
+                    <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: "0 0 7px" }}>They're deciding about</p>
+                    {(wd.brand_name || wd.product_name) && (
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px" }}>
+                        {[wd.brand_name, wd.product_name].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                    {asks.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {asks.map((u, i) => (
+                          <span key={i} style={{ fontSize: 13, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "4px 11px" }}>{u}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Step: context */}
               {weighInStep === "context" && (

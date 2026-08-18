@@ -1865,14 +1865,14 @@ const Feed = () => {
               {/* Step: take */}
               {weighInStep === "take" && (
                 <div>
-                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>Your take</p>
+                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>your take</p>
                   <p className="text-lg mb-4" style={{ color: "#8C7A70" }}>
-                    Think out loud — what would you tell someone like you?
+                    be the friend who tells her the truth.
                   </p>
                   <textarea
                     value={take}
                     onChange={(e) => setTake(e.target.value)}
-                    placeholder="Share your honest take..."
+                    placeholder="no bs…"
                     rows={4}
                     className="w-full rounded-xl px-4 py-3 text-lg resize-none focus:outline-none mb-3"
                     style={{

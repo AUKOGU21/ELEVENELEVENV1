@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { timeAgo } from "@/lib/format";
+import { pushState, enablePush, type PushState } from "@/lib/push";
 
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
@@ -46,6 +47,17 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [unread, setUnread] = useState(0);
+  const [push, setPush] = useState<PushState>("granted"); // assume granted until checked, so we don't flash the prompt
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => { if (open) setPush(pushState()); }, [open]);
+
+  const turnOnPush = async () => {
+    setPushBusy(true);
+    await enablePush(user.id);
+    setPush(pushState());
+    setPushBusy(false);
+  };
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -126,6 +138,29 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
           <div style={{ padding: "13px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)", position: "sticky", top: 0, background: "#FDFAF6" }}>
             <p style={{ fontSize: 15, fontWeight: 700, color: INK, margin: 0 }}>Notifications</p>
           </div>
+
+          {push === "default" && (
+            <button
+              onClick={turnOnPush}
+              disabled={pushBusy}
+              style={{ width: "100%", textAlign: "left", padding: "12px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(196,158,100,0.10)", cursor: "pointer" }}
+            >
+              <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: INK }}>
+                {pushBusy ? "Turning on…" : "Turn on push notifications ✦"}
+              </span>
+              <span style={{ display: "block", fontSize: 11.5, color: MUTED, marginTop: 2 }}>
+                Get a ping when someone weighs in on your decision.
+              </span>
+            </button>
+          )}
+          {push === "needs-install" && (
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(196,158,100,0.10)" }}>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: INK }}>Add ElevenEleven to your Home Screen</span>
+              <span style={{ display: "block", fontSize: 11.5, color: MUTED, marginTop: 2 }}>
+                On iPhone, push alerts turn on once the app is on your home screen.
+              </span>
+            </div>
+          )}
 
           {items.length === 0 ? (
             <div style={{ padding: "30px 20px", textAlign: "center" }}>

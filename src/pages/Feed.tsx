@@ -13,6 +13,7 @@ import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDe
 import ResponsesDrawer from "@/components/ResponsesDrawer";
 import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
+import NotificationBanner from "@/components/NotificationBanner";
 import NotificationBell from "@/components/NotificationBell";
 import LookingForCard from "@/components/LookingForCard";
 import RecommendationsDrawer from "@/components/RecommendationsDrawer";
@@ -1636,6 +1637,9 @@ const Feed = () => {
         }}
         onClick={() => filterOpen && setFilterOpen(false)}
       >
+        {!loading && activeTab === "feed" && user && (
+          <NotificationBanner userId={user.id} isMobile={isMobile} />
+        )}
         {!loading && activeTab === "feed" && (
           <FeedBanner
             isMobile={isMobile}

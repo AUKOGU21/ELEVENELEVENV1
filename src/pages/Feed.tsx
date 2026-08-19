@@ -11,6 +11,7 @@ import { DialInFitModal, shouldShowFitPrompt } from "@/components/DialInFitModal
 import { imageToJpeg } from "@/lib/image";
 import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDetailOptions, FIT_RESULT_OPTIONS } from "@/components/OutcomeModal";
 import ResponsesDrawer from "@/components/ResponsesDrawer";
+import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBell from "@/components/NotificationBell";
 import LookingForCard from "@/components/LookingForCard";
@@ -1379,9 +1380,7 @@ const Feed = () => {
         <p style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(28,23,18,0.6)", margin: "0 0 14px" }}>Here's a decision from someone in your circle. Weigh in, and let us start learning your taste.</p>
         <div style={{ display: "flex", alignItems: "center", gap: 11, background: "rgba(28,23,18,0.04)", border: "1px solid rgba(28,23,18,0.08)", borderRadius: 12, padding: 9, marginBottom: 14 }}>
           <div style={{ width: 48, height: 58, borderRadius: 8, background: "#D9CFC2", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {t.product_image_url
-              ? <img src={t.product_image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <Camera className="w-5 h-5" style={{ color: "rgba(28,23,18,0.35)" }} />}
+            <ProductImage url={t.product_image_url} fallback={<Camera className="w-5 h-5" style={{ color: "rgba(28,23,18,0.35)" }} />} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             {t.brand_name && <span style={{ display: "block", fontSize: 11, letterSpacing: "0.04em", color: "rgba(28,23,18,0.5)", textTransform: "uppercase" }}>{t.brand_name}</span>}

@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bookmark, MoreHorizontal, ArrowRight, Search, Users } from "lucide-react";
 import { formatName, getInitials, timeAgo, formatBudget } from "@/lib/format";
 import MatchBadge from "./MatchBadge";
+import { ProductImage } from "./ProductImage";
 import type { RecommendationData } from "./RecommendationCard";
 
 const INK = "#1A1A1A";
@@ -75,9 +76,7 @@ export default function LookingForCard({
     return (
       <button key={rec.id} onClick={onOpenRecommendations} style={{ textAlign: "left", background: "#FDFAF6", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 12, overflow: "hidden", cursor: "pointer", padding: 0, display: "flex", flexDirection: "column" }}>
         <div style={{ width: "100%", aspectRatio: "4 / 5", background: "#EDE8E2", overflow: "hidden", position: "relative" }}>
-          {rec.product_image_url
-            ? <img src={rec.product_image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: MUTED }}><Search style={{ width: 20, height: 20 }} /></div>}
+          <ProductImage url={rec.product_image_url} fallback={<div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: MUTED }}><Search style={{ width: 20, height: 20 }} /></div>} />
         </div>
         <div style={{ padding: "8px 10px 10px" }}>
           {rec.brand_name && <p style={{ fontSize: 13, fontWeight: 700, color: INK, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.brand_name}</p>}

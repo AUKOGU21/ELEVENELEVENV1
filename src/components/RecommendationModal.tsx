@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Link as LinkIcon, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { ProductImage } from "./ProductImage";
 
 const INK = "#1C1712";
 const CREAM = "#FDFAF6";
@@ -124,7 +125,7 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
               {product && (
                 <div style={{ display: "flex", gap: 12, alignItems: "center", background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, padding: 10, marginBottom: 18 }}>
                   <div style={{ width: 58, height: 58, borderRadius: 8, overflow: "hidden", background: "#EDE8E2", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {product.image_url ? <img src={product.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <LinkIcon style={{ width: 18, height: 18, color: MUTED }} />}
+                    <ProductImage url={product.image_url} fallback={<LinkIcon style={{ width: 18, height: 18, color: MUTED }} />} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
                     <input value={product.brand} onChange={(e) => setProduct({ ...product, brand: e.target.value })} placeholder="Brand" style={{ ...inputStyle, padding: "6px 9px", fontSize: 13.5, fontWeight: 700 }} />

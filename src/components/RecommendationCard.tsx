@@ -3,6 +3,7 @@
 // product itself (image, brand, name, price) is the centerpiece.
 import { ThumbsUp, Check, ExternalLink } from "lucide-react";
 import MatchBadge from "./MatchBadge";
+import { ProductImage } from "./ProductImage";
 import { formatName, getInitials, recommendationLabel, timeAgo } from "@/lib/format";
 
 export interface RecommendationData {
@@ -68,9 +69,7 @@ export default function RecommendationCard({ rec, counts, myVote, canVote, onHel
           style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "#FDFAF6", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, padding: 10, marginBottom: rec.fit_note || rec.who_for ? 10 : 12 }}
         >
           <div style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, overflow: "hidden", background: "#EDE8E2", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {rec.product_image_url
-              ? <img src={rec.product_image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <ExternalLink style={{ width: 18, height: 18, color: MUTED }} />}
+            <ProductImage url={rec.product_image_url} fallback={<ExternalLink style={{ width: 18, height: 18, color: MUTED }} />} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             {rec.brand_name && <p style={{ fontSize: 14, fontWeight: 700, color: INK, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.brand_name}</p>}

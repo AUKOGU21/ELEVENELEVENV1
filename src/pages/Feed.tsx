@@ -1453,13 +1453,7 @@ const Feed = () => {
           >
             Feed
           </button>
-          <button
-            onClick={() => navigate("/brands")}
-            className="rounded-full font-medium transition-all"
-            style={{ fontSize: isMobile ? 12 : 14, padding: isMobile ? "4px 9px" : "6px 16px", color: "rgba(28,23,18,0.45)" }}
-          >
-            Brands
-          </button>
+          {/* Brands tab hidden for now — too much for launch. Restore this button to bring it back. */}
           <button
             onClick={() => setActiveTab("mine")}
             className="rounded-full font-medium transition-all"

@@ -53,7 +53,7 @@ export default function RecommendationsDrawer({
     const active = filter === key;
     return (
       <button key={key} onClick={() => setFilter(key)} style={{
-        padding: "6px 14px", borderRadius: 100, cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
+        padding: "6px 14px", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
         border: active ? "1px solid transparent" : "1px solid rgba(0,0,0,0.12)",
         background: active ? INK : "transparent", color: active ? "#FDFAF6" : "#5A4A42",
       }}>{label} ({n})</button>
@@ -62,15 +62,15 @@ export default function RecommendationsDrawer({
 
   const pinned = (
     <div>
-      <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: LF, margin: "0 0 5px" }}>Looking for</p>
-      <p style={{ fontSize: 16, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.35 }}>{lookingFor.lf_title || "Recommendations"}</p>
+      <p style={{ fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: LF, margin: "0 0 5px" }}>Looking for</p>
+      <p style={{ fontSize: 13.5, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.35 }}>{lookingFor.lf_title || "Recommendations"}</p>
       {(lookingFor.lf_budget || (lookingFor.lf_priorities && lookingFor.lf_priorities.length > 0)) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
           {lookingFor.lf_budget && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#5A4A42", background: "rgba(0,0,0,0.05)", borderRadius: 100, padding: "3px 10px" }}>{formatBudget(lookingFor.lf_budget)}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#5A4A42", background: "rgba(0,0,0,0.05)", borderRadius: 100, padding: "3px 10px" }}>{formatBudget(lookingFor.lf_budget)}</span>
           )}
           {(lookingFor.lf_priorities ?? []).map((p) => (
-            <span key={p} style={{ fontSize: 12, fontWeight: 600, color: LF, background: "rgba(122,106,174,0.12)", border: "1px solid rgba(122,106,174,0.25)", borderRadius: 100, padding: "3px 10px" }}>{p}</span>
+            <span key={p} style={{ fontSize: 10, fontWeight: 600, color: LF, background: "rgba(122,106,174,0.12)", border: "1px solid rgba(122,106,174,0.25)", borderRadius: 100, padding: "3px 10px" }}>{p}</span>
           ))}
         </div>
       )}
@@ -79,13 +79,13 @@ export default function RecommendationsDrawer({
 
   const footer = isOwner ? null : user ? (
     <>
-      <button onClick={() => { onAddRecommendation(lookingFor.id); onClose(); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+      <button onClick={() => { onAddRecommendation(lookingFor.id); onClose(); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
         <Plus style={{ width: 17, height: 17 }} /> Add a recommendation
       </button>
-      <p style={{ fontSize: 12.5, color: MUTED, textAlign: "center", margin: "9px 0 0" }}>Share a product link and why you recommend it.</p>
+      <p style={{ fontSize: 10.5, color: MUTED, textAlign: "center", margin: "9px 0 0" }}>Share a product link and why you recommend it.</p>
     </>
   ) : (
-    <button onClick={onSignIn} style={{ width: "100%", background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+    <button onClick={onSignIn} style={{ width: "100%", background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
       Sign in to recommend
     </button>
   );
@@ -98,7 +98,7 @@ export default function RecommendationsDrawer({
         {chip("do_not_buy", "Wouldn't buy", noBuyCount)}
       </div>
       {shown.length === 0 ? (
-        <p style={{ fontSize: 14, color: MUTED, textAlign: "center", padding: "28px 0" }}>
+        <p style={{ fontSize: 12, color: MUTED, textAlign: "center", padding: "28px 0" }}>
           {count === 0 ? "No recommendations yet — be the first to share a pick." : "None in this filter."}
         </p>
       ) : (

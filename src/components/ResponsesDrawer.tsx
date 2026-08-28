@@ -70,7 +70,7 @@ export default function ResponsesDrawer({
         onClick={() => setFilter(key)}
         style={{
           padding: "6px 14px", borderRadius: 100, cursor: "pointer",
-          fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
+          fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
           border: active ? "1px solid transparent" : "1px solid rgba(0,0,0,0.12)",
           background: active ? INK : "transparent",
           color: active ? "#FDFAF6" : "#5A4A42",
@@ -83,16 +83,16 @@ export default function ResponsesDrawer({
 
   const pinned = (
     <div>
-      <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: MUTED, margin: "0 0 5px" }}>
+      <p style={{ fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: MUTED, margin: "0 0 5px" }}>
         {isClosed ? "Was deciding about" : "The question"}
       </p>
-      <p style={{ fontSize: 16, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.35 }}>
+      <p style={{ fontSize: 13.5, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.35 }}>
         {question || (decision.brand_name || decision.product_name || "This decision")}
       </p>
       {confidence != null && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9 }}>
-          <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: MUTED }}>Confidence when posted</span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "#3A3530" }}>{confidence}/10</span>
+          <span style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: MUTED }}>Confidence when posted</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: "#3A3530" }}>{confidence}/10</span>
           <div style={{ display: "flex", gap: 2 }}>
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} style={{ width: 4, height: 12, borderRadius: 2, background: i < confidence ? "#3A3530" : "rgba(0,0,0,0.12)" }} />
@@ -107,18 +107,18 @@ export default function ResponsesDrawer({
     <>
       <button
         onClick={() => { onAddThoughts(decision.id); onClose(); }}
-        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
       >
         <Plus style={{ width: 17, height: 17 }} /> Add your thoughts
       </button>
-      <p style={{ fontSize: 12.5, color: MUTED, textAlign: "center", margin: "9px 0 0" }}>
+      <p style={{ fontSize: 10.5, color: MUTED, textAlign: "center", margin: "9px 0 0" }}>
         Share your experience to help other women decide.
       </p>
     </>
   ) : (
     <button
       onClick={() => { onSignIn(); }}
-      style={{ width: "100%", background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+      style={{ width: "100%", background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
     >
       Sign in to weigh in
     </button>
@@ -135,7 +135,7 @@ export default function ResponsesDrawer({
 
       {/* Responses */}
       {shown.length === 0 ? (
-        <p style={{ fontSize: 14, color: MUTED, textAlign: "center", padding: "28px 0" }}>
+        <p style={{ fontSize: 12, color: MUTED, textAlign: "center", padding: "28px 0" }}>
           {count === 0 ? "No responses yet — be the first to weigh in." : "None in this filter."}
         </p>
       ) : (

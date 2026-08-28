@@ -22,10 +22,10 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
       boxShadow: "0 6px 24px rgba(0,0,0,0.06)", marginTop: isMobile ? 18 : 34, marginBottom: 20, border: "1px solid rgba(0,0,0,0.04)",
     }}>
       <div style={{ textAlign: "center", marginBottom: isMobile ? 18 : 22 }}>
-        <p style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 22 : 28, color: INK, margin: 0, lineHeight: 1.15, letterSpacing: "-0.01em" }}>
+        <p style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 18.5 : 24, color: INK, margin: 0, lineHeight: 1.15, letterSpacing: "-0.01em" }}>
           What are you deciding on today?
         </p>
-        <p style={{ fontSize: isMobile ? 13.5 : 15, color: MUTED, margin: "7px 0 0" }}>
+        <p style={{ fontSize: isMobile ? 11.5 : 13, color: MUTED, margin: "7px 0 0" }}>
           Share a decision or ask the community for help.
         </p>
       </div>
@@ -48,14 +48,14 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
               <ShoppingBag style={{ width: 22, height: 22, color: "#A07848" }} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 10.5, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, margin: "0 0 2px" }}>Decision</p>
-              <p style={{ fontSize: isMobile ? 17 : 19, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15 }}>Should I buy this?</p>
+              <p style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, margin: "0 0 2px" }}>Decision</p>
+              <p style={{ fontSize: isMobile ? 14.5 : 16, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15 }}>Should I buy this?</p>
             </div>
           </div>
-          <p style={{ fontSize: 13.5, color: "#5A4A42", margin: 0, lineHeight: 1.45 }}>
+          <p style={{ fontSize: 11.5, color: "#5A4A42", margin: 0, lineHeight: 1.45 }}>
             Get real opinions from women like you before you buy.
           </p>
-          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", borderRadius: 100, padding: "11px 0", fontSize: 14.5, fontWeight: 600, marginTop: 2 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", borderRadius: 100, padding: "11px 0", fontSize: 12.5, fontWeight: 600, marginTop: 2 }}>
             Post a decision <ArrowRight style={{ width: 16, height: 16 }} />
           </span>
         </button>
@@ -76,14 +76,14 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
               <Search style={{ width: 21, height: 21, color: "#6F665A" }} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 10.5, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, margin: "0 0 2px" }}>Looking For</p>
-              <p style={{ fontSize: isMobile ? 17 : 19, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15 }}>Need recommendations?</p>
+              <p style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, margin: "0 0 2px" }}>Looking For</p>
+              <p style={{ fontSize: isMobile ? 14.5 : 16, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15 }}>Need recommendations?</p>
             </div>
           </div>
-          <p style={{ fontSize: 13.5, color: "#5A4A42", margin: 0, lineHeight: 1.45 }}>
+          <p style={{ fontSize: 11.5, color: "#5A4A42", margin: 0, lineHeight: 1.45 }}>
             Tell us what you want and get matched product picks.
           </p>
-          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: INK, border: "1px solid rgba(0,0,0,0.22)", borderRadius: 100, padding: "10px 0", fontSize: 14.5, fontWeight: 600, marginTop: 2 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: INK, border: "1px solid rgba(0,0,0,0.22)", borderRadius: 100, padding: "10px 0", fontSize: 12.5, fontWeight: 600, marginTop: 2 }}>
             Ask the community <ArrowRight style={{ width: 16, height: 16 }} />
           </span>
         </button>
@@ -91,7 +91,7 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
 
       {onInvite && (
         <div style={{ textAlign: "center", marginTop: isMobile ? 14 : 18 }}>
-          <button onClick={onInvite} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: MUTED, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <button onClick={onInvite} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: MUTED, display: "inline-flex", alignItems: "center", gap: 6 }}>
             <Users style={{ width: 14, height: 14 }} /> Invite your shopping circle
           </button>
         </div>

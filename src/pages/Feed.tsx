@@ -196,7 +196,7 @@ function MatchBadge({ score }: { score: number | null }) {
   return (
     <span style={{
       marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4,
-      fontSize: 12, fontWeight: 800, letterSpacing: "0.02em",
+      fontSize: 10, fontWeight: 800, letterSpacing: "0.02em",
       padding: "2px 10px", borderRadius: 100,
       color: col, background: bg, border: `1px solid ${bd}`, boxShadow: glow,
     }}>✦ {m}% match</span>
@@ -1376,20 +1376,20 @@ const Feed = () => {
     const m = t.matchScore != null ? Math.round(t.matchScore) : null;
     return (
       <div style={{ background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 18, padding: 18, marginBottom: 18 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#8A6620", textTransform: "uppercase" }}>✦ For you</span>
-        <p className="font-sans" style={{ fontSize: 26, lineHeight: 1.1, color: "#1C1712", margin: "10px 0 8px" }}>Break the ice.</p>
-        <p style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(28,23,18,0.6)", margin: "0 0 14px" }}>Here's a decision from someone in your circle. Weigh in, and let us start learning your taste.</p>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", color: "#8A6620", textTransform: "uppercase" }}>✦ For you</span>
+        <p className="font-sans" style={{ fontSize: 22, lineHeight: 1.1, color: "#1C1712", margin: "10px 0 8px" }}>Break the ice.</p>
+        <p style={{ fontSize: 12, lineHeight: 1.5, color: "rgba(28,23,18,0.6)", margin: "0 0 14px" }}>Here's a decision from someone in your circle. Weigh in, and let us start learning your taste.</p>
         <div style={{ display: "flex", alignItems: "center", gap: 11, background: "rgba(28,23,18,0.04)", border: "1px solid rgba(28,23,18,0.08)", borderRadius: 12, padding: 9, marginBottom: 14 }}>
           <div style={{ width: 48, height: 58, borderRadius: 8, background: "#D9CFC2", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ProductImage url={t.product_image_url} fallback={<Camera className="w-5 h-5" style={{ color: "rgba(28,23,18,0.35)" }} />} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            {t.brand_name && <span style={{ display: "block", fontSize: 11, letterSpacing: "0.04em", color: "rgba(28,23,18,0.5)", textTransform: "uppercase" }}>{t.brand_name}</span>}
-            <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1C1712", margin: "1px 0 5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.product_name ?? "A decision"}</span>
-            {m != null && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 100, color: "#9B2F63", background: "rgba(190,70,130,0.12)", border: "1px solid rgba(190,70,130,0.5)" }}>✦ {m}% match</span>}
+            {t.brand_name && <span style={{ display: "block", fontSize: 9.5, letterSpacing: "0.04em", color: "rgba(28,23,18,0.5)", textTransform: "uppercase" }}>{t.brand_name}</span>}
+            <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#1C1712", margin: "1px 0 5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.product_name ?? "A decision"}</span>
+            {m != null && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 100, color: "#9B2F63", background: "rgba(190,70,130,0.12)", border: "1px solid rgba(190,70,130,0.5)" }}>✦ {m}% match</span>}
           </div>
         </div>
-        <button onClick={() => startWeighIn(t.id)} className="w-full" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "#1C1712", color: "#F4EEE6", borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 600 }}>
+        <button onClick={() => startWeighIn(t.id)} className="w-full" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "#1C1712", color: "#F4EEE6", borderRadius: 12, padding: 13, fontSize: 13, fontWeight: 600 }}>
           Weigh in <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -1429,7 +1429,7 @@ const Feed = () => {
           <button
             onClick={() => navigate("/")}
             className="font-sans uppercase select-none"
-            style={{ letterSpacing: isMobile ? "0.05em" : "0.32em", fontSize: isMobile ? 11 : 18, color: "#1C1712", whiteSpace: "nowrap" }}
+            style={{ letterSpacing: isMobile ? "0.05em" : "0.32em", fontSize: isMobile ? 9.5 : 15.5, color: "#1C1712", whiteSpace: "nowrap" }}
           >
             <span style={{ fontWeight: 700 }}>ELEVEN</span>
             <span style={{ fontWeight: 300 }}>ELEVEN</span>
@@ -1445,7 +1445,7 @@ const Feed = () => {
             onClick={() => setActiveTab("feed")}
             className="rounded-full font-medium transition-all"
             style={{
-              fontSize: isMobile ? 12 : 14,
+              fontSize: isMobile ? 10 : 12,
               padding: isMobile ? "4px 9px" : "6px 16px",
               ...(activeTab === "feed"
                 ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
@@ -1459,7 +1459,7 @@ const Feed = () => {
             onClick={() => setActiveTab("mine")}
             className="rounded-full font-medium transition-all"
             style={{
-              fontSize: isMobile ? 12 : 14,
+              fontSize: isMobile ? 10 : 12,
               padding: isMobile ? "4px 9px" : "6px 16px",
               ...(activeTab === "mine"
                 ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
@@ -1502,7 +1502,7 @@ const Feed = () => {
           {user ? (
             <button
               onClick={() => navigate("/profile")}
-              className="rounded-full flex items-center justify-center text-[10px] font-semibold text-white overflow-hidden shrink-0"
+              className="rounded-full flex items-center justify-center text-[9px] font-semibold text-white overflow-hidden shrink-0"
               style={{ width: isMobile ? 30 : 32, height: isMobile ? 30 : 32, background: "#3A3530" }}
             >
               {avatarContent(myProfile?.avatar_url ?? null, myProfile?.display_name ?? null)}
@@ -1542,19 +1542,19 @@ const Feed = () => {
                     value={filterBrand}
                     onChange={(e) => setFilterBrand(e.target.value)}
                     placeholder="Search brand or item name"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-base focus:outline-none"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-[13.5px] focus:outline-none"
                     style={{ background: "rgba(28,23,18,0.06)", color: "#1C1712", border: "1px solid rgba(28,23,18,0.10)" }}
                   />
                 </div>
 
                 {/* Category */}
-                <p className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Category</p>
+                <p className="text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Category</p>
                 <div className="flex flex-wrap gap-2 mb-4">
                   {CATEGORY_OPTIONS.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setFilterCategory(cat)}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                      className="px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
                       style={
                         filterCategory === cat
                           ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
@@ -1567,13 +1567,13 @@ const Feed = () => {
                 </div>
 
                 {/* Status */}
-                <p className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Status</p>
+                <p className="text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Status</p>
                 <div className="flex gap-2 mb-4">
                   {(["all", "open", "closed"] as const).map((s) => (
                     <button
                       key={s}
                       onClick={() => setFilterStatus(s)}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                      className="px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
                       style={
                         filterStatus === s
                           ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
@@ -1586,7 +1586,7 @@ const Feed = () => {
                 </div>
 
                 {/* Sort */}
-                <p className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Sort by</p>
+                <p className="text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Sort by</p>
                 <div className="flex gap-2 mb-3">
                   {([
                     { value: "newest", label: "Newest" },
@@ -1597,7 +1597,7 @@ const Feed = () => {
                     <button
                       key={value}
                       onClick={() => setSortBy(value)}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                      className="px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
                       style={
                         sortBy === value
                           ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
@@ -1612,7 +1612,7 @@ const Feed = () => {
                 {(filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest") && (
                   <button
                     onClick={() => { setFilterBrand(""); setFilterCategory("All"); setFilterStatus("all"); setSortBy("newest"); }}
-                    className="text-sm flex items-center gap-1 mt-1"
+                    className="text-[12px] flex items-center gap-1 mt-1"
                     style={{ color: "rgba(28,23,18,0.40)" }}
                   >
                     <X className="w-3 h-3" /> Clear all
@@ -1652,17 +1652,17 @@ const Feed = () => {
           <div className="flex items-center justify-center" style={{ minHeight: "60vh" }}>
             <div className="space-y-3 text-center">
               <div className="w-12 h-12 rounded-full mx-auto animate-pulse" style={{ background: "rgba(245,239,234,0.20)" }} />
-              <p className="text-lg tracking-[0.2em] uppercase" style={{ color: "#1C1712" }}>Loading decisions</p>
+              <p className="text-[15.5px] tracking-[0.2em] uppercase" style={{ color: "#1C1712" }}>Loading decisions</p>
             </div>
           </div>
         ) : displayList.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-8 text-center" style={{ minHeight: "60vh" }}>
-            <p className="font-sans text-3xl leading-tight mb-3" style={{ color: "#1C1712" }}>
+            <p className="font-sans text-[25.5px] leading-tight mb-3" style={{ color: "#1C1712" }}>
               {filterBrand || filterCategory !== "All" || filterStatus !== "all"
                 ? "No results"
                 : activeTab === "mine" ? "Nothing here yet" : "Nothing posted yet"}
             </p>
-            <p className="text-lg mb-8" style={{ color: "rgba(28,23,18,0.45)" }}>
+            <p className="text-[15.5px] mb-8" style={{ color: "rgba(28,23,18,0.45)" }}>
               {filterBrand || filterCategory !== "All" || filterStatus !== "all"
                 ? "Try clearing the filters."
                 : activeTab === "mine"
@@ -1672,7 +1672,7 @@ const Feed = () => {
             {!filterBrand && filterCategory === "All" && filterStatus === "all" && (
               <button
                 onClick={() => navigate(user ? "/post" : "/signin")}
-                className="px-8 py-3 text-lg tracking-[0.18em] uppercase font-medium transition-all"
+                className="px-8 py-3 text-[15.5px] tracking-[0.18em] uppercase font-medium transition-all"
                 style={{ borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)" }}
               >
                 {user ? "Post a decision" : "Sign in to post"}
@@ -1684,15 +1684,15 @@ const Feed = () => {
             {showFollowupBanner && (
               <button onClick={() => { setScrollTargetId(followupPending[0].id); setActiveTab("mine"); }} style={{ position: "relative", zIndex: 10, display: "flex", width: "100%", textAlign: "left", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer", boxShadow: "0 2px 14px rgba(120,60,20,0.10)" }}>
                 <div>
-                  <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A6620", margin: 0 }}>Follow up</p>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "#1C1712", margin: "4px 0 0" }}>
+                  <p style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A6620", margin: 0 }}>Follow up</p>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "#1C1712", margin: "4px 0 0" }}>
                     {followupPending.length === 1 ? "1 purchase is ready to close the loop" : `${followupPending.length} purchases are ready to close the loop`}
                   </p>
-                  <p style={{ fontSize: 12, color: "rgba(28,23,18,0.55)", margin: "2px 0 0" }}>
+                  <p style={{ fontSize: 10, color: "rgba(28,23,18,0.55)", margin: "2px 0 0" }}>
                     {[followupPending[0].brand_name, followupPending[0].product_name].filter(Boolean).join(" ").trim()}{followupPending.length > 1 ? " and more" : ""}
                   </p>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#8A6620", whiteSpace: "nowrap" }}>Review &rarr;</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#8A6620", whiteSpace: "nowrap" }}>Review &rarr;</span>
               </button>
             )}
             {showActivation && renderActivationCard()}
@@ -1780,7 +1780,7 @@ const Feed = () => {
               {/* Cancel */}
               <button
                 onClick={cancelWeighIn}
-                className="absolute top-6 right-6 text-lg tracking-widest uppercase"
+                className="absolute top-6 right-6 text-[15.5px] tracking-widest uppercase"
                 style={{ color: "#8C7A70" }}
               >
                 Cancel
@@ -1794,16 +1794,16 @@ const Feed = () => {
                 if (!asks.length && !wd.brand_name && !wd.product_name) return null;
                 return (
                   <div style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 14, padding: "12px 14px", marginBottom: 18 }}>
-                    <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: "0 0 7px" }}>They're deciding about</p>
+                    <p style={{ fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: "0 0 7px" }}>They're deciding about</p>
                     {(wd.brand_name || wd.product_name) && (
-                      <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px" }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px" }}>
                         {[wd.brand_name, wd.product_name].filter(Boolean).join(" · ")}
                       </p>
                     )}
                     {asks.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {asks.map((u, i) => (
-                          <span key={i} style={{ fontSize: 13, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "4px 11px" }}>{u}</span>
+                          <span key={i} style={{ fontSize: 11, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "4px 11px" }}>{u}</span>
                         ))}
                       </div>
                     )}
@@ -1814,14 +1814,14 @@ const Feed = () => {
               {/* Step: context */}
               {weighInStep === "context" && (
                 <div>
-                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>Your context</p>
-                  <p className="text-lg mb-5" style={{ color: "#8C7A70" }}>What's your relationship with this item or brand?</p>
+                  <p className="font-sans text-[20.5px] mb-1" style={{ color: "#1A1A1A" }}>Your context</p>
+                  <p className="text-[15.5px] mb-5" style={{ color: "#8C7A70" }}>What's your relationship with this item or brand?</p>
                   <div className="space-y-2">
                     {CONTEXT_OPTIONS.map((opt) => (
                       <button
                         key={opt}
                         onClick={() => { setContext(opt); setWeighInStep("vote"); }}
-                        className="w-full text-left px-4 py-3.5 rounded-xl text-lg transition-all"
+                        className="w-full text-left px-4 py-3.5 rounded-xl text-[15.5px] transition-all"
                         style={{
                           background: "rgba(0,0,0,0.04)",
                           border: "1px solid rgba(0,0,0,0.08)",
@@ -1838,14 +1838,14 @@ const Feed = () => {
               {/* Step: vote */}
               {weighInStep === "vote" && (
                 <div>
-                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>Your verdict</p>
-                  <p className="text-lg mb-5" style={{ color: "#8C7A70" }}>Would you buy this?</p>
+                  <p className="font-sans text-[20.5px] mb-1" style={{ color: "#1A1A1A" }}>Your verdict</p>
+                  <p className="text-[15.5px] mb-5" style={{ color: "#8C7A70" }}>Would you buy this?</p>
                   <div className="flex gap-2">
                     {(["buy", "do_not_buy", "need_more_info"] as const).map((v) => (
                       <button
                         key={v}
                         onClick={() => { setVote(v); setWeighInStep("take"); }}
-                        className="flex-1 py-3.5 rounded-full text-lg font-medium transition-all"
+                        className="flex-1 py-3.5 rounded-full text-[15.5px] font-medium transition-all"
                         style={{
                           background: vote === v ? "#3A3530" : "rgba(0,0,0,0.04)",
                           border: `1px solid ${vote === v ? "#3A3530" : "rgba(0,0,0,0.08)"}`,
@@ -1862,8 +1862,8 @@ const Feed = () => {
               {/* Step: take */}
               {weighInStep === "take" && (
                 <div>
-                  <p className="font-sans text-2xl mb-1" style={{ color: "#1A1A1A" }}>your take</p>
-                  <p className="text-lg mb-4" style={{ color: "#8C7A70" }}>
+                  <p className="font-sans text-[20.5px] mb-1" style={{ color: "#1A1A1A" }}>your take</p>
+                  <p className="text-[15.5px] mb-4" style={{ color: "#8C7A70" }}>
                     be the friend who tells her the truth.
                   </p>
                   <textarea
@@ -1871,7 +1871,7 @@ const Feed = () => {
                     onChange={(e) => setTake(e.target.value)}
                     placeholder="no bs…"
                     rows={4}
-                    className="w-full rounded-xl px-4 py-3 text-lg resize-none focus:outline-none mb-3"
+                    className="w-full rounded-xl px-4 py-3 text-[15.5px] resize-none focus:outline-none mb-3"
                     style={{
                       background: "rgba(0,0,0,0.04)",
                       border: "1px solid rgba(0,0,0,0.08)",
@@ -1891,7 +1891,7 @@ const Feed = () => {
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
-                      className="w-full rounded-full text-base focus:outline-none"
+                      className="w-full rounded-full text-[13.5px] focus:outline-none"
                       style={{
                         background: "rgba(0,0,0,0.04)",
                         border: "1px solid rgba(0,0,0,0.08)",
@@ -1900,7 +1900,7 @@ const Feed = () => {
                       }}
                     />
                     {takeLink.trim().length > 0 && !normalizeProductUrl(takeLink) && (
-                      <p style={{ fontSize: 13, color: "#c0392b", margin: "6px 4px 0" }}>
+                      <p style={{ fontSize: 11, color: "#c0392b", margin: "6px 4px 0" }}>
                         That doesn't look like a valid link.
                       </p>
                     )}
@@ -1929,7 +1929,7 @@ const Feed = () => {
                       </div>
                     ) : (
                       <button onClick={() => takePhotoInputRef.current?.click()}
-                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", color: "#5A4A42", fontSize: 18 }}>
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", color: "#5A4A42", fontSize: 15.5 }}>
                         <Camera style={{ width: 14, height: 14 }} />
                         Add a photo
                       </button>
@@ -1939,7 +1939,7 @@ const Feed = () => {
                   <button
                     onClick={submitWeighIn}
                     disabled={take.trim().length === 0 || submitting}
-                    className="w-full py-3.5 text-lg tracking-[0.2em] uppercase font-medium transition-all disabled:opacity-30"
+                    className="w-full py-3.5 text-[15.5px] tracking-[0.2em] uppercase font-medium transition-all disabled:opacity-30"
                     style={{ borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", cursor: "pointer" }}
                   >
                     {submitting ? "Submitting..." : "Submit"}
@@ -1950,11 +1950,11 @@ const Feed = () => {
               {/* Step: done */}
               {weighInStep === "done" && (
                 <div className="text-center py-6 space-y-3">
-                  <p className="font-sans text-2xl" style={{ color: "#1A1A1A" }}>You've weighed in</p>
-                  <p className="text-lg" style={{ color: "#5A4A42" }}>Your take has been added to the conversation.</p>
+                  <p className="font-sans text-[20.5px]" style={{ color: "#1A1A1A" }}>You've weighed in</p>
+                  <p className="text-[15.5px]" style={{ color: "#5A4A42" }}>Your take has been added to the conversation.</p>
                   <button
                     onClick={closeWeighIn}
-                    className="mt-4 px-8 py-3 rounded-full text-lg tracking-widest uppercase"
+                    className="mt-4 px-8 py-3 rounded-full text-[15.5px] tracking-widest uppercase"
                     style={{ background: "rgba(0,0,0,0.06)", color: "#5A4A42" }}
                   >
                     Done
@@ -2041,7 +2041,7 @@ const Feed = () => {
             />
             <button
               onClick={() => setLightboxUrl(null)}
-              className="absolute top-5 right-5 text-lg tracking-[0.2em] uppercase"
+              className="absolute top-5 right-5 text-[15.5px] tracking-[0.2em] uppercase"
               style={{ color: "rgba(255,255,255,0.55)" }}
             >
               Close ✕
@@ -2066,10 +2066,10 @@ const Feed = () => {
               boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
             }}
           >
-            <span style={{ fontSize: 19, color: "rgba(253,250,246,0.80)" }}>Post hidden</span>
+            <span style={{ fontSize: 16, color: "rgba(253,250,246,0.80)" }}>Post hidden</span>
             <button
               onClick={() => undoHide(undoHiddenId)}
-              style={{ fontSize: 19, fontWeight: 700, color: "#C49E64", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              style={{ fontSize: 16, fontWeight: 700, color: "#C49E64", background: "none", border: "none", cursor: "pointer", padding: 0 }}
             >
               Undo
             </button>
@@ -2317,17 +2317,17 @@ const DecisionCard = ({
       >
         <div style={{ display: "flex", flexShrink: 0 }}>
           {sortedResponses.slice(0, 3).map((r, i) => (
-            <div key={r.id} style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", border: "2px solid #F5EFEA", marginLeft: i > 0 ? -10 : 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff", fontWeight: 700 }}>
+            <div key={r.id} style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", border: "2px solid #F5EFEA", marginLeft: i > 0 ? -10 : 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 700 }}>
               {r.profiles?.avatar_url
                 ? <img src={r.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : getInitials(r.profiles?.display_name ?? null)}
             </div>
           ))}
         </div>
-        <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? 14 : 15, fontWeight: 600, color: "#5A4A42" }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? 12 : 13, fontWeight: 600, color: "#5A4A42" }}>
           {sortedResponses.length} {sortedResponses.length === 1 ? "woman" : "women"} {isClosedStatus ? "shared their thoughts" : (sortedResponses.length === 1 ? "is weighing in" : "are weighing in")}
         </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: isMobile ? 14 : 15, fontWeight: 700, color: "#A07848", whiteSpace: "nowrap" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: "#A07848", whiteSpace: "nowrap" }}>
           View responses <ArrowRight style={{ width: 15, height: 15 }} />
         </span>
       </button>
@@ -2352,7 +2352,7 @@ const DecisionCard = ({
         borderRadius: "20px 20px 0 0",
       }}>
         {/* Avatar */}
-        <div style={{ width: isMobile ? 44 : 72, height: isMobile ? 44 : 72, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 15 : 22, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+        <div style={{ width: isMobile ? 44 : 72, height: isMobile ? 44 : 72, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 13 : 18.5, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
           {decision.profiles?.avatar_url
             ? <img src={decision.profiles.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <span>{getInitials(decision.profiles?.display_name ?? null)}</span>
@@ -2362,18 +2362,18 @@ const DecisionCard = ({
         {/* Name + meta + profile toggle */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Name */}
-          <p style={{ fontSize: isMobile ? 14 : 17, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 2 }}>
+          <p style={{ fontSize: isMobile ? 12 : 14.5, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 2 }}>
             {posterName}
           </p>
           {/* Age, city · match badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
-            <span style={{ fontSize: isMobile ? 13 : 16, color: "#8C7A70" }}>
+            <span style={{ fontSize: isMobile ? 11 : 13.5, color: "#8C7A70" }}>
               {posterMeta}
             </span>
             {decision.matchScore != null && (
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0,
-                fontSize: isMobile ? 12 : 15, fontWeight: 700, color: "#FDFAF6",
+                fontSize: isMobile ? 10 : 13, fontWeight: 700, color: "#FDFAF6",
                 background: "linear-gradient(135deg, #C4A47A 0%, #B8956A 50%, #A07848 100%)",
                 border: "1px solid rgba(220,185,130,0.55)",
                 borderRadius: 100, padding: isMobile ? "1px 6px" : "2px 7px",
@@ -2389,14 +2389,14 @@ const DecisionCard = ({
             onClick={() => setProfileOpen(v => !v)}
             style={{ display: "flex", alignItems: "center", gap: 3, color: "#8C7A70", background: "none", border: "none", cursor: "pointer", padding: 0 }}
           >
-            <span style={{ fontSize: isMobile ? 12 : 16 }}>{isOwn ? "Your profile" : "See her profile"}</span>
+            <span style={{ fontSize: isMobile ? 10 : 13.5 }}>{isOwn ? "Your profile" : "See her profile"}</span>
             {profileOpen ? <ChevronUp style={{ width: 12, height: 12 }} /> : <ChevronDown style={{ width: 12, height: 12 }} />}
           </button>
         </div>
 
         {/* Date + Save (bookmark) */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: isMobile ? 12 : 15, color: "#8C7A70" }}>{timeAgo(decision.created_at)}</span>
+          <span style={{ fontSize: isMobile ? 10 : 13, color: "#8C7A70" }}>{timeAgo(decision.created_at)}</span>
           <button
             onClick={onSave}
             title={isSaved ? "Unsave" : "Save"}
@@ -2446,7 +2446,7 @@ const DecisionCard = ({
                   style={{
                     width: "100%", textAlign: "left",
                     padding: "12px 16px", background: "none", border: "none",
-                    fontSize: 19, color: "#1A1A1A", cursor: "pointer",
+                    fontSize: 16, color: "#1A1A1A", cursor: "pointer",
                   }}
                 >
                   Hide this post
@@ -2458,7 +2458,7 @@ const DecisionCard = ({
                   style={{
                     width: "100%", textAlign: "left",
                     padding: "12px 16px", background: "none", border: "none",
-                    fontSize: 19, color: "#1A1A1A", cursor: "pointer",
+                    fontSize: 16, color: "#1A1A1A", cursor: "pointer",
                   }}
                 >
                   Edit post
@@ -2470,7 +2470,7 @@ const DecisionCard = ({
                   style={{
                     width: "100%", textAlign: "left",
                     padding: "12px 16px", background: "none", border: "none",
-                    fontSize: 19, color: "#c0392b", cursor: "pointer",
+                    fontSize: 16, color: "#c0392b", cursor: "pointer",
                   }}
                 >
                   Delete post
@@ -2482,7 +2482,7 @@ const DecisionCard = ({
                   style={{
                     width: "100%", textAlign: "left",
                     padding: "12px 16px", background: "none", border: "none",
-                    fontSize: 19, color: "#1A1A1A", cursor: "pointer",
+                    fontSize: 16, color: "#1A1A1A", cursor: "pointer",
                     borderTop: "1px solid rgba(0,0,0,0.06)",
                   }}
                 >
@@ -2499,35 +2499,35 @@ const DecisionCard = ({
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={() => setEditing(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} />
           <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 460, maxHeight: "88vh", overflowY: "auto", background: "#FDFAF6", borderRadius: 16, padding: 22, boxShadow: "0 12px 40px rgba(0,0,0,0.28)" }}>
-            <p style={{ fontFamily: "Georgia, serif", fontSize: 22, color: "#1A1A1A", margin: "0 0 4px" }}>Edit your post</p>
-            <p style={{ fontSize: 14, color: "#8C7A70", margin: "0 0 18px" }}>Add more context, adjust your confidence, or fix a detail.</p>
+            <p style={{ fontFamily: "Georgia, serif", fontSize: 18.5, color: "#1A1A1A", margin: "0 0 4px" }}>Edit your post</p>
+            <p style={{ fontSize: 12, color: "#8C7A70", margin: "0 0 18px" }}>Add more context, adjust your confidence, or fix a detail.</p>
             {editConsiderations.map((u) => (
               <div key={u} style={{ marginBottom: 14 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>{u}</p>
-                <textarea value={editDetails[u] ?? ""} onChange={(e) => setEditDetails((p) => ({ ...p, [u]: e.target.value }))} rows={2} placeholder="Add context — how you'll wear it, your specific worry..." style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+                <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>{u}</p>
+                <textarea value={editDetails[u] ?? ""} onChange={(e) => setEditDetails((p) => ({ ...p, [u]: e.target.value }))} rows={2} placeholder="Add context — how you'll wear it, your specific worry..." style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 12, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
               </div>
             ))}
             {(decision.uncertainty_text ?? "").toLowerCase().includes("between sizes") && (
               <div style={{ marginBottom: 14 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>Sizes you're deciding between</p>
-                <input value={editSizes} onChange={(e) => setEditSizes(e.target.value)} placeholder="e.g. M, L" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A" }} />
+                <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>Sizes you're deciding between</p>
+                <input value={editSizes} onChange={(e) => setEditSizes(e.target.value)} placeholder="e.g. M, L" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 12, color: "#1A1A1A" }} />
               </div>
             )}
             <div style={{ marginBottom: 14 }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>Price</p>
-              <input value={editPrice} onChange={(e) => setEditPrice(e.target.value)} inputMode="decimal" placeholder="e.g. 128" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A" }} />
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>Price</p>
+              <input value={editPrice} onChange={(e) => setEditPrice(e.target.value)} inputMode="decimal" placeholder="e.g. 128" style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 12, color: "#1A1A1A" }} />
             </div>
             <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px" }}>Confidence: {editConf}/10</p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px" }}>Confidence: {editConf}/10</p>
               <div style={{ display: "flex", gap: 4 }}>
                 {Array.from({ length: 10 }).map((_, i) => { const n = i + 1; return (
-                  <button key={n} onClick={() => setEditConf(n)} style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: n <= editConf ? "#1C1712" : "#fff", color: n <= editConf ? "#FDFAF6" : "#1A1A1A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{n}</button>
+                  <button key={n} onClick={() => setEditConf(n)} style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: n <= editConf ? "#1C1712" : "#fff", color: n <= editConf ? "#FDFAF6" : "#1A1A1A", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{n}</button>
                 ); })}
               </div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setEditing(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.15)", background: "transparent", color: "#5A4A42", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
-              <button onClick={submitEdit} style={{ flex: 2, padding: "12px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Save changes</button>
+              <button onClick={() => setEditing(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.15)", background: "transparent", color: "#5A4A42", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={submitEdit} style={{ flex: 2, padding: "12px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save changes</button>
             </div>
           </div>
         </div>
@@ -2552,17 +2552,17 @@ const DecisionCard = ({
                   <img src={silMatch.image} alt={silMatch.label} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
                 </div>
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 14px" }}>
-                  <span style={{ fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 4 }}>Silhouette</span>
-                  <span style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", lineHeight: 1.3, marginBottom: 3 }}>{silMatch.label}</span>
-                  <span style={{ fontSize: 19, color: "#5A4A42", lineHeight: 1.4 }}>{silMatch.desc}</span>
+                  <span style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 4 }}>Silhouette</span>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", lineHeight: 1.3, marginBottom: 3 }}>{silMatch.label}</span>
+                  <span style={{ fontSize: 16, color: "#5A4A42", lineHeight: 1.4 }}>{silMatch.desc}</span>
                 </div>
               </div>
             )}
             <div style={{ padding: "0 14px" }}>
               {statRows.map(([label, value], i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: i < statRows.length - 1 ? "1px solid rgba(0,0,0,0.05)" : "none" }}>
-                  <span style={{ fontSize: 13, color: "#8C7A70", textTransform: "uppercase", letterSpacing: "0.15em" }}>{label}</span>
-                  <span style={{ fontSize: 19, color: "#5A4A42", fontWeight: 500 }}>{value}</span>
+                  <span style={{ fontSize: 11, color: "#8C7A70", textTransform: "uppercase", letterSpacing: "0.15em" }}>{label}</span>
+                  <span style={{ fontSize: 16, color: "#5A4A42", fontWeight: 500 }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -2571,7 +2571,7 @@ const DecisionCard = ({
                 onClick={() => navigate(isOwn ? "/profile" : `/profile/${decision.user_id}`)}
                 style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, color: "#5A4A42" }}
               >
-                <span style={{ fontSize: 19, fontWeight: 600 }}>View full profile</span>
+                <span style={{ fontSize: 16, fontWeight: 600 }}>View full profile</span>
                 <ArrowRight style={{ width: 11, height: 11 }} />
               </button>
             </div>
@@ -2594,7 +2594,7 @@ const DecisionCard = ({
             : imgs[idx] === decision.product_image_url_2 ? (decision.product_url_2 ?? null)
             : null;
           const go = (dir: number) => setImgIdx((imgs.length + idx + dir) % imgs.length);
-          const arrow: React.CSSProperties = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(28,23,18,0.55)", color: "#fff", fontSize: 20, lineHeight: "30px", textAlign: "center", cursor: "pointer", zIndex: 3, padding: 0 };
+          const arrow: React.CSSProperties = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(28,23,18,0.55)", color: "#fff", fontSize: 17, lineHeight: "30px", textAlign: "center", cursor: "pointer", zIndex: 3, padding: 0 };
           return (
             <div
               style={{ position: "relative", width: isMobile ? "100%" : "42%", flexShrink: 0, background: "#EDE8E2", overflow: "hidden", ...(isMobile ? { aspectRatio: "4 / 5" } : { alignSelf: "stretch", minHeight: 420 }) }}
@@ -2608,7 +2608,7 @@ const DecisionCard = ({
                 onClick={() => setLightboxUrl(imgs[idx])}
               />
               {showingOutcome && (
-                <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(28,23,18,0.82)", color: "#F4EEE6", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em", zIndex: 3 }}>✦ On her</span>
+                <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(28,23,18,0.82)", color: "#F4EEE6", fontSize: 9.5, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em", zIndex: 3 }}>✦ On her</span>
               )}
               {oPhoto && !showingOutcome && (
                 <motion.button
@@ -2616,21 +2616,21 @@ const DecisionCard = ({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: [0, -3, 0] }}
                   transition={{ y: { repeat: Infinity, duration: 1.8, ease: "easeInOut" }, opacity: { duration: 0.3 } }}
-                  style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.86)", color: "#F4EEE6", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", borderRadius: 100, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6, zIndex: 4, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", whiteSpace: "nowrap" }}
+                  style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.86)", color: "#F4EEE6", border: "none", cursor: "pointer", fontSize: 10, fontWeight: 700, letterSpacing: "0.03em", borderRadius: 100, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6, zIndex: 4, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", whiteSpace: "nowrap" }}
                 >
-                  ✦ See it IRL <span style={{ fontSize: 14 }}>→</span>
+                  ✦ See it IRL <span style={{ fontSize: 12 }}>→</span>
                 </motion.button>
               )}
               {multi && (
                 <>
-                  <span style={{ position: "absolute", top: 10, right: 10, background: "rgba(28,23,18,0.6)", color: "#fff", fontSize: 11, fontWeight: 600, borderRadius: 100, padding: "2px 9px", zIndex: 3 }}>{idx + 1} / {imgs.length}</span>
+                  <span style={{ position: "absolute", top: 10, right: 10, background: "rgba(28,23,18,0.6)", color: "#fff", fontSize: 9.5, fontWeight: 600, borderRadius: 100, padding: "2px 9px", zIndex: 3 }}>{idx + 1} / {imgs.length}</span>
                   {!isMobile ? (
                     <>
                       <button aria-label="Previous image" onClick={(e) => { e.stopPropagation(); go(-1); }} style={{ ...arrow, left: 8 }}>‹</button>
                       <button aria-label="Next image" onClick={(e) => { e.stopPropagation(); go(1); }} style={{ ...arrow, right: 8 }}>›</button>
                     </>
                   ) : (!oPhoto || showingOutcome) ? (
-                    <span style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.62)", color: "#fff", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 100, padding: "3px 12px", zIndex: 3, display: "flex", alignItems: "center", gap: 5 }}>swipe <span style={{ fontSize: 13 }}>→</span></span>
+                    <span style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.62)", color: "#fff", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 100, padding: "3px 12px", zIndex: 3, display: "flex", alignItems: "center", gap: 5 }}>swipe <span style={{ fontSize: 11 }}>→</span></span>
                   ) : null}
                 </>
               )}
@@ -2639,7 +2639,7 @@ const DecisionCard = ({
                   href={currentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#5A4A42", textDecoration: "none", zIndex: 2 }}
+                  style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#5A4A42", textDecoration: "none", zIndex: 2 }}
                 >
                   <ExternalLink style={{ width: 11, height: 11 }} /> View
                 </a>
@@ -2655,23 +2655,23 @@ const DecisionCard = ({
           {(dispBrand || dispName) && (
             <div style={{ marginBottom: 4 }}>
               {dispBrand && (
-                <p style={{ fontSize: isMobile ? 16 : 19, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
+                <p style={{ fontSize: isMobile ? 13.5 : 16, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.25, marginBottom: 4 }}>
                   {dispBrand}
                 </p>
               )}
               {dispName && (
-                <p style={{ fontSize: isMobile ? 11 : 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8C7A70" }}>
+                <p style={{ fontSize: isMobile ? 9.5 : 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8C7A70" }}>
                   {dispName}
                 </p>
               )}
               {dispPrice && (
-                <p style={{ fontSize: isMobile ? 14 : 16, fontWeight: 600, color: "#1A1A1A", marginTop: 5 }}>
+                <p style={{ fontSize: isMobile ? 12 : 13.5, fontWeight: 600, color: "#1A1A1A", marginTop: 5 }}>
                   {dispPrice.startsWith("$") ? dispPrice : `$${dispPrice}`}
                 </p>
               )}
               {!decision.product_image_url && decision.product_url && (
                 <a href={decision.product_url} target="_blank" rel="noopener noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 15, color: "#5A4A42", textDecoration: "none", marginTop: 4 }}>
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "#5A4A42", textDecoration: "none", marginTop: 4 }}>
                   <ExternalLink style={{ width: 11, height: 11 }} /> View
                 </a>
               )}
@@ -2697,9 +2697,9 @@ const DecisionCard = ({
             const recommend = outcome?.recommend;
             const uncertainties = (decision.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
             const sizeChips = (decision.sizes_note ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-            const LBL: React.CSSProperties = { fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: 0 };
+            const LBL: React.CSSProperties = { fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: 0 };
             // Prominent section title — the deciding-about question is the point of the card.
-            const LBL_STRONG: React.CSSProperties = { fontSize: 13.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "#1A1A1A", fontWeight: 700, margin: 0 };
+            const LBL_STRONG: React.CSSProperties = { fontSize: 11.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "#1A1A1A", fontWeight: 700, margin: 0 };
 
             return (
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -2710,10 +2710,10 @@ const DecisionCard = ({
                     <p style={{ ...LBL_STRONG, marginBottom: 10 }}>Was deciding about</p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                       {uncertainties.map((u, i) => (
-                        <span key={`u${i}`} style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "6px 13px", whiteSpace: "nowrap" }}>{u}</span>
+                        <span key={`u${i}`} style={{ fontSize: 11.5, fontWeight: 600, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "6px 13px", whiteSpace: "nowrap" }}>{u}</span>
                       ))}
                       {sizeChips.map((s) => (
-                        <span key={`s${s}`} style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.14)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "6px 13px", whiteSpace: "nowrap" }}>{s}</span>
+                        <span key={`s${s}`} style={{ fontSize: 11.5, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.14)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "6px 13px", whiteSpace: "nowrap" }}>{s}</span>
                       ))}
                     </div>
                   </div>
@@ -2727,7 +2727,7 @@ const DecisionCard = ({
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={LBL}>Final decision</p>
-                      <p style={{ fontWeight: 800, fontSize: 24, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, whiteSpace: "nowrap" }}>{bought ? (chosenOpt === "both" ? "Bought both" : "Bought it") : (hasTwoOptions ? "Didn't buy either" : "Didn't buy it")}</p>
+                      <p style={{ fontWeight: 800, fontSize: 20.5, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, whiteSpace: "nowrap" }}>{bought ? (chosenOpt === "both" ? "Bought both" : "Bought it") : (hasTwoOptions ? "Didn't buy either" : "Didn't buy it")}</p>
                     </div>
                   </div>
                   {bought && sizeBought && (
@@ -2735,7 +2735,7 @@ const DecisionCard = ({
                       <div style={{ width: 1, alignSelf: "stretch", background: "rgba(0,0,0,0.1)", margin: "0 14px" }} />
                       <div style={{ flexShrink: 0 }}>
                         <p style={LBL}>Purchased size</p>
-                        <p style={{ fontWeight: 800, fontSize: 24, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, textTransform: "uppercase" }}>{sizeBought}</p>
+                        <p style={{ fontWeight: 800, fontSize: 20.5, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, textTransform: "uppercase" }}>{sizeBought}</p>
                       </div>
                     </>
                   )}
@@ -2759,7 +2759,7 @@ const DecisionCard = ({
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <p style={LBL}>Confidence journey</p>
                         {hasAfter && (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 700, color: delta === 0 ? "#8C7A70" : up ? "#6E7A44" : "#B5544A", background: delta === 0 ? "rgba(0,0,0,0.05)" : up ? "rgba(110,122,68,0.12)" : "rgba(181,84,74,0.12)", borderRadius: 100, padding: "2px 9px" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: delta === 0 ? "#8C7A70" : up ? "#6E7A44" : "#B5544A", background: delta === 0 ? "rgba(0,0,0,0.05)" : up ? "rgba(110,122,68,0.12)" : "rgba(181,84,74,0.12)", borderRadius: 100, padding: "2px 9px" }}>
                             {delta === 0 ? "No change" : `${up ? "▲ +" : "▼ −"}${Math.abs(delta)}`}
                           </span>
                         )}
@@ -2769,11 +2769,11 @@ const DecisionCard = ({
                         <div style={{ position: "absolute", left: `${lo}%`, top: 0, bottom: 0, width: `${hi - lo}%`, background: strong }} />
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#3A3530" }}>Started <strong style={{ fontSize: 15 }}>{before}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
+                        <span style={{ fontSize: 11.5, color: "#3A3530" }}>Started <strong style={{ fontSize: 13 }}>{before}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
                         {hasAfter ? (
-                          <span style={{ fontSize: 13.5, color: "#3A3530" }}>Ended <strong style={{ fontSize: 15, color: up ? "#6E7A44" : "#B5544A" }}>{after}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
+                          <span style={{ fontSize: 11.5, color: "#3A3530" }}>Ended <strong style={{ fontSize: 13, color: up ? "#6E7A44" : "#B5544A" }}>{after}</strong><span style={{ color: "#8C7A70" }}>/10</span></span>
                         ) : (
-                          <span style={{ fontSize: 12.5, color: "#B0A498", fontStyle: "italic" }}>pending</span>
+                          <span style={{ fontSize: 10.5, color: "#B0A498", fontStyle: "italic" }}>pending</span>
                         )}
                       </div>
                     </div>
@@ -2785,8 +2785,8 @@ const DecisionCard = ({
                   <div style={{ marginBottom: 16 }}>
                     <p style={{ ...LBL, marginBottom: 8 }}>Her take</p>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <span style={{ fontSize: 26, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
-                      <p style={{ fontSize: 15, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}<span style={{ fontSize: 26, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span></p>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
+                      <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}<span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span></p>
                     </div>
                   </div>
                 )}
@@ -2794,10 +2794,10 @@ const DecisionCard = ({
                 {/* Recommends / kept — only after the 2-week follow-up */}
                 {followedUp && (kept != null || recommend != null) && (
                   <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 16 }}>
-                    {recommend === true && <span style={{ fontSize: 12, background: "#6E7A44", color: "#fff", borderRadius: 100, padding: "4px 11px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}><Check style={{ width: 12, height: 12 }} /> Recommends to her matches</span>}
-                    {recommend === false && <span style={{ fontSize: 12, background: "rgba(122,64,64,0.10)", color: "#7A4040", borderRadius: 100, padding: "4px 11px", fontWeight: 600 }}>Wouldn't recommend</span>}
-                    {kept === true && <span style={{ fontSize: 12, color: "#6E7A44", fontWeight: 600 }}>Kept it</span>}
-                    {kept === false && <span style={{ fontSize: 12, color: "#7A4040", fontWeight: 600 }}>Returned it</span>}
+                    {recommend === true && <span style={{ fontSize: 10, background: "#6E7A44", color: "#fff", borderRadius: 100, padding: "4px 11px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}><Check style={{ width: 12, height: 12 }} /> Recommends to her matches</span>}
+                    {recommend === false && <span style={{ fontSize: 10, background: "rgba(122,64,64,0.10)", color: "#7A4040", borderRadius: 100, padding: "4px 11px", fontWeight: 600 }}>Wouldn't recommend</span>}
+                    {kept === true && <span style={{ fontSize: 10, color: "#6E7A44", fontWeight: 600 }}>Kept it</span>}
+                    {kept === false && <span style={{ fontSize: 10, color: "#7A4040", fontWeight: 600 }}>Returned it</span>}
                   </div>
                 )}
 
@@ -2815,10 +2815,10 @@ const DecisionCard = ({
                   const detailQ = fitLike ? "How did it fit?" : outcomeDetailQuestion(primary, "bought_it");
                   const detailOpts = fitLike ? FIT_RESULT_OPTIONS : outcomeDetailOptions(primary);
 
-                  const heading = (t: string) => <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>{t}</p>;
-                  const dark: React.CSSProperties = { flex: 1, padding: "11px 6px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 13.5, fontWeight: 600, cursor: "pointer", textAlign: "center" };
-                  const outline: React.CSSProperties = { flex: 1, padding: "11px 8px", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 13.5, fontWeight: 600, cursor: "pointer", textAlign: "center" };
-                  const ta: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 14, color: "#1A1A1A", resize: "none", fontFamily: "inherit" };
+                  const heading = (t: string) => <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>{t}</p>;
+                  const dark: React.CSSProperties = { flex: 1, padding: "11px 6px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 11.5, fontWeight: 600, cursor: "pointer", textAlign: "center" };
+                  const outline: React.CSSProperties = { flex: 1, padding: "11px 8px", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 11.5, fontWeight: 600, cursor: "pointer", textAlign: "center" };
+                  const ta: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 12, color: "#1A1A1A", resize: "none", fontFamily: "inherit" };
                   const wrap = (inner: React.ReactNode) => <div style={{ background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 12, padding: 14, marginBottom: 16 }}>{inner}</div>;
 
                   if (fuStage === "gate") return wrap(
@@ -2837,7 +2837,7 @@ const DecisionCard = ({
                       <textarea value={fuReturnNote} onChange={(e) => setFuReturnNote(e.target.value)} rows={2} placeholder="e.g. ran huge, fabric felt cheap, changed my mind" style={ta} />
                       <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
                       <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo (optional)"}</button>
-                      <p style={{ fontSize: 12, color: "#8C7A70", margin: "8px 0 0" }}>Even if it didn't work out, a photo shows the next woman why.</p>
+                      <p style={{ fontSize: 10, color: "#8C7A70", margin: "8px 0 0" }}>Even if it didn't work out, a photo shows the next woman why.</p>
                       <button style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }} onClick={() => { submitReturned(decision.id, { note: fuReturnNote, photoFile: fuPhoto }); setFuThanks(true); }}>Done</button>
                     </div>
                   );
@@ -2871,15 +2871,15 @@ const DecisionCard = ({
                     <div>
                       {heading("Post-purchase confidence?")}
                       <div style={{ display: "flex", gap: 4 }}>
-                        {Array.from({ length: 10 }).map((_, i) => { const n = i + 1; return <button key={n} onClick={() => { setFuConf(n); setFuStage("photo"); }} style={{ flex: 1, padding: "9px 0", borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", color: "#1A1A1A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{n}</button>; })}
+                        {Array.from({ length: 10 }).map((_, i) => { const n = i + 1; return <button key={n} onClick={() => { setFuConf(n); setFuStage("photo"); }} style={{ flex: 1, padding: "9px 0", borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", color: "#1A1A1A", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{n}</button>; })}
                       </div>
-                      <p style={{ fontSize: 12, color: "#8C7A70", margin: "8px 0 0" }}>1 = wish I hadn't, 10 = so glad I did</p>
+                      <p style={{ fontSize: 10, color: "#8C7A70", margin: "8px 0 0" }}>1 = wish I hadn't, 10 = so glad I did</p>
                     </div>
                   );
                   return wrap(
                     <div>
                       {heading("Anything you'd tell a woman like you?")}
-                      <p style={{ fontSize: 12.5, color: "#8C7A70", margin: "0 0 10px" }}>Optional — how it really fits, wears, or holds up (e.g. runs big, super wrinkly by end of day, the denim gives after a few wears).</p>
+                      <p style={{ fontSize: 10.5, color: "#8C7A70", margin: "0 0 10px" }}>Optional — how it really fits, wears, or holds up (e.g. runs big, super wrinkly by end of day, the denim gives after a few wears).</p>
                       <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={3} placeholder="Share what the photos can't show..." style={ta} />
                       <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
                       <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo (optional)"}</button>
@@ -2890,7 +2890,7 @@ const DecisionCard = ({
 
                 {/* Reinforcement message, right after they log what happened */}
                 {isOwn && fuThanks && (
-                  <div style={{ background: "#1C1712", color: "#F4EEE6", borderRadius: 12, padding: 16, textAlign: "center", fontSize: 13.5, lineHeight: 1.5, marginBottom: 16 }}>
+                  <div style={{ background: "#1C1712", color: "#F4EEE6", borderRadius: 12, padding: 16, textAlign: "center", fontSize: 11.5, lineHeight: 1.5, marginBottom: 16 }}>
                     Your experience is now part of ELEVENELEVEN.<br />It will help women like you shop with more confidence.
                   </div>
                 )}
@@ -2906,7 +2906,7 @@ const DecisionCard = ({
                   {isOwn && activeTab === "mine" && (
                     <button
                       onClick={() => { if (confirm("Remove this decision?")) handleDelete(decision.id); }}
-                      style={{ padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 15, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                      style={{ padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
                     >
                       Delete
                     </button>
@@ -2920,7 +2920,7 @@ const DecisionCard = ({
               <div style={{ display: "flex", gap: 12, padding: "10px 0" }}>
                 {/* Decision block — one card per uncertainty */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: isMobile ? "0.02em" : "0.08em", whiteSpace: "nowrap", textTransform: "uppercase", color: "#1A1A1A", marginBottom: 10 }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: isMobile ? "0.02em" : "0.08em", whiteSpace: "nowrap", textTransform: "uppercase", color: "#1A1A1A", marginBottom: 10 }}>
                     Deciding about
                   </p>
                   {(() => {
@@ -2948,19 +2948,19 @@ const DecisionCard = ({
 
                       return (
                         <div key={i} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "12px 14px", marginBottom: i < uncertainties.length - 1 ? 8 : 0 }}>
-                          <p style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A", marginBottom: hasDetail ? 6 : 0 }}>{u}</p>
+                          <p style={{ fontSize: 13.5, fontWeight: 700, color: "#1A1A1A", marginBottom: hasDetail ? 6 : 0 }}>{u}</p>
                           {isBetweenSizes && decision.sizes_note && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                              <span style={{ fontSize: 15, color: "#8C7A70" }}>Deciding between</span>
+                              <span style={{ fontSize: 13, color: "#8C7A70" }}>Deciding between</span>
                               {decision.sizes_note.split(",").map((s: string) => (
-                                <span key={s} style={{ fontSize: 15, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.12)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "2px 10px" }}>
+                                <span key={s} style={{ fontSize: 13, fontWeight: 600, color: "#3A3530", background: "rgba(184,149,106,0.12)", border: "1px solid rgba(184,149,106,0.22)", borderRadius: 100, padding: "2px 10px" }}>
                                   {s.trim()}
                                 </span>
                               ))}
                             </div>
                           )}
                           {detail && (
-                            <p style={{ fontSize: 15, lineHeight: 1.5, color: "#5A4A42" }}>"{detail}"</p>
+                            <p style={{ fontSize: 13, lineHeight: 1.5, color: "#5A4A42" }}>"{detail}"</p>
                           )}
                         </div>
                       );
@@ -2970,19 +2970,19 @@ const DecisionCard = ({
 
                 {/* Confidence block */}
                 <div style={{ width: 110, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                  <p style={{ fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 4, textAlign: "center" }}>
+                  <p style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "#8C7A70", marginBottom: 4, textAlign: "center" }}>
                     Confidence
                   </p>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 2, marginBottom: 6 }}>
-                    <span style={{ fontSize: 33, fontWeight: 700, color: "#3A3530", lineHeight: 1 }}>{confidence}</span>
-                    <span style={{ fontSize: 15, fontWeight: 500, color: "#8C7A70", lineHeight: 1 }}>/10</span>
+                    <span style={{ fontSize: 28, fontWeight: 700, color: "#3A3530", lineHeight: 1 }}>{confidence}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#8C7A70", lineHeight: 1 }}>/10</span>
                   </div>
                   <div style={{ display: "flex", gap: 2, marginBottom: 5 }}>
                     {Array.from({ length: 10 }).map((_, i) => (
                       <div key={i} style={{ width: 5, height: 18, borderRadius: 3, background: i < confidence ? "#3A3530" : "rgba(0,0,0,0.10)" }} />
                     ))}
                   </div>
-                  <p style={{ fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, color: confidence <= 3 ? "#c0392b" : confidence <= 6 ? "#d97706" : "#16a34a" }}>
+                  <p style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, color: confidence <= 3 ? "#c0392b" : confidence <= 6 ? "#d97706" : "#16a34a" }}>
                     {confidence <= 3 ? "Low" : confidence <= 6 ? "Medium" : "High"}
                   </p>
                 </div>
@@ -2997,21 +2997,21 @@ const DecisionCard = ({
               <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: "auto", paddingTop: 12 }}>
                 {!user ? (
                   <>
-                    <button onClick={onSignIn} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    <button onClick={onSignIn} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                       Weigh in →
                     </button>
-                    <span style={{ fontSize: 14, color: "#8C7A70", lineHeight: 1.4 }}>Share your take to help others like you.</span>
+                    <span style={{ fontSize: 12, color: "#8C7A70", lineHeight: 1.4 }}>Share your take to help others like you.</span>
                   </>
                 ) : isOwn ? (
                   <div style={{ width: "100%" }}>
                     {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
                       snoozedOutcome ? (
-                        <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ fontSize: 15, fontWeight: 600, color: "#6E7A44", margin: "4px 0", lineHeight: 1.4 }}>
+                        <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ fontSize: 13, fontWeight: 600, color: "#6E7A44", margin: "4px 0", lineHeight: 1.4 }}>
                           Sounds good — we'll circle back. ✦
                         </motion.p>
                       ) : (
                         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                          <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.4 }}>
                             {hasTwoOptions
                               ? "Which did you go with?"
                               : weighInCount > 0
@@ -3021,20 +3021,20 @@ const DecisionCard = ({
                           {hasTwoOptions ? (
                             <>
                               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("first"); setTrackingId(decision.id); }} style={{ flex: 1, minWidth: 0, padding: "11px 8px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 13.5, fontWeight: 600, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optAName}</button>
-                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("second"); setTrackingId(decision.id); }} style={{ flex: 1, minWidth: 0, padding: "11px 8px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 13.5, fontWeight: 600, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optBName}</button>
+                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("first"); setTrackingId(decision.id); }} style={{ flex: 1, minWidth: 0, padding: "11px 8px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 11.5, fontWeight: 600, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optAName}</button>
+                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("second"); setTrackingId(decision.id); }} style={{ flex: 1, minWidth: 0, padding: "11px 8px", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 11.5, fontWeight: 600, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optBName}</button>
                               </div>
                               <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("both"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Both</button>
-                                <button onClick={() => { setOutcomeInitial("didnt_buy"); setOutcomeChosen(null); setTrackingId(decision.id); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Neither</button>
-                                <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
+                                <button onClick={() => { setOutcomeInitial("bought_it"); setOutcomeChosen("both"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Both</button>
+                                <button onClick={() => { setOutcomeInitial("didnt_buy"); setOutcomeChosen(null); setTrackingId(decision.id); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Neither</button>
+                                <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
                               </div>
                             </>
                           ) : (
                             <div style={{ display: "flex", gap: 8 }}>
-                              <button onClick={() => { setOutcomeInitial("bought_it"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
-                              <button onClick={() => { setOutcomeInitial("didnt_buy"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passed</button>
-                              <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
+                              <button onClick={() => { setOutcomeInitial("bought_it"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: "#1C1712", color: "#FDFAF6", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Bought it</button>
+                              <button onClick={() => { setOutcomeInitial("didnt_buy"); setTrackingId(decision.id); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid #1C1712", background: "transparent", color: "#1C1712", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Passed</button>
+                              <button onClick={() => { quickStillDeciding(decision.id); setSnoozedOutcome(true); }} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: "#8C7A70", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Still deciding</button>
                             </div>
                           )}
                         </motion.div>
@@ -3044,7 +3044,7 @@ const DecisionCard = ({
                     {activeTab === "mine" && (
                       <button
                         onClick={() => { if (confirm("Remove this decision?")) handleDelete(decision.id); }}
-                        style={{ display: "block", marginLeft: "auto", marginTop: 12, padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 15, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                        style={{ display: "block", marginLeft: "auto", marginTop: 12, padding: "8px 16px", borderRadius: 100, background: "transparent", border: "1px solid rgba(0,0,0,0.10)", color: "#8C7A70", fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
                       >
                         Delete
                       </button>
@@ -3052,10 +3052,10 @@ const DecisionCard = ({
                   </div>
                 ) : (
                   <>
-                    <button onClick={() => startWeighIn(decision.id)} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 15, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    <button onClick={() => startWeighIn(decision.id)} style={{ padding: "11px 20px", borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", fontSize: 13, letterSpacing: "0.15em", textTransform: "uppercase", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                       Weigh in →
                     </button>
-                    <span style={{ fontSize: 14, color: "#8C7A70", lineHeight: 1.4 }}>Share your take to help others like you.</span>
+                    <span style={{ fontSize: 12, color: "#8C7A70", lineHeight: 1.4 }}>Share your take to help others like you.</span>
                   </>
                 )}
               </div>

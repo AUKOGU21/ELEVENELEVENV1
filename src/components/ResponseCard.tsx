@@ -109,28 +109,28 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "white", fontWeight: 700 }}>
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, color: "white", fontWeight: 700 }}>
             {resp.profiles?.avatar_url
               ? <img src={resp.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : getInitials(resp.profiles?.display_name ?? null)}
           </div>
           <div style={{ minWidth: 0, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14.5, fontWeight: 700, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1A1A1A" }}>{formatName(resp.profiles?.display_name ?? null)}</span>
             <MatchBadge score={resp.match_score} />
           </div>
         </div>
-        <div style={{ flexShrink: 0, borderRadius: 100, padding: "3px 10px", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
+        <div style={{ flexShrink: 0, borderRadius: 100, padding: "3px 10px", fontSize: 10.5, fontWeight: 600, whiteSpace: "nowrap", background: isBuy ? "rgba(22,163,74,0.10)" : isNoBuy ? "rgba(192,57,43,0.10)" : "rgba(217,119,6,0.10)", color: isBuy ? "#16a34a" : isNoBuy ? "#c0392b" : "#d97706" }}>
           {recommendationLabel(resp.recommendation)}
         </div>
       </div>
 
       {/* Reasoning */}
-      <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "#5A4A42", margin: "0 0 10px" }}>{resp.reasoning}</p>
+      <p style={{ fontSize: 12.5, lineHeight: 1.55, color: "#5A4A42", margin: "0 0 10px" }}>{resp.reasoning}</p>
 
       {/* Product link */}
       {resp.product_url && (
         <a href={resp.product_url} target="_blank" rel="noopener noreferrer"
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, maxWidth: "100%", padding: "7px 13px", marginBottom: 10, borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "rgba(0,0,0,0.02)", color: "#3A3530", fontSize: 13.5, fontWeight: 600, textDecoration: "none" }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 7, maxWidth: "100%", padding: "7px 13px", marginBottom: 10, borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "rgba(0,0,0,0.02)", color: "#3A3530", fontSize: 11.5, fontWeight: 600, textDecoration: "none" }}>
           <ExternalLink style={{ width: 14, height: 14, flexShrink: 0, color: "#8C7A70" }} />
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prettyHost(resp.product_url)}</span>
         </a>
@@ -151,17 +151,17 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
             border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
             background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
             color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
-            cursor: canVote ? "pointer" : "default", fontSize: 13, fontWeight: 600, opacity: canVote ? 1 : 0.55,
+            cursor: canVote ? "pointer" : "default", fontSize: 11, fontWeight: 600, opacity: canVote ? 1 : 0.55,
           }}
         >
           {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
           <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
         </button>
         {/* Reply — deliberately a quiet text button, never dominant */}
-        <button onClick={openComposer} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, fontWeight: 600, color: MUTED }}>
+        <button onClick={openComposer} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 600, color: MUTED }}>
           Reply
         </button>
-        <span style={{ marginLeft: "auto", fontSize: 13, color: MUTED }}>{timeAgo(resp.created_at)}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: MUTED }}>{timeAgo(resp.created_at)}</span>
       </div>
 
       {/* Replies — nested, one level, quieter than the response (annotations) */}
@@ -177,19 +177,19 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#3A3530" }}>{formatName(rp.profiles?.display_name ?? null)}</span>
-                    <span style={{ fontSize: 11, color: MUTED }}>{timeAgo(rp.created_at)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#3A3530" }}>{formatName(rp.profiles?.display_name ?? null)}</span>
+                    <span style={{ fontSize: 9.5, color: MUTED }}>{timeAgo(rp.created_at)}</span>
                   </div>
                   {editing ? (
                     <div style={{ marginTop: 4 }}>
-                      <textarea autoFocus value={editText} maxLength={MAXLEN} onChange={(e) => setEditText(e.target.value)} rows={2} style={{ width: "100%", boxSizing: "border-box", borderRadius: 8, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "7px 9px", fontSize: 13, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+                      <textarea autoFocus value={editText} maxLength={MAXLEN} onChange={(e) => setEditText(e.target.value)} rows={2} style={{ width: "100%", boxSizing: "border-box", borderRadius: 8, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "7px 9px", fontSize: 11, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 5 }}>
-                        <button onClick={() => setEditingReplyId(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: MUTED }}>Cancel</button>
-                        <button onClick={() => saveEdit(rp.id)} disabled={!editText.trim() || savingEdit} style={{ background: editText.trim() && !savingEdit ? "#1C1712" : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "5px 13px", fontSize: 12.5, fontWeight: 600, cursor: editText.trim() && !savingEdit ? "pointer" : "default" }}>{savingEdit ? "Saving…" : "Save"}</button>
+                        <button onClick={() => setEditingReplyId(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10.5, fontWeight: 600, color: MUTED }}>Cancel</button>
+                        <button onClick={() => saveEdit(rp.id)} disabled={!editText.trim() || savingEdit} style={{ background: editText.trim() && !savingEdit ? "#1C1712" : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "5px 13px", fontSize: 10.5, fontWeight: 600, cursor: editText.trim() && !savingEdit ? "pointer" : "default" }}>{savingEdit ? "Saving…" : "Save"}</button>
                       </div>
                     </div>
                   ) : (
-                    <p style={{ fontSize: 13, lineHeight: 1.5, color: "#5A4A42", margin: "1px 0 0" }}>{rp.body}</p>
+                    <p style={{ fontSize: 11, lineHeight: 1.5, color: "#5A4A42", margin: "1px 0 0" }}>{rp.body}</p>
                   )}
                 </div>
                 {isMine && !editing && (
@@ -199,8 +199,8 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
                     </button>
                     {menuReplyId === rp.id && (
                       <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: "#FDFAF6", borderRadius: 10, border: "1px solid rgba(0,0,0,0.10)", boxShadow: "0 8px 22px rgba(0,0,0,0.14)", minWidth: 110, zIndex: 5, overflow: "hidden" }}>
-                        <button onClick={() => { setEditingReplyId(rp.id); setEditText(rp.body); setMenuReplyId(null); }} style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 13, color: "#1A1A1A", cursor: "pointer" }}>Edit</button>
-                        <button onClick={() => { setMenuReplyId(null); onDeleteReply(rp.id); }} style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 13, color: "#c0392b", cursor: "pointer", borderTop: "1px solid rgba(0,0,0,0.06)" }}>Delete</button>
+                        <button onClick={() => { setEditingReplyId(rp.id); setEditText(rp.body); setMenuReplyId(null); }} style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 11, color: "#1A1A1A", cursor: "pointer" }}>Edit</button>
+                        <button onClick={() => { setMenuReplyId(null); onDeleteReply(rp.id); }} style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 11, color: "#c0392b", cursor: "pointer", borderTop: "1px solid rgba(0,0,0,0.06)" }}>Delete</button>
                       </div>
                     )}
                   </div>
@@ -221,13 +221,13 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
             onChange={(e) => setText(e.target.value)}
             placeholder="Ask a follow-up..."
             rows={2}
-            style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "9px 11px", fontSize: 13.5, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }}
+            style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "9px 11px", fontSize: 11.5, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-            <span style={{ fontSize: 11, color: MUTED }}>{text.length}/{MAXLEN}</span>
+            <span style={{ fontSize: 9.5, color: MUTED }}>{text.length}/{MAXLEN}</span>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { setComposerOpen(false); setText(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: MUTED, padding: "6px 8px" }}>Cancel</button>
-              <button onClick={submit} disabled={!text.trim() || posting} style={{ background: text.trim() && !posting ? "#1C1712" : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: text.trim() && !posting ? "pointer" : "default", display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <button onClick={() => { setComposerOpen(false); setText(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: MUTED, padding: "6px 8px" }}>Cancel</button>
+              <button onClick={submit} disabled={!text.trim() || posting} style={{ background: text.trim() && !posting ? "#1C1712" : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "7px 16px", fontSize: 11, fontWeight: 600, cursor: text.trim() && !posting ? "pointer" : "default", display: "inline-flex", alignItems: "center", gap: 5 }}>
                 <CornerDownRight style={{ width: 13, height: 13 }} /> {posting ? "Posting…" : "Post"}
               </button>
             </div>

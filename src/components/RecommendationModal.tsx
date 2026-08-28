@@ -85,8 +85,8 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
     reset();
   };
 
-  const inputStyle: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 12, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "11px 13px", fontSize: 14.5, color: INK, fontFamily: "inherit" };
-  const labelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: INK, margin: "0 0 7px", display: "block" };
+  const inputStyle: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 12, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "11px 13px", fontSize: 12.5, color: INK, fontFamily: "inherit" };
+  const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: INK, margin: "0 0 7px", display: "block" };
 
   return createPortal(
     <AnimatePresence>
@@ -101,10 +101,10 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
           >
             <div style={{ padding: "18px 20px 22px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: LF }}>Recommend a product</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: LF }}>Recommend a product</span>
                 <button onClick={close} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED }}><X style={{ width: 18, height: 18 }} /></button>
               </div>
-              {lookingForTitle && <p style={{ fontSize: 15, fontWeight: 700, color: INK, margin: "0 0 16px" }}>For: {lookingForTitle}</p>}
+              {lookingForTitle && <p style={{ fontSize: 13, fontWeight: 700, color: INK, margin: "0 0 16px" }}>For: {lookingForTitle}</p>}
 
               {/* URL */}
               <div style={{ marginBottom: 16 }}>
@@ -112,13 +112,13 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
                 <div style={{ display: "flex", gap: 8 }}>
                   <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, ...inputStyle, padding: "0 12px" }}>
                     <LinkIcon style={{ width: 16, height: 16, color: MUTED, flexShrink: 0 }} />
-                    <input value={url} onChange={(e) => { setUrl(e.target.value); setUrlError(null); }} onKeyDown={(e) => e.key === "Enter" && extract()} placeholder="Paste product URL" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "11px 0", fontSize: 14.5, color: INK }} />
+                    <input value={url} onChange={(e) => { setUrl(e.target.value); setUrlError(null); }} onKeyDown={(e) => e.key === "Enter" && extract()} placeholder="Paste product URL" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "11px 0", fontSize: 12.5, color: INK }} />
                   </div>
-                  <button onClick={extract} disabled={extracting || !url.trim()} style={{ background: INK, color: CREAM, border: "none", borderRadius: 12, padding: "0 18px", fontSize: 14, fontWeight: 600, cursor: extracting || !url.trim() ? "default" : "pointer", opacity: extracting || !url.trim() ? 0.5 : 1 }}>
+                  <button onClick={extract} disabled={extracting || !url.trim()} style={{ background: INK, color: CREAM, border: "none", borderRadius: 12, padding: "0 18px", fontSize: 12, fontWeight: 600, cursor: extracting || !url.trim() ? "default" : "pointer", opacity: extracting || !url.trim() ? 0.5 : 1 }}>
                     {extracting ? "…" : "Pull"}
                   </button>
                 </div>
-                {urlError && <p style={{ fontSize: 12.5, color: "#c0392b", margin: "6px 0 0" }}>{urlError}</p>}
+                {urlError && <p style={{ fontSize: 10.5, color: "#c0392b", margin: "6px 0 0" }}>{urlError}</p>}
               </div>
 
               {/* Product preview */}
@@ -128,8 +128,8 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
                     <ProductImage url={product.image_url} fallback={<LinkIcon style={{ width: 18, height: 18, color: MUTED }} />} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
-                    <input value={product.brand} onChange={(e) => setProduct({ ...product, brand: e.target.value })} placeholder="Brand" style={{ ...inputStyle, padding: "6px 9px", fontSize: 13.5, fontWeight: 700 }} />
-                    <input value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} placeholder="Product name" style={{ ...inputStyle, padding: "6px 9px", fontSize: 12.5 }} />
+                    <input value={product.brand} onChange={(e) => setProduct({ ...product, brand: e.target.value })} placeholder="Brand" style={{ ...inputStyle, padding: "6px 9px", fontSize: 11.5, fontWeight: 700 }} />
+                    <input value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} placeholder="Product name" style={{ ...inputStyle, padding: "6px 9px", fontSize: 10.5 }} />
                   </div>
                 </div>
               )}
@@ -144,7 +144,7 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
                       {([["buy", "Would buy"], ["do_not_buy", "Wouldn't buy"]] as const).map(([val, lab]) => {
                         const on = recommendation === val;
                         const col = val === "buy" ? "#16a34a" : "#c0392b";
-                        return <button key={val} onClick={() => setRecommendation(val)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer", fontSize: 14, fontWeight: 700, border: on ? `1.5px solid ${col}` : "1px solid rgba(0,0,0,0.14)", background: on ? (val === "buy" ? "rgba(22,163,74,0.10)" : "rgba(192,57,43,0.10)") : "transparent", color: on ? col : "#5A4A42" }}>{lab}</button>;
+                        return <button key={val} onClick={() => setRecommendation(val)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, border: on ? `1.5px solid ${col}` : "1px solid rgba(0,0,0,0.14)", background: on ? (val === "buy" ? "rgba(22,163,74,0.10)" : "rgba(192,57,43,0.10)") : "transparent", color: on ? col : "#5A4A42" }}>{lab}</button>;
                       })}
                     </div>
                   </div>
@@ -164,7 +164,7 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
                     <input value={whoFor} onChange={(e) => setWhoFor(e.target.value)} placeholder="e.g. Tall, long torso, smaller bust" style={inputStyle} />
                   </div>
 
-                  <button onClick={doSubmit} disabled={!canSubmit} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: canSubmit ? INK : "rgba(0,0,0,0.25)", color: CREAM, border: "none", borderRadius: 100, padding: "14px 0", fontSize: 15.5, fontWeight: 600, cursor: canSubmit ? "pointer" : "default" }}>
+                  <button onClick={doSubmit} disabled={!canSubmit} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: canSubmit ? INK : "rgba(0,0,0,0.25)", color: CREAM, border: "none", borderRadius: 100, padding: "14px 0", fontSize: 13, fontWeight: 600, cursor: canSubmit ? "pointer" : "default" }}>
                     {submitting ? "Sharing…" : <><Check style={{ width: 17, height: 17 }} /> Share recommendation</>}
                   </button>
                 </>

@@ -10,7 +10,7 @@ export default function MatchBadge({ score }: { score: number | null }) {
   return (
     <span style={{
       marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4,
-      fontSize: 12, fontWeight: 800, letterSpacing: "0.02em",
+      fontSize: 10, fontWeight: 800, letterSpacing: "0.02em",
       padding: "2px 10px", borderRadius: 100,
       color: col, background: bg, border: `1px solid ${bd}`, boxShadow: glow,
     }}>✦ {m}% match</span>

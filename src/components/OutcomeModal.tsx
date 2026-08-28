@@ -344,7 +344,7 @@ const OPTION_BASE: React.CSSProperties = {
   borderRadius: 12,
   background: "rgba(28,23,18,0.05)",
   border: "1.5px solid rgba(28,23,18,0.12)",
-  fontSize: 16,
+  fontSize: 13.5,
   color: "#1C1712",
   cursor: "pointer",
   marginBottom: 8,
@@ -363,7 +363,7 @@ const CONTINUE_BTN: React.CSSProperties = {
   color: "#FDFAF6",
   borderRadius: 100,
   padding: "14px",
-  fontSize: 16,
+  fontSize: 13.5,
   fontWeight: 600,
   border: "none",
   cursor: "pointer",
@@ -377,7 +377,7 @@ const TEXTAREA_STYLE: React.CSSProperties = {
   borderRadius: 10,
   border: "1px solid rgba(196,158,100,0.4)",
   background: "white",
-  fontSize: 16,
+  fontSize: 13.5,
   fontFamily: "inherit",
   color: "#1C1712",
   resize: "none",
@@ -387,7 +387,7 @@ const TEXTAREA_STYLE: React.CSSProperties = {
 };
 
 const QUESTION_STYLE: React.CSSProperties = {
-  fontSize: 22,
+  fontSize: 18.5,
   fontWeight: 700,
   color: "#1C1712",
   fontFamily: "Georgia, serif",
@@ -662,7 +662,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                 background: "none",
                 border: "none",
                 padding: "0 0 20px",
-                fontSize: 15,
+                fontSize: 13,
                 color: "#8C7A70",
                 cursor: "pointer",
                 display: "flex",
@@ -900,7 +900,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 20,
+                      fontSize: 17,
                       color: "#C49E64",
                       marginBottom: 16,
                     }}
@@ -909,7 +909,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                   </div>
                   <p
                     style={{
-                      fontSize: 18,
+                      fontSize: 15.5,
                       color: "#1C1712",
                       fontFamily: "Georgia, serif",
                       lineHeight: 1.4,

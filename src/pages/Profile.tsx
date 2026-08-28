@@ -411,12 +411,12 @@ const Profile = () => {
   };
 
   // Shared button styles
-  const btnPrimary: React.CSSProperties = { padding: "10px 22px", borderRadius: 100, background: ACCENT, color: "white", border: "none", fontSize: 15, letterSpacing: "0.16em", textTransform: "uppercase" as const, fontWeight: 700, cursor: "pointer" };
-  const btnSecondary: React.CSSProperties = { padding: "10px 22px", borderRadius: 100, background: "transparent", border: `1px solid ${PILL_BDR}`, color: MUTED, fontSize: 15, letterSpacing: "0.16em", textTransform: "uppercase" as const, cursor: "pointer" };
+  const btnPrimary: React.CSSProperties = { padding: "10px 22px", borderRadius: 100, background: ACCENT, color: "white", border: "none", fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase" as const, fontWeight: 700, cursor: "pointer" };
+  const btnSecondary: React.CSSProperties = { padding: "10px 22px", borderRadius: 100, background: "transparent", border: `1px solid ${PILL_BDR}`, color: MUTED, fontSize: 13, letterSpacing: "0.16em", textTransform: "uppercase" as const, cursor: "pointer" };
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#ECE7DF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <p style={{ color: "rgba(28,23,18,0.4)", fontSize: 15 }}>Loading...</p>
+      <p style={{ color: "rgba(28,23,18,0.4)", fontSize: 13 }}>Loading...</p>
     </div>
   );
 
@@ -443,10 +443,10 @@ const Profile = () => {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.93)", display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px" }}>
-              <button onClick={() => setCropSrc(null)} style={{ color: "rgba(255,255,255,0.55)", background: "none", border: "none", cursor: "pointer", fontSize: 15 }}>Cancel</button>
-              <p style={{ color: "white", fontSize: 16, fontWeight: 500 }}>Position your photo</p>
+              <button onClick={() => setCropSrc(null)} style={{ color: "rgba(255,255,255,0.55)", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>Cancel</button>
+              <p style={{ color: "white", fontSize: 13.5, fontWeight: 500 }}>Position your photo</p>
               <button onClick={applyCrop} disabled={uploadingPhoto}
-                style={{ color: uploadingPhoto ? "rgba(255,255,255,0.3)" : "#F5EFEA", background: "none", border: "none", cursor: "pointer", fontSize: 16, fontWeight: 700 }}>
+                style={{ color: uploadingPhoto ? "rgba(255,255,255,0.3)" : "#F5EFEA", background: "none", border: "none", cursor: "pointer", fontSize: 13.5, fontWeight: 700 }}>
                 {uploadingPhoto ? "Saving..." : "Apply"}
               </button>
             </div>
@@ -455,7 +455,7 @@ const Profile = () => {
                 onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropComplete} />
             </div>
             <div style={{ padding: "20px 32px 32px" }}>
-              <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 15, textAlign: "center", marginBottom: 10 }}>Pinch or scroll to zoom</p>
+              <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, textAlign: "center", marginBottom: 10 }}>Pinch or scroll to zoom</p>
               <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={e => setZoom(Number(e.target.value))} style={{ width: "100%", accentColor: "white" }} />
             </div>
           </motion.div>
@@ -470,16 +470,16 @@ const Profile = () => {
               style={{ background: CARD_BG, borderRadius: "20px 20px 0 0", padding: "28px 28px 40px", width: "100%", maxWidth: 520 }}>
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <p style={{ fontSize: 17, fontWeight: 700, color: PRIMARY }}>Add photos</p>
+                <p style={{ fontSize: 14.5, fontWeight: 700, color: PRIMARY }}>Add photos</p>
                 <button onClick={() => { setFitPhotoModal(null); setPendingFiles([]); setPendingPreviews([]); }}
                   style={{ background: "none", border: "none", cursor: "pointer", color: MUTED }}>
                   <X style={{ width: 18, height: 18 }} />
                 </button>
               </div>
-              <p style={{ fontSize: 15, color: SECONDARY, marginBottom: 4 }}>
+              <p style={{ fontSize: 13, color: SECONDARY, marginBottom: 4 }}>
                 Upload up to {3 - fitPhotos.length} photo{3 - fitPhotos.length !== 1 ? "s" : ""} that show how clothes fit on your body.
               </p>
-              <p style={{ fontSize: 16, color: MUTED, marginBottom: 20 }}>These help others make better decisions.</p>
+              <p style={{ fontSize: 13.5, color: MUTED, marginBottom: 20 }}>These help others make better decisions.</p>
 
               {/* Drop zone */}
               <div
@@ -490,8 +490,8 @@ const Profile = () => {
                 style={{ border: `2px dashed ${draggingOver ? ACCENT : PILL_BDR}`, borderRadius: 16, padding: "28px 20px", textAlign: "center", cursor: "pointer", background: draggingOver ? "rgba(142,58,58,0.04)" : "transparent", transition: "all 0.15s", marginBottom: 16 }}>
                 <input ref={fitPhotoInputRef} type="file" accept="image/*" multiple style={{ display: "none" }}
                   onChange={e => e.target.files && addPendingFiles(e.target.files)} />
-                <p style={{ fontSize: 15, color: MUTED, marginBottom: 4 }}>Drag & drop or click to upload</p>
-                <p style={{ fontSize: 15, color: MUTED, opacity: 0.7 }}>Max {3 - fitPhotos.length} image{3 - fitPhotos.length !== 1 ? "s" : ""}</p>
+                <p style={{ fontSize: 13, color: MUTED, marginBottom: 4 }}>Drag & drop or click to upload</p>
+                <p style={{ fontSize: 13, color: MUTED, opacity: 0.7 }}>Max {3 - fitPhotos.length} image{3 - fitPhotos.length !== 1 ? "s" : ""}</p>
               </div>
 
               {/* Previews */}
@@ -582,7 +582,7 @@ const Profile = () => {
               style={{ background: CARD_BG, borderRadius: "20px 20px 0 0", padding: "28px 28px 40px", width: "100%", maxWidth: 520 }}>
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                <p style={{ fontSize: 17, fontWeight: 700, color: PRIMARY }}>Your photos</p>
+                <p style={{ fontSize: 14.5, fontWeight: 700, color: PRIMARY }}>Your photos</p>
                 <button onClick={() => setFitPhotoModal(null)} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED }}>
                   <X style={{ width: 18, height: 18 }} />
                 </button>
@@ -602,7 +602,7 @@ const Profile = () => {
                   <button onClick={() => { setPendingFiles([]); setPendingPreviews([]); setFitPhotoModal("upload"); }}
                     style={{ flex: 1, aspectRatio: "3/4", borderRadius: 12, border: `1.5px dashed ${PILL_BDR}`, background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer" }}>
                     <Plus style={{ width: 18, height: 18, color: MUTED }} />
-                    <span style={{ fontSize: 15, color: MUTED }}>Add photo</span>
+                    <span style={{ fontSize: 13, color: MUTED }}>Add photo</span>
                   </button>
                 )}
               </div>
@@ -620,11 +620,11 @@ const Profile = () => {
         <button onClick={() => navigate("/feed")}
           style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(28,23,18,0.55)", background: "none", border: "none", cursor: "pointer" }}>
           <ArrowLeft style={{ width: 14, height: 14 }} />
-          <span style={{ fontSize: 15 }}>Feed</span>
+          <span style={{ fontSize: 13 }}>Feed</span>
         </button>
-        <span style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(28,23,18,0.38)" }}>Profile</span>
+        <span style={{ fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(28,23,18,0.38)" }}>Profile</span>
         <button onClick={async () => { await signOut(); navigate("/"); }}
-          style={{ display: "flex", alignItems: "center", gap: 5, color: "rgba(28,23,18,0.55)", background: "none", border: "none", cursor: "pointer", fontSize: 16 }}>
+          style={{ display: "flex", alignItems: "center", gap: 5, color: "rgba(28,23,18,0.55)", background: "none", border: "none", cursor: "pointer", fontSize: 13.5 }}>
           <LogOut style={{ width: 13, height: 13 }} />
           Sign out
         </button>
@@ -636,7 +636,7 @@ const Profile = () => {
           <button
             onClick={() => setProfileTab("overview")}
             style={{
-              padding: "8px 24px", borderRadius: 100, fontSize: 15, fontWeight: 500,
+              padding: "8px 24px", borderRadius: 100, fontSize: 13, fontWeight: 500,
               border: "none", cursor: "pointer", transition: "all 0.18s",
               background: profileTab === "overview" ? "rgba(28,23,18,0.10)" : "transparent",
               color: profileTab === "overview" ? "#1C1712" : "rgba(28,23,18,0.45)",
@@ -647,7 +647,7 @@ const Profile = () => {
           <button
             onClick={() => setProfileTab("saved")}
             style={{
-              padding: "8px 24px", borderRadius: 100, fontSize: 15, fontWeight: 500,
+              padding: "8px 24px", borderRadius: 100, fontSize: 13, fontWeight: 500,
               border: "none", cursor: "pointer", transition: "all 0.18s",
               background: profileTab === "saved" ? "rgba(28,23,18,0.10)" : "transparent",
               color: profileTab === "saved" ? "#1C1712" : "rgba(28,23,18,0.45)",
@@ -669,11 +669,11 @@ const Profile = () => {
           {savedDecisions.length === 0 ? (
             <div style={{ textAlign: "center", padding: "80px 24px" }}>
               <Bookmark style={{ width: 36, height: 36, color: MUTED, margin: "0 auto 16px", display: "block" }} />
-              <p style={{ fontSize: 18, fontWeight: 600, color: PRIMARY, marginBottom: 8 }}>Nothing saved yet</p>
-              <p style={{ fontSize: 16, color: MUTED }}>Bookmark posts in the feed to revisit them later.</p>
+              <p style={{ fontSize: 15.5, fontWeight: 600, color: PRIMARY, marginBottom: 8 }}>Nothing saved yet</p>
+              <p style={{ fontSize: 13.5, color: MUTED }}>Bookmark posts in the feed to revisit them later.</p>
               <button
                 onClick={() => navigate("/feed")}
-                style={{ marginTop: 24, padding: "12px 28px", borderRadius: 100, background: "#1C1712", color: "#FDFAF6", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+                style={{ marginTop: 24, padding: "12px 28px", borderRadius: 100, background: "#1C1712", color: "#FDFAF6", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
               >
                 Go to feed
               </button>
@@ -695,20 +695,20 @@ const Profile = () => {
                   )}
                   <div style={{ padding: "14px 16px 16px" }}>
                     {d.brand_name && (
-                      <p style={{ fontSize: 16, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 3 }}>{d.brand_name}</p>
+                      <p style={{ fontSize: 13.5, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 3 }}>{d.brand_name}</p>
                     )}
-                    <p style={{ fontSize: 15, fontWeight: 700, color: PRIMARY, lineHeight: 1.3, marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: PRIMARY, lineHeight: 1.3, marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {d.product_name ?? "Untitled"}
                     </p>
                     {d.uncertainty_text && (
-                      <p style={{ fontSize: 16, color: SECONDARY, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>
+                      <p style={{ fontSize: 13.5, color: SECONDARY, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>
                         "{d.uncertainty_text}"
                       </p>
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
                       <div style={{ width: 7, height: 7, borderRadius: "50%", background: d.status === "open" ? "#16a34a" : MUTED }} />
-                      <span style={{ fontSize: 15, color: SECONDARY, fontWeight: 500 }}>{d.status === "open" ? "Open" : "Closed"}</span>
-                      <span style={{ fontSize: 15, color: MUTED, marginLeft: "auto" }}>Confidence {d.confidence_score}/10</span>
+                      <span style={{ fontSize: 13, color: SECONDARY, fontWeight: 500 }}>{d.status === "open" ? "Open" : "Closed"}</span>
+                      <span style={{ fontSize: 13, color: MUTED, marginLeft: "auto" }}>Confidence {d.confidence_score}/10</span>
                     </div>
                   </div>
                 </div>
@@ -752,7 +752,7 @@ const Profile = () => {
 
             {/* Avatar */}
             <div style={{ position: "relative", display: "inline-block", flexShrink: 0 }}>
-              <div style={{ width: 130, height: 130, borderRadius: "50%", background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 42, fontWeight: 700, color: "white", overflow: "hidden" }}>
+              <div style={{ width: 130, height: 130, borderRadius: "50%", background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 35.5, fontWeight: 700, color: "white", overflow: "hidden" }}>
                 {profile?.avatar_url
                   ? <img src={profile.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : initial}
@@ -770,7 +770,7 @@ const Profile = () => {
               {/* Badge */}
               {badgeInfo.label && (
                 <div style={{ marginBottom: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: ACCENT, borderBottom: `1px solid ${ACCENT}`, paddingBottom: 1 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: ACCENT, borderBottom: `1px solid ${ACCENT}`, paddingBottom: 1 }}>
                     {badgeInfo.label}
                   </span>
                 </div>
@@ -780,18 +780,18 @@ const Profile = () => {
               {editing ? (
                 <div style={{ maxWidth: 380 }}>
                   <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} placeholder="Full name"
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: 12, border: `1px solid ${PILL_BDR}`, background: "white", fontSize: 15, color: PRIMARY, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 12, border: `1px solid ${PILL_BDR}`, background: "white", fontSize: 13, color: PRIMARY, outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
                   <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                     <input value={editAge} onChange={e => setEditAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" maxLength={3}
-                      style={{ width: "28%", padding: "10px 12px", borderRadius: 12, border: `1px solid ${PILL_BDR}`, background: "white", fontSize: 16, color: PRIMARY, outline: "none", boxSizing: "border-box" }} />
+                      style={{ width: "28%", padding: "10px 12px", borderRadius: 12, border: `1px solid ${PILL_BDR}`, background: "white", fontSize: 13.5, color: PRIMARY, outline: "none", boxSizing: "border-box" }} />
                     <div style={{ flex: 1, position: "relative" }}>
                       <input value={editCity} onChange={e => setEditCity(e.target.value)} placeholder="City"
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: 12, border: `1px solid ${PILL_BDR}`, background: "white", fontSize: 16, color: PRIMARY, outline: "none", boxSizing: "border-box" }} />
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: 12, border: `1px solid ${PILL_BDR}`, background: "white", fontSize: 13.5, color: PRIMARY, outline: "none", boxSizing: "border-box" }} />
                       {citySuggestions.length > 0 && (
                         <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "white", border: `1px solid ${PILL_BDR}`, borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", zIndex: 10 }}>
                           {citySuggestions.map(c => (
                             <button key={c} onClick={() => { setEditCity(c.split(",")[0]); setCitySuggestions([]); }}
-                              style={{ width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 15, color: PRIMARY, background: "none", border: "none", cursor: "pointer", borderBottom: `1px solid ${DIVIDER}` }}>
+                              style={{ width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 13, color: PRIMARY, background: "none", border: "none", cursor: "pointer", borderBottom: `1px solid ${DIVIDER}` }}>
                               {c}
                             </button>
                           ))}
@@ -812,7 +812,7 @@ const Profile = () => {
               ) : (
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                    <h1 style={{ fontSize: 34, fontWeight: 700, color: PRIMARY, lineHeight: 1.05, margin: 0, flexShrink: 1, minWidth: 0 }}>
+                    <h1 style={{ fontSize: 29, fontWeight: 700, color: PRIMARY, lineHeight: 1.05, margin: 0, flexShrink: 1, minWidth: 0 }}>
                       {formatName(profile?.display_name)}
                     </h1>
                     <button onClick={() => setEditing(true)} style={{ color: MUTED, background: "none", border: "none", cursor: "pointer", flexShrink: 0, padding: 0, lineHeight: 0 }}>
@@ -820,7 +820,7 @@ const Profile = () => {
                     </button>
                   </div>
                   {(profile?.age || profile?.city) && (
-                    <p style={{ fontSize: 15, color: MUTED, margin: 0, marginTop: 10 }}>
+                    <p style={{ fontSize: 13, color: MUTED, margin: 0, marginTop: 10 }}>
                       {[profile?.age, profile?.city?.split(",")[0]].filter(Boolean).join(" · ")}
                     </p>
                   )}
@@ -835,13 +835,13 @@ const Profile = () => {
             {fitPhotos.length === 0 ? (
               /* STATE 1: Empty */
               <div style={{ paddingTop: 20 }}>
-                <p style={{ fontSize: 16, fontWeight: 700, color: PRIMARY, marginBottom: 6 }}>
+                <p style={{ fontSize: 13.5, fontWeight: 700, color: PRIMARY, marginBottom: 6 }}>
                   Help someone like you decide
                 </p>
-                <p style={{ fontSize: 15, color: SECONDARY, lineHeight: 1.6, marginBottom: 4 }}>
+                <p style={{ fontSize: 13, color: SECONDARY, lineHeight: 1.6, marginBottom: 4 }}>
                   Add 1–3 photos so women with a similar body can see how things actually fit.
                 </p>
-                <p style={{ fontSize: 16, color: MUTED, marginBottom: 16 }}>
+                <p style={{ fontSize: 13.5, color: MUTED, marginBottom: 16 }}>
                   This makes your advice more useful.
                 </p>
 
@@ -851,7 +851,7 @@ const Profile = () => {
                     onClick={() => { setPendingFiles([]); setPendingPreviews([]); setFitPhotoModal("upload"); }}
                     style={{ width: 150, height: 200, borderRadius: 16, border: `1.5px dashed ${PILL_BDR}`, background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", flexShrink: 0 }}>
                     <Plus style={{ width: 22, height: 22, color: MUTED }} />
-                    <span style={{ fontSize: 16, color: MUTED, letterSpacing: "0.03em", textAlign: "center", lineHeight: 1.4 }}>Add{"\n"}photo</span>
+                    <span style={{ fontSize: 13.5, color: MUTED, letterSpacing: "0.03em", textAlign: "center", lineHeight: 1.4 }}>Add{"\n"}photo</span>
                   </button>
 
                   {/* Tips with check icons */}
@@ -859,7 +859,7 @@ const Profile = () => {
                     {["full body", "natural lighting", "everyday outfits"].map(tip => (
                       <div key={tip} style={{ display: "flex", alignItems: "center", gap: 7 }}>
                         <CircleCheck style={{ width: 14, height: 14, color: MUTED, flexShrink: 0 }} />
-                        <span style={{ fontSize: 16, color: MUTED }}>{tip}</span>
+                        <span style={{ fontSize: 13.5, color: MUTED }}>{tip}</span>
                       </div>
                     ))}
                   </div>
@@ -868,7 +868,7 @@ const Profile = () => {
                 <AnimatePresence>
                   {fitPhotoConfirm && (
                     <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                      style={{ fontSize: 16, color: "#16a34a", marginTop: 12 }}>
+                      style={{ fontSize: 13.5, color: "#16a34a", marginTop: 12 }}>
                       Your profile is now more helpful to others
                     </motion.p>
                   )}
@@ -895,15 +895,15 @@ const Profile = () => {
                     <button onClick={() => { setPendingFiles([]); setPendingPreviews([]); setFitPhotoModal("upload"); }}
                       style={{ width: 150, height: 200, borderRadius: 16, border: `1.5px dashed ${PILL_BDR}`, background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", flexShrink: 0 }}>
                       <Plus style={{ width: 22, height: 22, color: MUTED }} />
-                      <span style={{ fontSize: 16, color: MUTED, textAlign: "center", lineHeight: 1.4 }}>Add{"\n"}photo</span>
+                      <span style={{ fontSize: 13.5, color: MUTED, textAlign: "center", lineHeight: 1.4 }}>Add{"\n"}photo</span>
                     </button>
                   )}
                 </div>
-                <p style={{ fontSize: 16, fontWeight: 600, color: SECONDARY }}>you, IRL</p>
+                <p style={{ fontSize: 13.5, fontWeight: 600, color: SECONDARY }}>you, IRL</p>
                 <AnimatePresence>
                   {fitPhotoConfirm && (
                     <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                      style={{ fontSize: 16, color: "#16a34a", marginTop: 8 }}>
+                      style={{ fontSize: 13.5, color: "#16a34a", marginTop: 8 }}>
                       Your profile is now more helpful to others
                     </motion.p>
                   )}
@@ -915,12 +915,12 @@ const Profile = () => {
           {/* Trust bar — full-width strip at bottom of header card */}
           {!editing && (
             <div style={{ background: TRUST_BG, padding: isMobile ? "14px 18px" : "14px 28px", display: "flex", alignItems: "center", gap: isMobile ? 12 : 16, position: "relative", zIndex: 2 }}>
-              <span style={{ fontSize: 16, color: "#C4A47A", flexShrink: 0 }}>✦</span>
+              <span style={{ fontSize: 13.5, color: "#C4A47A", flexShrink: 0 }}>✦</span>
               <div style={{ flexShrink: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "rgba(245,239,234,0.92)", marginBottom: 2 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(245,239,234,0.92)", marginBottom: 2 }}>
                   Building trust in the community
                 </p>
-                <p style={{ fontSize: 15, color: "rgba(245,239,234,0.50)", lineHeight: 1.4 }}>
+                <p style={{ fontSize: 13, color: "rgba(245,239,234,0.50)", lineHeight: 1.4 }}>
                   {stats.helpfulVotes} of {badgeInfo.threshold} helpful responses to reach {badgeInfo.next}
                 </p>
               </div>
@@ -942,7 +942,7 @@ const Profile = () => {
                   </div>
                 );
               })()}
-              <span style={{ fontSize: 15, fontWeight: 700, color: "rgba(245,239,234,0.75)", flexShrink: 0, marginLeft: isMobile ? "auto" : 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(245,239,234,0.75)", flexShrink: 0, marginLeft: isMobile ? "auto" : 0 }}>
                 {stats.helpfulVotes} / {badgeInfo.threshold}
               </span>
             </div>
@@ -963,8 +963,8 @@ const Profile = () => {
               { value: stats.helpfulVotes, label: "Marked\nhelpful" },
             ].map(({ value, label }, i) => (
               <div key={label} style={{ flex: 1, textAlign: "center", padding: "28px 16px", borderRight: i < 2 ? `1px solid ${DIVIDER}` : "none" }}>
-                <p style={{ fontSize: 36, fontWeight: 700, color: PRIMARY, lineHeight: 1, marginBottom: 8 }}>{value}</p>
-                <p style={{ fontSize: 15, color: MUTED, letterSpacing: "0.08em", textTransform: "uppercase", lineHeight: 1.5, whiteSpace: "pre-line" }}>{label}</p>
+                <p style={{ fontSize: 30.5, fontWeight: 700, color: PRIMARY, lineHeight: 1, marginBottom: 8 }}>{value}</p>
+                <p style={{ fontSize: 13, color: MUTED, letterSpacing: "0.08em", textTransform: "uppercase", lineHeight: 1.5, whiteSpace: "pre-line" }}>{label}</p>
               </div>
             ))}
           </div>
@@ -978,17 +978,17 @@ const Profile = () => {
               {avgHelp ? (
                 <>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 3 }}>
-                    <span style={{ fontSize: 22, fontWeight: 700, color: PRIMARY }}>{avgHelp}</span>
-                    <span style={{ fontSize: 16, color: MUTED }}>/  5 average helpfulness</span>
+                    <span style={{ fontSize: 18.5, fontWeight: 700, color: PRIMARY }}>{avgHelp}</span>
+                    <span style={{ fontSize: 13.5, color: MUTED }}>/  5 average helpfulness</span>
                   </div>
-                  <p style={{ fontSize: 16, color: MUTED }}>
+                  <p style={{ fontSize: 13.5, color: MUTED }}>
                     Based on {stats.responses} response{stats.responses !== 1 ? "s" : ""} · Rated by other users
                   </p>
                 </>
               ) : (
                 <>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: SECONDARY, marginBottom: 3 }}>No helpfulness data yet</p>
-                  <p style={{ fontSize: 16, color: MUTED }}>Start weighing in to build your score</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: SECONDARY, marginBottom: 3 }}>No helpfulness data yet</p>
+                  <p style={{ fontSize: 13.5, color: MUTED }}>Start weighing in to build your score</p>
                 </>
               )}
             </div>
@@ -1002,10 +1002,10 @@ const Profile = () => {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }}
             style={{ background: CARD_BG, borderRadius: 20, marginBottom: 12, padding: "28px 28px 24px" }}>
 
-            <p style={{ fontSize: 16, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED, marginBottom: 4 }}>
+            <p style={{ fontSize: 13.5, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED, marginBottom: 4 }}>
               Your Mirrors
             </p>
-            <p style={{ fontSize: 15, color: MUTED, marginBottom: 20 }}>matched on fit, taste, and how you shop</p>
+            <p style={{ fontSize: 13, color: MUTED, marginBottom: 20 }}>matched on fit, taste, and how you shop</p>
 
             {/* Horizontal scroll row */}
             <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 10, scrollbarWidth: "none", margin: "0 -28px", padding: "0 28px 10px" }}>
@@ -1053,7 +1053,7 @@ const Profile = () => {
                       boxShadow: "0 0 10px rgba(184,149,106,0.50), 0 0 22px rgba(184,149,106,0.20), inset 0 1px 0 rgba(255,255,255,0.22)",
                       zIndex: 2,
                     }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: "#FDFAF6", letterSpacing: "0.03em" }}>✦ {m.score}% match</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#FDFAF6", letterSpacing: "0.03em" }}>✦ {m.score}% match</span>
                     </div>
 
                     {/* Avatar — large, centred */}
@@ -1069,18 +1069,18 @@ const Profile = () => {
                     }}>
                       {m.avatar_url
                         ? <img src={m.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, fontWeight: 700, color: "white" }}>{mirrorInitial}</div>
+                        : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, fontWeight: 700, color: "white" }}>{mirrorInitial}</div>
                       }
                     </div>
 
                     {/* Name */}
-                    <p style={{ fontSize: 22, fontWeight: 700, color: PRIMARY, lineHeight: 1.15, marginBottom: 4, textAlign: "center" }}>
+                    <p style={{ fontSize: 18.5, fontWeight: 700, color: PRIMARY, lineHeight: 1.15, marginBottom: 4, textAlign: "center" }}>
                       {m.display_name?.trim() || "Anonymous"}
                     </p>
 
                     {/* Age + city */}
                     {(m.age || m.city) ? (
-                      <p style={{ fontSize: 15, color: MUTED, marginBottom: 16, textAlign: "center" }}>
+                      <p style={{ fontSize: 13, color: MUTED, marginBottom: 16, textAlign: "center" }}>
                         {[m.age, m.city?.split(",")[0]].filter(Boolean).join(" · ")}
                       </p>
                     ) : <div style={{ marginBottom: 16 }} />}
@@ -1090,7 +1090,7 @@ const Profile = () => {
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18, justifyContent: "center" }}>
                         {tags.map((tag, i) => (
                           <span key={i} style={{
-                            fontSize: 15,
+                            fontSize: 13,
                             color: SECONDARY,
                             background: PILL_BG,
                             border: `1px solid ${PILL_BDR}`,
@@ -1105,7 +1105,7 @@ const Profile = () => {
 
                     {/* Arrow — bottom right */}
                     <div style={{ marginTop: "auto", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 5 }}>
-                      <span style={{ fontSize: 15, color: MUTED, letterSpacing: "0.04em" }}>See profile</span>
+                      <span style={{ fontSize: 13, color: MUTED, letterSpacing: "0.04em" }}>See profile</span>
                       <ArrowRight style={{ width: 14, height: 14, color: MUTED }} />
                     </div>
                   </button>
@@ -1121,19 +1121,19 @@ const Profile = () => {
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
           style={{ background: CARD_BG, borderRadius: 20, marginBottom: 12, padding: "28px 28px 24px" }}>
 
-          <p style={{ fontSize: 16, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED, marginBottom: 24 }}>
+          <p style={{ fontSize: 13.5, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED, marginBottom: 24 }}>
             Your fit profile
           </p>
 
           {editMode === "silhouette" ? (
             <div>
-              <p style={{ fontSize: 15, color: MUTED, marginBottom: 16 }}>Select your silhouette</p>
+              <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>Select your silhouette</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
                 {SILHOUETTE_OPTIONS.map(opt => (
                   <button key={opt.label} onClick={() => setEditSilhouette(opt.label)}
                     style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderRadius: 14, border: `1px solid ${editSilhouette === opt.label ? ACCENT : PILL_BDR}`, background: editSilhouette === opt.label ? "rgba(142,58,58,0.06)" : "white", padding: "12px 8px", cursor: "pointer", transition: "all 0.15s" }}>
                     <img src={opt.image} alt={opt.label} style={{ width: 52, height: 70, objectFit: "cover", objectPosition: "top", borderRadius: 8 }} />
-                    <p style={{ fontSize: 15, fontWeight: 600, color: PRIMARY, textAlign: "center", lineHeight: 1.3 }}>{opt.label}</p>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: PRIMARY, textAlign: "center", lineHeight: 1.3 }}>{opt.label}</p>
                   </button>
                 ))}
               </div>
@@ -1149,10 +1149,10 @@ const Profile = () => {
                 <img src={sil.image} alt={sil.label}
                   style={{ width: 88, height: 116, objectFit: "cover", objectPosition: "top", borderRadius: 14, flexShrink: 0 }} />
                 <div style={{ flex: 1, paddingTop: 4 }}>
-                  <p style={{ fontSize: 26, fontWeight: 700, color: PRIMARY, lineHeight: 1.1, marginBottom: 6 }}>{sil.label}</p>
-                  <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, marginBottom: 14 }}>{sil.desc}</p>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: PRIMARY, lineHeight: 1.1, marginBottom: 6 }}>{sil.label}</p>
+                  <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, marginBottom: 14 }}>{sil.desc}</p>
                   <button onClick={openSilhouetteEdit}
-                    style={{ fontSize: 16, color: ACCENT, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                    style={{ fontSize: 13.5, color: ACCENT, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                     Update profile →
                   </button>
                 </div>
@@ -1167,11 +1167,11 @@ const Profile = () => {
                     { label: "Bottom size", val: editBottom, set: setEditBottom, opts: SIZE_OPTIONS },
                   ].map((row) => (
                     <div key={row.label} style={{ marginBottom: 14 }}>
-                      <p style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 8 }}>{row.label}</p>
+                      <p style={{ fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 8 }}>{row.label}</p>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {row.opts.map((opt) => (
                           <button key={opt} onClick={() => row.set(row.val === opt ? null : opt)}
-                            style={{ fontSize: 15, padding: "6px 14px", borderRadius: 100, cursor: "pointer",
+                            style={{ fontSize: 13, padding: "6px 14px", borderRadius: 100, cursor: "pointer",
                               border: `1px solid ${row.val === opt ? ACCENT : PILL_BDR}`,
                               background: row.val === opt ? ACCENT : "transparent",
                               color: row.val === opt ? "#FDFAF6" : SECONDARY }}>
@@ -1183,7 +1183,7 @@ const Profile = () => {
                   ))}
                   <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                     <button onClick={saveSizes} disabled={savingProfile}
-                      style={{ fontSize: 16, fontWeight: 600, padding: "10px 20px", borderRadius: 10, border: "none", background: ACCENT, color: "#FDFAF6", cursor: "pointer" }}>
+                      style={{ fontSize: 13.5, fontWeight: 600, padding: "10px 20px", borderRadius: 10, border: "none", background: ACCENT, color: "#FDFAF6", cursor: "pointer" }}>
                       {savingProfile ? "Saving…" : "Save"}
                     </button>
                     <button onClick={() => setEditMode(null)} style={btnSecondary}>Cancel</button>
@@ -1192,7 +1192,7 @@ const Profile = () => {
               ) : (profile?.height_range || profile?.top_size || profile?.bottom_size) ? (
                 <div style={{ borderTop: `1px solid ${DIVIDER}`, borderBottom: `1px solid ${DIVIDER}`, marginBottom: 16, position: "relative" }}>
                   <button onClick={openSizesEdit}
-                    style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: ACCENT, fontSize: 14, zIndex: 1 }}>Edit</button>
+                    style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: ACCENT, fontSize: 12, zIndex: 1 }}>Edit</button>
                   <div style={{ display: "flex", gap: 0 }}>
                     {[
                       profile?.height_range  && { label: "Height",      value: profile.height_range },
@@ -1200,8 +1200,8 @@ const Profile = () => {
                       profile?.bottom_size   && { label: "Bottom size",  value: profile.bottom_size },
                     ].filter(Boolean).map((item: any, i, arr) => (
                       <div key={item.label} style={{ flex: 1, padding: "14px 16px", borderRight: i < arr.length - 1 ? `1px solid ${DIVIDER}` : "none" }}>
-                        <p style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 6 }}>{item.label}</p>
-                        <p style={{ fontSize: 15, fontWeight: 600, color: PRIMARY }}>{item.value}</p>
+                        <p style={{ fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 6 }}>{item.label}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: PRIMARY }}>{item.value}</p>
                       </div>
                     ))}
                   </div>
@@ -1209,44 +1209,44 @@ const Profile = () => {
               ) : (
                 <button onClick={openSizesEdit}
                   style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 16px", borderRadius: 14, border: `1px dashed ${PILL_BDR}`, background: "transparent", cursor: "pointer", boxSizing: "border-box", marginBottom: 16 }}>
-                  <span style={{ fontSize: 16, color: MUTED }}>Add your sizes</span>
-                  <span style={{ fontSize: 15, color: ACCENT }}>+ Add</span>
+                  <span style={{ fontSize: 13.5, color: MUTED }}>Add your sizes</span>
+                  <span style={{ fontSize: 13, color: ACCENT }}>+ Add</span>
                 </button>
               )}
 
               {/* Fit details (dial-in features) — editable via the fit modal */}
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <p style={{ fontSize: 15, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED }}>Fit details</p>
+                  <p style={{ fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED }}>Fit details</p>
                   <button onClick={() => setShowFitModal(true)}
-                    style={{ fontSize: 14, color: ACCENT, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+                    style={{ fontSize: 12, color: ACCENT, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
                 </div>
                 {allTags.length > 0 ? (
                   <>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                       {visibleTags.map((tag, i) => (
-                        <span key={i} style={{ fontSize: 16, color: SECONDARY, background: PILL_BG, border: `1px solid ${PILL_BDR}`, borderRadius: 100, padding: "6px 14px" }}>
+                        <span key={i} style={{ fontSize: 13.5, color: SECONDARY, background: PILL_BG, border: `1px solid ${PILL_BDR}`, borderRadius: 100, padding: "6px 14px" }}>
                           {tag}
                         </span>
                       ))}
                     </div>
                     {allTags.length > 5 && (
                       <button onClick={() => setShowAllTags(v => !v)}
-                        style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 16, color: ACCENT, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                        style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13.5, color: ACCENT, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                         {showAllTags ? <><ChevronUp style={{ width: 13, height: 13 }} /> Show less</> : <><ChevronDown style={{ width: 13, height: 13 }} /> {allTags.length - 5} more</>}
                       </button>
                     )}
                   </>
                 ) : (
-                  <span style={{ fontSize: 16, color: MUTED }}>Not set yet. Tap Edit to dial in your fit.</span>
+                  <span style={{ fontSize: 13.5, color: MUTED }}>Not set yet. Tap Edit to dial in your fit.</span>
                 )}
               </div>
             </div>
           ) : (
             <button onClick={openSilhouetteEdit}
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "18px 20px", borderRadius: 14, border: `1px dashed ${PILL_BDR}`, background: "transparent", cursor: "pointer", boxSizing: "border-box" }}>
-              <span style={{ fontSize: 16, color: MUTED }}>Set your body type</span>
-              <span style={{ fontSize: 15, color: ACCENT }}>+ Add</span>
+              <span style={{ fontSize: 13.5, color: MUTED }}>Set your body type</span>
+              <span style={{ fontSize: 13, color: ACCENT }}>+ Add</span>
             </button>
           )}
         </motion.div>
@@ -1258,15 +1258,15 @@ const Profile = () => {
           style={{ background: CARD_BG, borderRadius: 20, marginBottom: 12, padding: "28px 28px 24px" }}>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-            <p style={{ fontSize: 16, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED }}>Aesthetic</p>
+            <p style={{ fontSize: 13.5, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED }}>Aesthetic</p>
             {editMode !== "style" && (profile?.style_aesthetics?.length ?? 0) > 0 && (
-              <button onClick={openStyleEdit} style={{ fontSize: 16, color: ACCENT, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+              <button onClick={openStyleEdit} style={{ fontSize: 13.5, color: ACCENT, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
             )}
           </div>
 
           {editMode === "style" ? (
             <div>
-              <p style={{ fontSize: 15, color: MUTED, marginBottom: 16 }}>Select up to 3 aesthetics</p>
+              <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>Select up to 3 aesthetics</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
                 {STYLE_OPTIONS.map(opt => {
                   const sel = editStyle.includes(opt.label);
@@ -1280,7 +1280,7 @@ const Profile = () => {
                         </div>}
                       </div>
                       <div style={{ padding: "7px 10px", background: "white" }}>
-                        <p style={{ fontSize: 16, fontWeight: 500, color: PRIMARY }}>{opt.label}</p>
+                        <p style={{ fontSize: 13.5, fontWeight: 500, color: PRIMARY }}>{opt.label}</p>
                       </div>
                     </button>
                   );
@@ -1299,7 +1299,7 @@ const Profile = () => {
                   <div key={label} style={{ borderRadius: 14, overflow: "hidden", position: "relative" }}>
                     <img src={opt.image} alt={label} style={{ width: "100%", height: 260, objectFit: "cover", objectPosition: "top", display: "block" }} />
                     <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "28px 10px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.58), transparent)" }}>
-                      <p style={{ fontSize: 16, color: "white", fontWeight: 700, textAlign: "center", letterSpacing: "0.05em" }}>{label}</p>
+                      <p style={{ fontSize: 13.5, color: "white", fontWeight: 700, textAlign: "center", letterSpacing: "0.05em" }}>{label}</p>
                     </div>
                   </div>
                 ) : null;
@@ -1308,8 +1308,8 @@ const Profile = () => {
           ) : (
             <button onClick={openStyleEdit}
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "18px 20px", borderRadius: 14, border: `1px dashed ${PILL_BDR}`, background: "transparent", cursor: "pointer", boxSizing: "border-box" }}>
-              <span style={{ fontSize: 16, color: MUTED }}>Set your aesthetic</span>
-              <span style={{ fontSize: 15, color: ACCENT }}>+ Add</span>
+              <span style={{ fontSize: 13.5, color: MUTED }}>Set your aesthetic</span>
+              <span style={{ fontSize: 13, color: ACCENT }}>+ Add</span>
             </button>
           )}
         </motion.div>
@@ -1322,9 +1322,9 @@ const Profile = () => {
             style={{ background: CARD_BG, borderRadius: 20, padding: "28px 28px 8px" }}>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <p style={{ fontSize: 16, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED }}>Recent decisions</p>
+              <p style={{ fontSize: 13.5, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED }}>Recent decisions</p>
               <button onClick={() => navigate("/feed")}
-                style={{ fontSize: 16, color: ACCENT, background: "none", border: "none", cursor: "pointer" }}>
+                style={{ fontSize: 13.5, color: ACCENT, background: "none", border: "none", cursor: "pointer" }}>
                 View all →
               </button>
             </div>
@@ -1342,15 +1342,15 @@ const Profile = () => {
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {d.brand_name && (
-                    <p style={{ fontSize: 16, letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginBottom: 3 }}>
+                    <p style={{ fontSize: 13.5, letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginBottom: 3 }}>
                       {d.brand_name}
                     </p>
                   )}
-                  <p style={{ fontSize: 15, fontWeight: 600, color: PRIMARY, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: PRIMARY, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                     {d.product_name ?? "Untitled item"}
                   </p>
                   {d.uncertainty_text && (
-                    <p style={{ fontSize: 16, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p style={{ fontSize: 13.5, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       "{d.uncertainty_text}"
                     </p>
                   )}
@@ -1360,11 +1360,11 @@ const Profile = () => {
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end", marginBottom: 4 }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: d.status === "open" ? "#16a34a" : d.status === "purchased" ? ACCENT : MUTED }} />
-                    <span style={{ fontSize: 16, fontWeight: 600, color: SECONDARY }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: SECONDARY }}>
                       {d.status === "open" ? "Open" : d.status === "purchased" ? "Bought" : d.status ?? "Open"}
                     </span>
                   </div>
-                  <p style={{ fontSize: 15, color: MUTED }}>{timeAgo(d.created_at)}</p>
+                  <p style={{ fontSize: 13, color: MUTED }}>{timeAgo(d.created_at)}</p>
                 </div>
               </div>
             ))}

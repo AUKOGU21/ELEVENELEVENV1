@@ -160,7 +160,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
             <div style={{ marginBottom: 28 }}>
               <h2
                 style={{
-                  fontSize: 28,
+                  fontSize: 24,
                   fontWeight: 700,
                   color: "#1C1712",
                   lineHeight: 1.25,
@@ -173,7 +173,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
               </h2>
               <p
                 style={{
-                  fontSize: 22,
+                  fontSize: 18.5,
                   fontStyle: "italic",
                   color: "#C49E64",
                   marginBottom: 10,
@@ -183,7 +183,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
               >
                 Let's dial in your fit.
               </p>
-              <p style={{ fontSize: 14, color: "#8C7A70", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: "#8C7A70", lineHeight: 1.5 }}>
                 Make your matches more precise in seconds.
               </p>
             </div>
@@ -194,7 +194,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
                 <div key={cat.label}>
                   <p
                     style={{
-                      fontSize: 13,
+                      fontSize: 11,
                       fontWeight: 700,
                       color: "#1C1712",
                       marginBottom: 8,
@@ -215,7 +215,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
                             border: `1.5px solid ${active ? "#C49E64" : "rgba(28,23,18,0.18)"}`,
                             background: active ? "rgba(196,158,100,0.10)" : "transparent",
                             color: active ? "#1C1712" : "#5A4F47",
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: 500,
                             cursor: "pointer",
                             display: "flex",
@@ -249,7 +249,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
                   background: "#1C1712",
                   color: "#FDFAF6",
                   border: "none",
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: 600,
                   cursor: filledCount === 0 ? "default" : "pointer",
                   opacity: filledCount === 0 ? 0.35 : 1,
@@ -271,7 +271,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
                   marginTop: 14,
                   background: "transparent",
                   border: "none",
-                  fontSize: 14,
+                  fontSize: 12,
                   color: "#8C7A70",
                   cursor: "pointer",
                   padding: "8px 0",

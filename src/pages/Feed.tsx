@@ -15,7 +15,7 @@ import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBanner from "@/components/NotificationBanner";
 import NotificationBell from "@/components/NotificationBell";
-import LookingForCard from "@/components/LookingForCard";
+import LookingForCard, { type LookingForFoundPayload } from "@/components/LookingForCard";
 import RecommendationsDrawer from "@/components/RecommendationsDrawer";
 import RecommendationModal, { RecommendationDraft } from "@/components/RecommendationModal";
 import ReferralPopup from "@/components/ReferralPopup";
@@ -88,6 +88,14 @@ interface OutcomeRow {
   received_at: string | null;
   photo_url: string | null;
   chosen_option?: string | null;
+  // "Passed" flow: she skipped this item but bought something else instead.
+  bought_alternative?: boolean | null;
+  alt_product_url?: string | null;
+  alt_product_name?: string | null;
+  alt_product_image_url?: string | null;
+  alt_brand_name?: string | null;
+  alt_price_note?: string | null;
+  chosen_recommendation_id?: string | null;
 }
 
 interface DecisionRow {
@@ -662,7 +670,7 @@ const Feed = () => {
       if (allDecisionIds.length > 0) {
         const { data: outcomesData } = await supabase
           .from("outcomes")
-          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, chosen_recommendation_id")
           .in("decision_id", allDecisionIds)
           .order("created_at", { ascending: false });
 
@@ -741,7 +749,7 @@ const Feed = () => {
         if (myDecisionIds.length > 0) {
           const { data: myOutcomesData } = await supabase
             .from("outcomes")
-            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, chosen_recommendation_id")
             .in("decision_id", myDecisionIds)
             .order("created_at", { ascending: false });
 
@@ -936,6 +944,84 @@ const Feed = () => {
       await supabase.from("outcomes").upsert({ decision_id: id, user_id: user.id, ...outcomeRow }, { onConflict: "decision_id" });
     } catch (e) {
       console.error("still-deciding note failed:", e);
+    }
+  };
+
+  // ── Looking For outcomes ───────────────────────────────────────────────────
+  // She found it. Records what she bought (pulled product or the recommended one),
+  // credits the recommendation that got her there, and closes the post.
+  const saveLookingForOutcome = async (id: string, p: LookingForFoundPayload) => {
+    if (!user) return;
+    const outcomeRow: any = {
+      did_purchase: true,
+      outcome_type: "bought_it",
+      chosen_recommendation_id: p.chosenRecommendationId,
+      // bought_alternative marks "not the exact piece someone recommended", which
+      // is what the card reads to say "different piece, same brand".
+      bought_alternative: p.chosenRecommendationId ? !p.boughtExact : true,
+      alt_product_url: p.productUrl,
+      alt_product_name: p.productName,
+      alt_brand_name: p.productBrand,
+      alt_price_note: p.productPrice,
+      alt_product_image_url: p.productImageUrl,
+      confidence_after: p.confidenceAfter,
+    };
+
+    const merge = (d: DecisionRow): DecisionRow =>
+      d.id === id ? { ...d, status: "closed", outcomes: [{ ...(d.outcomes?.[0] ?? {} as any), ...outcomeRow }] } : d;
+    setDecisions(prev => prev.map(merge));
+    setMyDecisions(prev => prev.map(merge));
+
+    try {
+      const { error: oErr } = await supabase
+        .from("outcomes")
+        .upsert({ decision_id: id, user_id: user.id, ...outcomeRow }, { onConflict: "decision_id" });
+      if (oErr) throw oErr;
+      const { error: sErr } = await supabase.from("decisions").update({ status: "closed" }).eq("id", id);
+      if (sErr) throw sErr;
+
+      if (p.chosenRecommendationId) {
+        supabase.functions
+          .invoke("notify-rec-outcome", { body: { decision_id: id, recommendation_id: p.chosenRecommendationId } })
+          .catch((e) => console.warn("rec outcome notify failed:", e));
+      }
+    } catch (e) {
+      console.error("looking-for outcome save failed:", e);
+      toast.error("Couldn't save that — try again in a second.");
+      fetchDecisions();
+    }
+  };
+
+  // A slow link read landing after she already finished: fill in the product
+  // details on the row she saved.
+  const patchLookingForProduct = async (id: string, pulled: { brand: string | null; name: string | null; image_url: string | null; price: string | null }) => {
+    const patch = {
+      alt_brand_name: pulled.brand,
+      alt_product_name: pulled.name,
+      alt_product_image_url: pulled.image_url,
+      alt_price_note: pulled.price,
+    };
+    const merge = (d: DecisionRow): DecisionRow =>
+      d.id === id ? { ...d, outcomes: [{ ...(d.outcomes?.[0] ?? {} as any), ...patch }] } : d;
+    setDecisions(prev => prev.map(merge));
+    setMyDecisions(prev => prev.map(merge));
+    try {
+      await supabase.from("outcomes").update(patch).eq("decision_id", id);
+    } catch (e) {
+      console.warn("looking-for product patch failed:", e);
+    }
+  };
+
+  // "Still looking" is a pause, not a close: no status change, just a note that
+  // she checked in, so the prompt can come back later.
+  const quickStillLooking = async (id: string) => {
+    if (!user) return;
+    try {
+      await supabase
+        .from("outcomes")
+        .upsert({ decision_id: id, user_id: user.id, did_purchase: false, outcome_type: "still_deciding" }, { onConflict: "decision_id" });
+    } catch (e) {
+      console.error("still-looking note failed:", e);
     }
   };
 
@@ -1713,6 +1799,9 @@ const Feed = () => {
                 onOpenRecommendations={() => setRecsOpenId(decision.id)}
                 onAddRecommendation={() => (user ? setRecModalFor(decision.id) : navigate("/signin"))}
                 onSignIn={() => navigate("/signin")}
+                onFound={saveLookingForOutcome}
+                onProductPulled={patchLookingForProduct}
+                onStillLooking={quickStillLooking}
               />
             ) : (
             <DecisionCard
@@ -1996,7 +2085,7 @@ const Feed = () => {
                 // if there are multiple rows for the same decision_id.
                 const { data: rows } = await supabase
                   .from("outcomes")
-                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, chosen_recommendation_id")
                   .eq("decision_id", id)
                   .order("created_at", { ascending: false })
                   .limit(1);
@@ -2272,12 +2361,28 @@ const DecisionCard = ({
   const webImgs = chosenOpt === "second"
     ? [decision.product_image_url_2, decision.product_image_url]
     : [decision.product_image_url, decision.product_image_url_2];
-  const swipeImgs = (outcomePhoto ? [outcomePhoto, ...webImgs] : webImgs).filter(Boolean) as string[];
+  // She passed on this item but bought something else — that product rides at the
+  // end of the swipe, pulled off her link the same way the original product was.
+  const outcomeRow = decision.outcomes?.[0] ?? null;
+  const altBought = decision.status === "closed" && outcomeRow?.bought_alternative === true;
+  const altImg = altBought ? (outcomeRow?.alt_product_image_url ?? null) : null;
+  const swipeImgs = [
+    ...(outcomePhoto ? [outcomePhoto] : []),
+    ...webImgs,
+    ...(altImg ? [altImg] : []),
+  ].filter(Boolean) as string[];
   const curSwipeIdx = swipeImgs.length ? Math.min(imgIdx, swipeImgs.length - 1) : 0;
+  const showingAlt = !!altImg && swipeImgs[curSwipeIdx] === altImg;
   const showingSecondProduct = !!decision.product_image_url_2 && swipeImgs[curSwipeIdx] === decision.product_image_url_2;
-  const dispBrand = showingSecondProduct ? (decision.brand_name_2 || decision.brand_name) : decision.brand_name;
-  const dispName = showingSecondProduct ? (decision.product_name_2 || decision.product_name) : decision.product_name;
-  const dispPrice = showingSecondProduct ? (decision.price_note_2 || decision.price_note) : decision.price_note;
+  const dispBrand = showingAlt
+    ? (outcomeRow?.alt_brand_name || outcomeRow?.alt_product_name || "What she bought instead")
+    : showingSecondProduct ? (decision.brand_name_2 || decision.brand_name) : decision.brand_name;
+  const dispName = showingAlt
+    ? (outcomeRow?.alt_brand_name ? outcomeRow?.alt_product_name ?? null : null)
+    : showingSecondProduct ? (decision.product_name_2 || decision.product_name) : decision.product_name;
+  const dispPrice = showingAlt
+    ? (outcomeRow?.alt_price_note ?? null)
+    : showingSecondProduct ? (decision.price_note_2 || decision.price_note) : decision.price_note;
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === decision.user_id;
   const confidence = decision.confidence_score ?? 0;
@@ -2592,6 +2697,7 @@ const DecisionCard = ({
           // Each option's image links to its own product page; the IRL photo has none.
           const currentUrl = imgs[idx] === decision.product_image_url ? (decision.product_url ?? null)
             : imgs[idx] === decision.product_image_url_2 ? (decision.product_url_2 ?? null)
+            : showingAlt ? (outcomeRow?.alt_product_url ?? null)
             : null;
           const go = (dir: number) => setImgIdx((imgs.length + idx + dir) % imgs.length);
           const arrow: React.CSSProperties = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(28,23,18,0.55)", color: "#fff", fontSize: 17, lineHeight: "30px", textAlign: "center", cursor: "pointer", zIndex: 3, padding: 0 };
@@ -2610,6 +2716,9 @@ const DecisionCard = ({
               {showingOutcome && (
                 <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(28,23,18,0.82)", color: "#F4EEE6", fontSize: 9.5, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em", zIndex: 3 }}>✦ On her</span>
               )}
+              {showingAlt && (
+                <span style={{ position: "absolute", top: 10, left: 10, background: "#6E7A44", color: "#F4EEE6", fontSize: 9.5, fontWeight: 600, borderRadius: 100, padding: "3px 10px", letterSpacing: "0.04em", zIndex: 3 }}>✦ Bought instead</span>
+              )}
               {oPhoto && !showingOutcome && (
                 <motion.button
                   onClick={(e) => { e.stopPropagation(); setImgIdx(imgs.indexOf(oPhoto)); }}
@@ -2621,6 +2730,17 @@ const DecisionCard = ({
                   ✦ See it IRL <span style={{ fontSize: 12 }}>→</span>
                 </motion.button>
               )}
+              {altImg && !showingAlt && !(oPhoto && !showingOutcome) && (
+                <motion.button
+                  onClick={(e) => { e.stopPropagation(); setImgIdx(imgs.indexOf(altImg)); }}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: [0, -3, 0] }}
+                  transition={{ y: { repeat: Infinity, duration: 1.8, ease: "easeInOut" }, opacity: { duration: 0.3 } }}
+                  style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "#6E7A44", color: "#F4EEE6", border: "none", cursor: "pointer", fontSize: 10, fontWeight: 700, letterSpacing: "0.03em", borderRadius: 100, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6, zIndex: 4, boxShadow: "0 3px 12px rgba(0,0,0,0.3)", whiteSpace: "nowrap" }}
+                >
+                  ✦ See what she bought instead <span style={{ fontSize: 12 }}>→</span>
+                </motion.button>
+              )}
               {multi && (
                 <>
                   <span style={{ position: "absolute", top: 10, right: 10, background: "rgba(28,23,18,0.6)", color: "#fff", fontSize: 9.5, fontWeight: 600, borderRadius: 100, padding: "2px 9px", zIndex: 3 }}>{idx + 1} / {imgs.length}</span>
@@ -2629,7 +2749,7 @@ const DecisionCard = ({
                       <button aria-label="Previous image" onClick={(e) => { e.stopPropagation(); go(-1); }} style={{ ...arrow, left: 8 }}>‹</button>
                       <button aria-label="Next image" onClick={(e) => { e.stopPropagation(); go(1); }} style={{ ...arrow, right: 8 }}>›</button>
                     </>
-                  ) : (!oPhoto || showingOutcome) ? (
+                  ) : ((!oPhoto || showingOutcome) && (!altImg || showingAlt)) ? (
                     <span style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(28,23,18,0.62)", color: "#fff", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 100, padding: "3px 12px", zIndex: 3, display: "flex", alignItems: "center", gap: 5 }}>swipe <span style={{ fontSize: 11 }}>→</span></span>
                   ) : null}
                 </>
@@ -2686,6 +2806,16 @@ const DecisionCard = ({
             const outcome = decision.outcomes?.[0] ?? null;
             const bought = decision.status === "purchased";
             const sizeBought = outcome?.size_bought ?? null;
+            // Passed on this item, but bought something else instead (altBought
+            // and altImg are computed up top, where the swipe is assembled).
+            const altUrl = outcome?.alt_product_url ?? null;
+            const altName = outcome?.alt_product_name ?? null;
+            const altBrand = outcome?.alt_brand_name ?? null;
+            const altPrice = outcome?.alt_price_note ?? null;
+            const altHost = (() => {
+              if (!altUrl) return null;
+              try { return new URL(altUrl).hostname.replace(/^www\./, ""); } catch { return null; }
+            })();
             const confidenceAfter = outcome?.confidence_after ?? null;
             // Prefer the dedicated take; fall back to legacy write-ins so old outcomes still read well.
             // Show her reasoning no matter what: free-text take first, then any
@@ -2722,12 +2852,14 @@ const DecisionCard = ({
                 {/* Final decision panel */}
                 <div style={{ background: "rgba(0,0,0,0.035)", borderRadius: 12, padding: "16px 14px", display: "flex", alignItems: "flex-start", marginBottom: 16 }}>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 11 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: bought ? "#6E7A44" : "#8C7A70", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {bought ? <Check style={{ width: 20, height: 20, color: "#fff" }} /> : <X style={{ width: 18, height: 18, color: "#fff" }} />}
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: bought || altBought ? "#6E7A44" : "#8C7A70", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {bought ? <Check style={{ width: 20, height: 20, color: "#fff" }} />
+                        : altBought ? <ArrowRight style={{ width: 19, height: 19, color: "#fff" }} />
+                        : <X style={{ width: 18, height: 18, color: "#fff" }} />}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={LBL}>Final decision</p>
-                      <p style={{ fontWeight: 800, fontSize: 20.5, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, whiteSpace: "nowrap" }}>{bought ? (chosenOpt === "both" ? "Bought both" : "Bought it") : (hasTwoOptions ? "Didn't buy either" : "Didn't buy it")}</p>
+                      <p style={{ fontWeight: 800, fontSize: 20.5, letterSpacing: "-0.01em", color: "#1A1A1A", margin: "2px 0 0", lineHeight: 1.05, whiteSpace: "nowrap" }}>{bought ? (chosenOpt === "both" ? "Bought both" : "Bought it") : altBought ? "Bought something else" : (hasTwoOptions ? "Didn't buy either" : "Didn't buy it")}</p>
                     </div>
                   </div>
                   {bought && sizeBought && (
@@ -2740,6 +2872,28 @@ const DecisionCard = ({
                     </>
                   )}
                 </div>
+
+                {/* Bought something else instead — the swap is the real signal */}
+                {altBought && (altUrl || altName || altBrand) && (
+                  <div style={{ background: "rgba(110,122,68,0.07)", border: "1px solid rgba(110,122,68,0.22)", borderRadius: 12, padding: "14px", marginBottom: 16 }}>
+                    <p style={{ ...LBL, marginBottom: 6 }}>Bought this instead</p>
+                    {altBrand && (
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A", margin: 0, lineHeight: 1.3 }}>{altBrand}</p>
+                    )}
+                    {altName && (
+                      <p style={{ fontSize: altBrand ? 11 : 14, fontWeight: altBrand ? 500 : 700, letterSpacing: altBrand ? "0.16em" : undefined, textTransform: altBrand ? "uppercase" : undefined, color: altBrand ? "#8C7A70" : "#1A1A1A", margin: altBrand ? "3px 0 0" : 0, lineHeight: 1.3 }}>{altName}</p>
+                    )}
+                    {altPrice && (
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "5px 0 0" }}>{altPrice.startsWith("$") ? altPrice : `$${altPrice}`}</p>
+                    )}
+                    {altUrl && (
+                      <a href={altUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "#5A4A42", textDecoration: "none", marginTop: altName ? 6 : 2, wordBreak: "break-all" }}>
+                        <ExternalLink style={{ width: 11, height: 11, flexShrink: 0 }} /> {altHost ?? "View what she bought"}
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {/* Confidence journey — directional progress bar (green = grew, rose = dropped) */}
                 {(() => {

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeUrl, pullProduct, type PulledProduct } from "@/lib/productPull";
 
 interface OutcomeModalProps {
   open: boolean;
@@ -25,6 +26,7 @@ type OutcomeType = "bought_it" | "didnt_buy" | "still_deciding";
 type StepId =
   | "outcome"
   | "tipping_factor"
+  | "bought_alternative"
   | "size_bought"
   | "fit_result"
   | "size_recommendation"
@@ -41,6 +43,10 @@ interface StepState {
   size_recommendation: string | null;
   outcome_detail: string | null;
   outcome_detail_other: string;
+  // "Passed" flow: she skipped this item but bought something else instead.
+  bought_alternative: boolean | null;
+  alt_product_url: string;
+  alt_product_name: string;
 }
 
 const UNCERTAINTY_PRIORITY = [
@@ -87,6 +93,11 @@ function buildSteps(outcome: OutcomeType | null, primary: string): StepId[] {
   }
 
   if (outcome === "still_deciding") return ["outcome", "complete"];
+
+  // Passing on the item isn't the end of the story — she often buys something
+  // else instead, and that swap is the most useful signal we can capture.
+  if (outcome === "didnt_buy") return [...base, "bought_alternative", "complete"];
+
   return [...base, "complete"];
 }
 
@@ -331,11 +342,15 @@ const SIZE_RECOMMENDATION_OPTIONS = [
   "Don't buy",
 ];
 
-function completeMessage(outcome: OutcomeType): string {
+function completeMessage(outcome: OutcomeType, boughtAlternative?: boolean | null): string {
   if (outcome === "bought_it") return "Got it. This helps us understand what you need.";
-  if (outcome === "didnt_buy") return "Makes sense. We're using this to get you more relevant input.";
+  if (outcome === "didnt_buy") {
+    if (boughtAlternative) return "Good to know what you went with instead. That's the useful part.";
+    return "Makes sense. We're using this to get you more relevant input.";
+  }
   return "Sounds good — we'll circle back.";
 }
+
 
 const OPTION_BASE: React.CSSProperties = {
   width: "100%",
@@ -408,11 +423,66 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
     size_recommendation: null,
     outcome_detail: null,
     outcome_detail_other: "",
+    bought_alternative: null,
+    alt_product_url: "",
+    alt_product_name: "",
   });
 
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // The alternative she bought, read off the pasted link by extract-product —
+  // same pull PostDecision uses, so it lands in the swipe like any other product.
+  const [altFetching, setAltFetching] = useState(false);
+  const [altPulled, setAltPulled] = useState<PulledProduct | null>(null);
+  const [altFailed, setAltFailed] = useState(false);
+  const altFetchedUrl = useRef<string | null>(null);
+
+  // True once the outcome row exists, so a slow link read can patch it after
+  // she's already moved on instead of making her wait on the modal.
+  const savedRef = useRef(false);
+
+  const pullPulledProduct = async (rawUrl: string): Promise<PulledProduct | null> => {
+    const url = normalizeUrl(rawUrl);
+    if (!url) return null;
+    // Don't re-read the same link on every blur.
+    if (altFetchedUrl.current === url) return altPulled;
+    altFetchedUrl.current = url;
+    setAltFetching(true);
+    setAltFailed(false);
+    try {
+      const pulled = await pullProduct(url);
+      // Nothing usable came back — treat it as a failure so she gets the note.
+      if (!pulled) {
+        setAltFailed(true);
+        setAltPulled(null);
+        return null;
+      }
+      setAltPulled(pulled);
+      // Prefill the name only if she hasn't typed her own.
+      setState((s) => ({ ...s, alt_product_name: s.alt_product_name || pulled.name || "" }));
+      // Reading a link takes ~10s, so she may have hit Continue already. Patch
+      // the saved row; the feed's realtime subscription picks the image up.
+      if (savedRef.current) {
+        await supabase
+          .from("outcomes")
+          .update({
+            alt_product_image_url: pulled.image_url,
+            alt_brand_name: pulled.brand,
+            alt_price_note: pulled.price,
+          })
+          .eq("decision_id", decision.id);
+      }
+      return pulled;
+    } catch {
+      setAltFailed(true);
+      setAltPulled(null);
+      return null;
+    } finally {
+      setAltFetching(false);
+    }
+  };
 
   const primary = parsePrimaryUncertainty(decision.uncertainty_text);
   const steps = buildSteps(state.outcome, primary);
@@ -431,10 +501,18 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
         size_recommendation: null,
         outcome_detail: null,
         outcome_detail_other: "",
+        bought_alternative: null,
+        alt_product_url: "",
+        alt_product_name: "",
       });
       // If pre-seeded, skip the "did you buy?" step and land on the first question.
       setCurrentStepIdx(seeded ? 1 : 0);
       setSaving(false);
+      setAltFetching(false);
+      setAltPulled(null);
+      setAltFailed(false);
+      altFetchedUrl.current = null;
+      savedRef.current = false;
       if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
     }
     return () => {
@@ -445,7 +523,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
   const advance = () => setCurrentStepIdx((i) => i + 1);
   const goBack = () => setCurrentStepIdx((i) => Math.max(0, i - 1));
 
-  const saveAndComplete = async (finalState: StepState) => {
+  const saveAndComplete = async (finalState: StepState, pulledOverride?: PulledProduct | null) => {
     if (!user || !finalState.outcome) return;
     setSaving(true);
 
@@ -456,6 +534,16 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
     const odOther = finalState.outcome_detail_other.trim() || null;
     const odValue = finalState.outcome_detail === "Other" ? null : finalState.outcome_detail;
     const fitNote = finalState.fit_result_note.trim() || null;
+
+    // She passed on this item but bought something else — keep the swap on the
+    // outcome so the closed card can show what she actually went with.
+    const boughtAlt = finalState.outcome === "didnt_buy" ? finalState.bought_alternative : null;
+    const pulled = pulledOverride !== undefined ? pulledOverride : altPulled;
+    const altUrl = boughtAlt ? normalizeUrl(finalState.alt_product_url) : null;
+    const altName = boughtAlt ? finalState.alt_product_name.trim() || pulled?.name || null : null;
+    const altImage = boughtAlt ? pulled?.image_url ?? null : null;
+    const altBrand = boughtAlt ? pulled?.brand ?? null : null;
+    const altPrice = boughtAlt ? pulled?.price ?? null : null;
 
     // Persist the outcome. .select() lets us distinguish a real write from a
     // silent no-op: an RLS-filtered write returns NO error but ALSO no rows, so
@@ -478,6 +566,12 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
           size_recommendation: finalState.size_recommendation,
           outcome_detail: odValue,
           outcome_detail_other: odOther,
+          bought_alternative: boughtAlt,
+          alt_product_url: altUrl,
+          alt_product_name: altName,
+          alt_product_image_url: altImage,
+          alt_brand_name: altBrand,
+          alt_price_note: altPrice,
         },
         { onConflict: "decision_id" }
       )
@@ -512,6 +606,8 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
       toast.error(`Couldn't close this decision — ${detail}`);
       return; // do NOT advance to the success step or call onComplete
     }
+
+    savedRef.current = true;
 
     // Close the loop: email everyone who weighed in (fire-and-forget; the
     // function skips if there were no weigh-ins and never blocks the UI).
@@ -756,6 +852,96 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                 </div>
               )}
 
+              {currentStep === "bought_alternative" && (
+                <div>
+                  <p style={QUESTION_STYLE}>Did you buy something else instead?</p>
+                  <button
+                    style={state.bought_alternative === true ? OPTION_SELECTED : OPTION_BASE}
+                    onClick={() => setState((s) => ({ ...s, bought_alternative: true }))}
+                  >
+                    Yes, I bought something else
+                  </button>
+                  {state.bought_alternative === true && (
+                    <div>
+                      <input
+                        type="url"
+                        inputMode="url"
+                        autoCapitalize="none"
+                        placeholder="Paste the link to what you bought"
+                        value={state.alt_product_url}
+                        onChange={(e) => setState((s) => ({ ...s, alt_product_url: e.target.value }))}
+                        onBlur={(e) => pullPulledProduct(e.target.value)}
+                        onPaste={(e) => {
+                          const pasted = e.clipboardData.getData("text");
+                          if (pasted) setTimeout(() => pullPulledProduct(pasted), 0);
+                        }}
+                        style={{ ...TEXTAREA_STYLE, resize: undefined }}
+                      />
+
+                      {altFetching && (
+                        <p style={{ fontSize: 12, color: "#8C7A70", margin: "6px 2px 0" }}>Reading that link...</p>
+                      )}
+
+                      {/* What we pulled off the link — she sees the exact image
+                          that will show up on her card before she commits. */}
+                      {!altFetching && altPulled && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "white", border: "1px solid rgba(196,158,100,0.4)", borderRadius: 10, padding: 10, marginTop: 8 }}>
+                          {altPulled.image_url ? (
+                            <img src={altPulled.image_url} alt="" style={{ width: 52, height: 64, objectFit: "cover", borderRadius: 6, flexShrink: 0, background: "#EDE8E2" }} />
+                          ) : (
+                            <div style={{ width: 52, height: 64, borderRadius: 6, flexShrink: 0, background: "#EDE8E2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#8C7A70", textAlign: "center", lineHeight: 1.2 }}>no image</div>
+                          )}
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            {altPulled.brand && <p style={{ fontSize: 13, fontWeight: 700, color: "#1C1712", margin: 0 }}>{altPulled.brand}</p>}
+                            {altPulled.name && <p style={{ fontSize: 11.5, color: "#5A4A42", margin: "2px 0 0", lineHeight: 1.3 }}>{altPulled.name}</p>}
+                            {altPulled.price && <p style={{ fontSize: 12, fontWeight: 600, color: "#1C1712", margin: "4px 0 0" }}>{altPulled.price.startsWith("$") ? altPulled.price : `$${altPulled.price}`}</p>}
+                          </div>
+                        </div>
+                      )}
+
+                      {!altFetching && altFailed && (
+                        <p style={{ fontSize: 11.5, color: "#8C7A70", margin: "6px 2px 0", lineHeight: 1.4 }}>
+                          Couldn't read that link, so there won't be an image. Your link still saves.
+                        </p>
+                      )}
+
+                      <input
+                        type="text"
+                        placeholder="What is it? (optional) e.g. Reformation Cynthia dress"
+                        value={state.alt_product_name}
+                        onChange={(e) => setState((s) => ({ ...s, alt_product_name: e.target.value }))}
+                        style={{ ...TEXTAREA_STYLE, resize: undefined, marginTop: 8 }}
+                      />
+                    </div>
+                  )}
+                  <button
+                    style={state.bought_alternative === false ? OPTION_SELECTED : OPTION_BASE}
+                    onClick={() => {
+                      const next = { ...state, bought_alternative: false, alt_product_url: "", alt_product_name: "" };
+                      setState(next);
+                      saveAndComplete(next, null);
+                    }}
+                  >
+                    No, I passed on it entirely
+                  </button>
+                  {state.bought_alternative === true && (
+                    <button
+                      style={CONTINUE_BTN}
+                      disabled={saving}
+                      onClick={() => {
+                        // Never make her wait on the link read. Start it if it
+                        // hasn't run (fast typer, or no blur on mobile) and save
+                        // now — whatever comes back patches the row after.
+                        if (!altPulled && !altFetching) void pullPulledProduct(state.alt_product_url);
+                        saveAndComplete(state, altPulled);
+                      }}
+                    >
+                      {saving ? "Saving..." : "Continue →"}
+                    </button>
+                  )}
+                </div>
+              )}
+
               {currentStep === "size_bought" && (
                 <div>
                   <p style={QUESTION_STYLE}>What size did you buy?</p>
@@ -916,7 +1102,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                       maxWidth: 280,
                     }}
                   >
-                    {completeMessage(state.outcome)}
+                    {completeMessage(state.outcome, state.bought_alternative)}
                   </p>
                 </div>
               )}

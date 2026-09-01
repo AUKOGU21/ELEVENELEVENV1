@@ -1489,6 +1489,19 @@ const Feed = () => {
     );
   };
 
+  // The fixed header's height drives the feed's top padding.
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerH, setHeaderH] = useState(isMobile ? 52 : 70);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const measure = () => setHeaderH(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // ─── Main render ──────────────────────────────────────────────────────────────
 
   return (
@@ -1514,6 +1527,7 @@ const Feed = () => {
 
       {/* ── Floating header ───────────────────────────────────────────────────── */}
       <header
+        ref={headerRef}
         className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between py-3"
         style={{ background: "rgba(235,230,222,0.96)", backdropFilter: "blur(12px)", padding: isMobile ? "9px 10px" : "16px 40px", gap: isMobile ? 6 : 0 }}
       >
@@ -1720,10 +1734,12 @@ const Feed = () => {
       {/* ── Feed scroll container ─────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
-        className="w-full max-w-[1160px] no-scrollbar"
+        className="w-full max-w-[1160px] no-scrollbar feed-scroll"
         style={{
           overflowY: "scroll",
-          paddingTop: 72,
+          // Clear the fixed header exactly, plus one deliberate gap. The first
+          // card's own top margin is zeroed in CSS so the two don't stack.
+          paddingTop: headerH + (isMobile ? 14 : 20),
           paddingBottom: 40,
           paddingLeft: 16,
           paddingRight: 16,

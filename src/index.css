@@ -131,3 +131,10 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;            /* Chrome/Safari */
 }
+
+/* The feed's top spacing comes from the scroll container alone. Banners and cards
+   carry their own top margin for stacking, which would otherwise double up under
+   the fixed header. !important is needed to beat their inline styles. */
+.feed-scroll > *:first-child {
+  margin-top: 0 !important;
+}

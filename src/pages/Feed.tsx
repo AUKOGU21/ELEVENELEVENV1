@@ -14,6 +14,7 @@ import ResponsesDrawer from "@/components/ResponsesDrawer";
 import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBanner from "@/components/NotificationBanner";
+import NotificationPrompt from "@/components/NotificationPrompt";
 import NotificationBell from "@/components/NotificationBell";
 import LookingForCard, { type LookingForFoundPayload } from "@/components/LookingForCard";
 import RecommendationsDrawer from "@/components/RecommendationsDrawer";
@@ -2235,6 +2236,8 @@ const Feed = () => {
       )}
 
       <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} />
+
+      {user && <NotificationPrompt userId={user.id} isMobile={isMobile} />}
     </div>
   );
 };

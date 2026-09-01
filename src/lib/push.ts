@@ -130,3 +130,36 @@ export async function recordHomeScreenUse(userId: string): Promise<void> {
     // Never let instrumentation break the app.
   }
 }
+
+// ── Android install prompt ────────────────────────────────────────────────────
+// Chrome fires beforeinstallprompt on load, so we capture it at import time and
+// hand the banner a real one-tap install. iOS has no equivalent and still needs
+// the manual share sheet instructions.
+let deferredInstall: (Event & { prompt: () => void; userChoice: Promise<{ outcome: string }> }) | null = null;
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstall = e as typeof deferredInstall;
+    window.dispatchEvent(new Event("ee-installable"));
+  });
+  window.addEventListener("appinstalled", () => {
+    deferredInstall = null;
+  });
+}
+
+export function canInstall(): boolean {
+  return !!deferredInstall && !isStandalone();
+}
+
+export async function promptInstall(): Promise<boolean> {
+  if (!deferredInstall) return false;
+  try {
+    deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    deferredInstall = null;
+    return outcome === "accepted";
+  } catch {
+    return false;
+  }
+}

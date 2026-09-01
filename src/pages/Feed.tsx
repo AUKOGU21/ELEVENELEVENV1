@@ -860,7 +860,7 @@ const Feed = () => {
       followed_up_at: new Date().toISOString(),
       kept: data.kept,
       recommend: data.recommend,
-      confidence_after: data.confidence,
+      ...(data.confidence != null ? { confidence_after: data.confidence } : {}),
       ...(fitLike ? { fit_result: data.detailAnswer } : { outcome_detail: data.detailAnswer }),
       ...(data.take && data.take.trim() ? { take: data.take.trim() } : {}),
       ...(photoUrl ? { photo_url: photoUrl } : {}),
@@ -1443,8 +1443,10 @@ const Feed = () => {
     const o = d.outcomes?.[0];
     if (!o) return false;
     // A swap is a purchase too: she bought something, it just wasn't this item.
+    // Same for a Looking For post she closed by finding something.
     const isSwap = d.status === "closed" && o.bought_alternative === true;
-    if (d.status !== "purchased" && !isSwap) return false;
+    const isFoundLf = d.post_type === "looking_for" && d.status === "closed" && o.outcome_type === "bought_it";
+    if (d.status !== "purchased" && !isSwap && !isFoundLf) return false;
     const arrival = o.arrival_status;
     if (arrival === "returned") return false;
     if (!arrival) return true;                         // "did you receive it?" not answered yet
@@ -1782,7 +1784,7 @@ const Feed = () => {
                     {(() => {
                       const d = followupPending[0];
                       const o = d.outcomes?.[0];
-                      const swap = d.status === "closed" && o?.bought_alternative === true;
+                      const swap = d.status === "closed" && (o?.bought_alternative === true || d.post_type === "looking_for");
                       const name = swap
                         ? [o?.alt_brand_name, o?.alt_product_name].filter(Boolean).join(" ").trim()
                         : [d.brand_name, d.product_name].filter(Boolean).join(" ").trim();
@@ -1814,6 +1816,9 @@ const Feed = () => {
                 onFound={saveLookingForOutcome}
                 onProductPulled={patchLookingForProduct}
                 onStillLooking={quickStillLooking}
+                updateOutcome={updateOutcome}
+                submitReceived={submitReceived}
+                submitReturned={submitReturned}
               />
             ) : (
             <DecisionCard
@@ -2824,7 +2829,6 @@ const DecisionCard = ({
             const altName = outcome?.alt_product_name ?? null;
             const altBrand = outcome?.alt_brand_name ?? null;
             const altPrice = outcome?.alt_price_note ?? null;
-            const altReason = outcome?.alt_reason ?? null;
             const altHost = (() => {
               if (!altUrl) return null;
               try { return new URL(altUrl).hostname.replace(/^www\./, ""); } catch { return null; }
@@ -2835,8 +2839,9 @@ const DecisionCard = ({
             // write-in, then the preset reason she picked (so "didn't buy" cards
             // always surface why — not only when she chose "Something else").
             const take = outcome?.take || outcome?.fit_result_note || outcome?.outcome_detail_other || outcome?.tipping_factor_other || outcome?.tipping_factor || null;
-            // The swap reason renders in its own panel, so don't repeat it here.
-            const showTake = !!take && take !== outcome?.alt_reason;
+            // Her take covers both what she wrote when she switched and what she
+            // wrote after living with it. Same heading, in the order she wrote them.
+            const takeQuotes = [...new Set([outcome?.alt_reason, take].filter(Boolean) as string[])];
             const followedUp = !!outcome?.followed_up_at;
             const kept = outcome?.kept;
             const recommend = outcome?.recommend;
@@ -2907,18 +2912,6 @@ const DecisionCard = ({
                         <ExternalLink style={{ width: 11, height: 11, flexShrink: 0 }} /> {altHost ?? "View what she bought"}
                       </a>
                     )}
-                    {altReason && (
-                      <div style={{ marginTop: 12, paddingTop: 11, borderTop: "1px solid rgba(110,122,68,0.22)" }}>
-                        <p style={{ ...LBL, marginBottom: 7 }}>Why this one</p>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
-                          <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>
-                            {altReason}
-                            <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span>
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -2962,13 +2955,15 @@ const DecisionCard = ({
                 })()}
 
                 {/* Her take — only once she's written one */}
-                {showTake && (
+                {takeQuotes.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
                     <p style={{ ...LBL, marginBottom: 8 }}>Her take</p>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
-                      <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{take}<span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span></p>
-                    </div>
+                    {takeQuotes.map((q, i) => (
+                      <div key={i} style={{ display: "flex", gap: 8, marginTop: i === 0 ? 0 : 10 }}>
+                        <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
+                        <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>{q}<span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span></p>
+                      </div>
+                    ))}
                   </div>
                 )}
 

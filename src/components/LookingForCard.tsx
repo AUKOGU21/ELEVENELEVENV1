@@ -37,6 +37,14 @@ export interface LookingForOutcome {
   alt_price_note?: string | null;
   alt_reason?: string | null;
   bought_alternative?: boolean | null;
+  // Received-it lifecycle, same shape decision cards use.
+  arrival_status?: string | null;
+  next_prompt_at?: string | null;
+  kept?: boolean | null;
+  recommend?: boolean | null;
+  take?: string | null;
+  photo_url?: string | null;
+  followed_up_at?: string | null;
 }
 
 export interface LookingForFoundPayload {
@@ -90,12 +98,16 @@ interface Props {
   // row gets its brand / price / image instead of losing them to the race.
   onProductPulled?: (id: string, pulled: PulledProduct) => void;
   onStillLooking?: (id: string) => void;
+  // Received-it lifecycle handlers, shared with the decision cards.
+  updateOutcome?: (id: string, patch: Record<string, any>) => void;
+  submitReceived?: (id: string, data: { primary: string; detailAnswer: string | null; kept: boolean | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null }) => void;
+  submitReturned?: (id: string, data: { note: string | null; photoFile: File | null }) => void;
 }
 
 type FoundStep = "idle" | "pick" | "same_or_diff" | "link" | "why" | "confidence" | "thanks" | "snoozed";
 
 export default function LookingForCard({
-  decision, user, isMobile, activeTab, isSaved, onSave, onHide, navigate, handleDelete, onOpenRecommendations, onAddRecommendation, onSignIn, onFound, onProductPulled, onStillLooking,
+  decision, user, isMobile, activeTab, isSaved, onSave, onHide, navigate, handleDelete, onOpenRecommendations, onAddRecommendation, onSignIn, onFound, onProductPulled, onStillLooking, updateOutcome, submitReceived, submitReturned,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -111,6 +123,19 @@ export default function LookingForCard({
   // Set when she picked a rec but bought a different piece from that brand.
   const [differentPiece, setDifferentPiece] = useState(false);
   const [reason, setReason] = useState("");
+
+  // ── Received-it lifecycle, once she's logged what she bought ───────────────
+  type FuStage = "gate" | "returned" | "detail" | "keep" | "recommend" | "take";
+  const [fuStage, setFuStage] = useState<FuStage>("gate");
+  const [fuDismiss, setFuDismiss] = useState(false);
+  const [fuThanks, setFuThanks] = useState(false);
+  const [fuDetail, setFuDetail] = useState<string | null>(null);
+  const [fuKept, setFuKept] = useState<boolean | null>(null);
+  const [fuRec, setFuRec] = useState<boolean | null>(null);
+  const [fuTake, setFuTake] = useState("");
+  const [fuNote, setFuNote] = useState("");
+  const [fuPhoto, setFuPhoto] = useState<File | null>(null);
+  const fuPhotoRef = useRef<HTMLInputElement>(null);
   // The in-flight link read, and whether she's already finished the flow.
   const pullPromiseRef = useRef<Promise<PulledProduct | null> | null>(null);
   const submittedRef = useRef(false);
@@ -136,7 +161,7 @@ export default function LookingForCard({
   const boughtPrice = outcome?.alt_price_note ?? null;
   const boughtImage = outcome?.alt_product_image_url ?? null;
   const boughtUrl = outcome?.alt_product_url ?? null;
-  const boughtReason = outcome?.alt_reason ?? null;
+  const takeQuotes = [...new Set([outcome?.alt_reason, outcome?.take].filter(Boolean) as string[])];
   const boughtHost = (() => {
     if (!boughtUrl) return null;
     try { return new URL(boughtUrl).hostname.replace(/^www\./, ""); } catch { return null; }
@@ -346,16 +371,18 @@ export default function LookingForCard({
                   )}
                 </div>
               </div>
-              {boughtReason && (
+              {takeQuotes.length > 0 && (
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(110,122,68,0.22)" }}>
-                  <p style={{ ...LBL, marginBottom: 7 }}>Why this one</p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
-                    <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>
-                      {boughtReason}
-                      <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span>
-                    </p>
-                  </div>
+                  <p style={{ ...LBL, marginBottom: 7 }}>Her take</p>
+                  {takeQuotes.map((q, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, marginTop: i === 0 ? 0 : 10 }}>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
+                      <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>
+                        {q}
+                        <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span>
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
               {winner && (
@@ -407,6 +434,115 @@ export default function LookingForCard({
           )}
         </div>
       </div>
+
+      {/* ── Received it? — her own post, once she's logged what she bought ── */}
+      {isOwn && isFound && submitReceived && (() => {
+        const arrival = outcome?.arrival_status;
+        if (fuThanks) return (
+          <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", background: "rgba(110,122,68,0.06)", padding: isMobile ? "12px 14px" : "14px 18px", borderRadius: "0 0 20px 20px" }}>
+            <p style={{ fontSize: 12.5, color: OLIVE, fontWeight: 600, margin: 0, lineHeight: 1.4 }}>
+              Thank you. That's exactly what the next woman needs. ✦
+            </p>
+          </div>
+        );
+        if (arrival === "received" || arrival === "returned" || fuDismiss) return null;
+        if (arrival === "waiting" && outcome?.next_prompt_at && Date.now() < new Date(outcome.next_prompt_at).getTime()) return null;
+
+        const itemName = [boughtBrand, boughtName].filter(Boolean).join(" ").trim() || "what you bought";
+        const wrap = (inner: React.ReactNode) => (
+          <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", background: "#F6F1EA", padding: isMobile ? "12px 14px" : "14px 18px", borderRadius: "0 0 20px 20px" }}>{inner}</div>
+        );
+        const heading = (t: string) => <p style={{ fontSize: 13, fontWeight: 600, color: INK, margin: "0 0 10px", lineHeight: 1.4 }}>{t}</p>;
+        const ta: React.CSSProperties = { ...LINK_INPUT, resize: "none", fontFamily: "inherit" };
+
+        if (fuStage === "gate") return wrap(
+          <div>
+            {heading(`Ready to tell us how the ${itemName} went?`)}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={BTN_OUTLINE} onClick={() => { updateOutcome?.(decision.id, { arrival_status: "waiting", next_prompt_at: new Date(Date.now() + 3 * 86400000).toISOString() }); setFuDismiss(true); }}>Still waiting</button>
+              <button style={BTN_OUTLINE} onClick={() => setFuStage("returned")}>Returned / canceled</button>
+              <button style={BTN_DARK} onClick={() => setFuStage("detail")}>Received it</button>
+            </div>
+          </div>
+        );
+
+        if (fuStage === "returned") return wrap(
+          <div>
+            {heading("What went wrong? (optional)")}
+            <textarea rows={2} value={fuNote} onChange={(e) => setFuNote(e.target.value)} placeholder="e.g. ran huge, fabric felt cheap, changed my mind" style={ta} />
+            <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button style={BTN_OUTLINE} onClick={() => fuPhotoRef.current?.click()}>{fuPhoto ? "✓ Photo added" : "+ Add a photo"}</button>
+              <button style={BTN_DARK} onClick={() => { submitReturned?.(decision.id, { note: fuNote, photoFile: fuPhoto }); setFuThanks(true); }}>Done</button>
+            </div>
+          </div>
+        );
+
+        if (fuStage === "detail") return wrap(
+          <div>
+            {heading("How did it work out?")}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {["Better than expected", "As expected", "Nothing like I imagined"].map((opt) => (
+                <button key={opt} style={BTN_OUTLINE} onClick={() => { setFuDetail(opt); setFuStage("keep"); }}>{opt}</button>
+              ))}
+            </div>
+          </div>
+        );
+
+        if (fuStage === "keep") return wrap(
+          <div>
+            {heading("Are you keeping it, or returning it?")}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={BTN_DARK} onClick={() => { setFuKept(true); setFuStage("recommend"); }}>Keeping it</button>
+              <button style={BTN_OUTLINE} onClick={() => { setFuKept(false); setFuStage("recommend"); }}>Returning it</button>
+            </div>
+          </div>
+        );
+
+        if (fuStage === "recommend") return wrap(
+          <div>
+            {heading("Would you recommend it to women like you?")}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={BTN_DARK} onClick={() => { setFuRec(true); setFuStage("take"); }}>Yes</button>
+              <button style={BTN_OUTLINE} onClick={() => { setFuRec(false); setFuStage("take"); }}>No</button>
+            </div>
+          </div>
+        );
+
+        return wrap(
+          <div>
+            {heading("Anything you'd tell a woman like you?")}
+            <p style={{ fontSize: 10.5, color: MUTED, margin: "-6px 0 8px", lineHeight: 1.4 }}>
+              Optional. How it really fits, wears, or holds up (e.g. runs big, the band rides up by the afternoon).
+            </p>
+            <textarea rows={3} value={fuTake} onChange={(e) => setFuTake(e.target.value)} placeholder="Share what the photos can't show..." style={ta} />
+            <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button style={BTN_OUTLINE} onClick={() => fuPhotoRef.current?.click()}>{fuPhoto ? "✓ Photo added" : "+ Add a photo"}</button>
+              <button
+                style={BTN_DARK}
+                onClick={() => {
+                  submitReceived(decision.id, {
+                    // "Other" routes the answer to outcome_detail, not fit_result.
+                    primary: "Other",
+                    detailAnswer: fuDetail,
+                    kept: fuKept,
+                    recommend: fuRec,
+                    // Confidence was already captured when she closed the post;
+                    // passing null leaves that journey intact.
+                    confidence: null,
+                    photoFile: fuPhoto,
+                    take: fuTake,
+                  });
+                  setFuThanks(true);
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── "Did you find it?" — her own post, once there are recs to pick from ── */}
       {isOwn && !isFound && recs.length > 0 && onFound && (() => {

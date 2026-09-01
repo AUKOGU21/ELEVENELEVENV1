@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -68,7 +69,13 @@ const IconGroup = () => (
 // ─── Component ────────────────────────────────────────────────────────────────
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  // Someone already signed in landing here was being shown a "Sign in" button and
+  // typing her password again, session intact. Send her straight to the feed.
+  useEffect(() => {
+    if (!loading && user) navigate("/feed", { replace: true });
+  }, [loading, user, navigate]);
 
   return (
     <div className="min-h-screen" style={{ fontFamily: "'Manrope', sans-serif" }}>
@@ -115,11 +122,11 @@ const Index = () => {
               Feed
             </button>
             <button
-              onClick={() => navigate("/signin")}
+              onClick={() => navigate(user ? "/feed" : "/signin")}
               className="uppercase transition-opacity hover:opacity-60"
               style={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: 14, letterSpacing: "0.2em" }}
             >
-              Sign in →
+              {user ? "Open the app →" : "Sign in →"}
             </button>
           </div>
 
@@ -133,11 +140,11 @@ const Index = () => {
               Feed
             </button>
             <button
-              onClick={() => navigate("/signin")}
+              onClick={() => navigate(user ? "/feed" : "/signin")}
               className="text-xs tracking-widest uppercase"
               style={{ color: "rgba(255,255,255,0.9)" }}
             >
-              Sign in
+              {user ? "Open app" : "Sign in"}
             </button>
           </div>
         </nav>

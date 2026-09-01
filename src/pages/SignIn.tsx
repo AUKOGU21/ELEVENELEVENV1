@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -7,7 +7,12 @@ import { useAuth } from "@/contexts/AuthContext";
 const SignIn = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signInWithPassword } = useAuth();
+  const { signInWithPassword, user, loading: authLoading } = useAuth();
+
+  // Already signed in? Don't make her type it again.
+  useEffect(() => {
+    if (!authLoading && user) navigate("/feed", { replace: true });
+  }, [authLoading, user, navigate]);
 
   const [mode, setMode] = useState<"signin" | "signup">(
     searchParams.get("mode") === "signup" ? "signup" : "signin"

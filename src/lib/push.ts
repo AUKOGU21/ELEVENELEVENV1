@@ -94,3 +94,39 @@ export async function enablePush(userId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: (e as Error).message };
   }
 }
+
+// ── Home screen install tracking ──────────────────────────────────────────────
+// There is no reliable "was installed" event across platforms (iOS never fires
+// appinstalled), so the honest signal is: this user opened the app from her home
+// screen. Stamp it at most once a day per device.
+export async function recordHomeScreenUse(userId: string): Promise<void> {
+  if (!isStandalone()) return;
+
+  const key = `ee_standalone_ping_${userId}`;
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    if (localStorage.getItem(key) === today) return;
+  } catch { /* private mode: fall through and write */ }
+
+  const now = new Date().toISOString();
+  try {
+    // installed_at is the first launch ever, so only fill it when it's empty.
+    const { data } = await supabase
+      .from("profiles")
+      .select("installed_at")
+      .eq("id", userId)
+      .single();
+
+    await supabase
+      .from("profiles")
+      .update({
+        last_standalone_at: now,
+        ...(data?.installed_at ? {} : { installed_at: now }),
+      })
+      .eq("id", userId);
+
+    try { localStorage.setItem(key, today); } catch { /* private mode */ }
+  } catch {
+    // Never let instrumentation break the app.
+  }
+}

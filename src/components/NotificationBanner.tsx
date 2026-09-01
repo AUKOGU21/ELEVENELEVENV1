@@ -4,7 +4,7 @@
 // Safari (not installed), it guides the user to add to Home Screen instead.
 import { useEffect, useState } from "react";
 import { Bell, X, Plus } from "lucide-react";
-import { pushState, enablePush, canInstall, promptInstall } from "@/lib/push";
+import { pushState, enablePush, canInstall, promptInstall, isStandalone } from "@/lib/push";
 
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
@@ -53,6 +53,11 @@ export default function NotificationBanner({ userId, isMobile }: { userId: strin
   const iosInstall = state === "needs-install";
   const androidInstall = !iosInstall && installable;
   const install = iosInstall || androidInstall;
+
+  // Push nudges are only for the installed app, where push actually lands. In a
+  // browser, desktop included, email is the channel and this has nothing to
+  // offer, so it was just taking up space at the top of the feed.
+  if (!install && !isStandalone()) return null;
   if (!install && state !== "default") return null;
 
   const dismiss = () => {

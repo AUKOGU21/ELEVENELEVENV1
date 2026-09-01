@@ -149,7 +149,8 @@ if (typeof window !== "undefined") {
 }
 
 export function canInstall(): boolean {
-  return !!deferredInstall && !isStandalone();
+  const mobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  return !!deferredInstall && !isStandalone() && mobile;
 }
 
 export async function promptInstall(): Promise<boolean> {

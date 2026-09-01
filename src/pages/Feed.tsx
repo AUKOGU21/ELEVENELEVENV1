@@ -95,6 +95,7 @@ interface OutcomeRow {
   alt_product_image_url?: string | null;
   alt_brand_name?: string | null;
   alt_price_note?: string | null;
+  alt_reason?: string | null;
   chosen_recommendation_id?: string | null;
 }
 
@@ -670,7 +671,7 @@ const Feed = () => {
       if (allDecisionIds.length > 0) {
         const { data: outcomesData } = await supabase
           .from("outcomes")
-          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, chosen_recommendation_id")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id")
           .in("decision_id", allDecisionIds)
           .order("created_at", { ascending: false });
 
@@ -749,7 +750,7 @@ const Feed = () => {
         if (myDecisionIds.length > 0) {
           const { data: myOutcomesData } = await supabase
             .from("outcomes")
-            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, chosen_recommendation_id")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id")
             .in("decision_id", myDecisionIds)
             .order("created_at", { ascending: false });
 
@@ -964,6 +965,7 @@ const Feed = () => {
       alt_brand_name: p.productBrand,
       alt_price_note: p.productPrice,
       alt_product_image_url: p.productImageUrl,
+      alt_reason: p.reason,
       confidence_after: p.confidenceAfter,
     };
 
@@ -1438,9 +1440,11 @@ const Feed = () => {
 
   // Purchases still owed their received-it log — drives the top-of-feed banner.
   const followupPending = myDecisions.filter((d) => {
-    if (d.status !== "purchased") return false;
     const o = d.outcomes?.[0];
     if (!o) return false;
+    // A swap is a purchase too: she bought something, it just wasn't this item.
+    const isSwap = d.status === "closed" && o.bought_alternative === true;
+    if (d.status !== "purchased" && !isSwap) return false;
     const arrival = o.arrival_status;
     if (arrival === "returned") return false;
     if (!arrival) return true;                         // "did you receive it?" not answered yet
@@ -1775,7 +1779,15 @@ const Feed = () => {
                     {followupPending.length === 1 ? "1 purchase is ready to close the loop" : `${followupPending.length} purchases are ready to close the loop`}
                   </p>
                   <p style={{ fontSize: 10, color: "rgba(28,23,18,0.55)", margin: "2px 0 0" }}>
-                    {[followupPending[0].brand_name, followupPending[0].product_name].filter(Boolean).join(" ").trim()}{followupPending.length > 1 ? " and more" : ""}
+                    {(() => {
+                      const d = followupPending[0];
+                      const o = d.outcomes?.[0];
+                      const swap = d.status === "closed" && o?.bought_alternative === true;
+                      const name = swap
+                        ? [o?.alt_brand_name, o?.alt_product_name].filter(Boolean).join(" ").trim()
+                        : [d.brand_name, d.product_name].filter(Boolean).join(" ").trim();
+                      return name;
+                    })()}{followupPending.length > 1 ? " and more" : ""}
                   </p>
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 600, color: "#8A6620", whiteSpace: "nowrap" }}>Review &rarr;</span>
@@ -2085,7 +2097,7 @@ const Feed = () => {
                 // if there are multiple rows for the same decision_id.
                 const { data: rows } = await supabase
                   .from("outcomes")
-                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, chosen_recommendation_id")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id")
                   .eq("decision_id", id)
                   .order("created_at", { ascending: false })
                   .limit(1);
@@ -2812,6 +2824,7 @@ const DecisionCard = ({
             const altName = outcome?.alt_product_name ?? null;
             const altBrand = outcome?.alt_brand_name ?? null;
             const altPrice = outcome?.alt_price_note ?? null;
+            const altReason = outcome?.alt_reason ?? null;
             const altHost = (() => {
               if (!altUrl) return null;
               try { return new URL(altUrl).hostname.replace(/^www\./, ""); } catch { return null; }
@@ -2822,6 +2835,8 @@ const DecisionCard = ({
             // write-in, then the preset reason she picked (so "didn't buy" cards
             // always surface why — not only when she chose "Something else").
             const take = outcome?.take || outcome?.fit_result_note || outcome?.outcome_detail_other || outcome?.tipping_factor_other || outcome?.tipping_factor || null;
+            // The swap reason renders in its own panel, so don't repeat it here.
+            const showTake = !!take && take !== outcome?.alt_reason;
             const followedUp = !!outcome?.followed_up_at;
             const kept = outcome?.kept;
             const recommend = outcome?.recommend;
@@ -2892,6 +2907,18 @@ const DecisionCard = ({
                         <ExternalLink style={{ width: 11, height: 11, flexShrink: 0 }} /> {altHost ?? "View what she bought"}
                       </a>
                     )}
+                    {altReason && (
+                      <div style={{ marginTop: 12, paddingTop: 11, borderTop: "1px solid rgba(110,122,68,0.22)" }}>
+                        <p style={{ ...LBL, marginBottom: 7 }}>Why this one</p>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
+                          <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>
+                            {altReason}
+                            <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span>
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2935,7 +2962,7 @@ const DecisionCard = ({
                 })()}
 
                 {/* Her take — only once she's written one */}
-                {take && (
+                {showTake && (
                   <div style={{ marginBottom: 16 }}>
                     <p style={{ ...LBL, marginBottom: 8 }}>Her take</p>
                     <div style={{ display: "flex", gap: 8 }}>
@@ -2956,14 +2983,17 @@ const DecisionCard = ({
                 )}
 
                 {/* Outcome lifecycle — owner only: gate → received questions (or returned) */}
-                {isOwn && decision.status === "purchased" && (() => {
+                {isOwn && (decision.status === "purchased" || altBought) && (() => {
                   const o = decision.outcomes?.[0] ?? null;
                   if (!o) return null;
                   const arrival = o.arrival_status;
                   if (arrival === "received" || arrival === "returned" || fuDismiss) return null;
                   if (arrival === "waiting" && o.next_prompt_at && Date.now() < new Date(o.next_prompt_at).getTime()) return null;
 
-                  const itemName = [decision.brand_name, decision.product_name].filter(Boolean).join(" ").trim() || "your pick";
+                  // For a swap, follow up on what she actually bought, not the item she passed on.
+                  const itemName = (altBought
+                    ? [outcome?.alt_brand_name, outcome?.alt_product_name].filter(Boolean).join(" ").trim()
+                    : [decision.brand_name, decision.product_name].filter(Boolean).join(" ").trim()) || "your pick";
                   const primary = parsePrimaryUncertainty(decision.uncertainty_text);
                   const fitLike = primary === "Between sizes" || primary === "Will it fit right";
                   const detailQ = fitLike ? "How did it fit?" : outcomeDetailQuestion(primary, "bought_it");

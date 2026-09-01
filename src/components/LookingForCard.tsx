@@ -35,6 +35,7 @@ export interface LookingForOutcome {
   alt_product_image_url?: string | null;
   alt_brand_name?: string | null;
   alt_price_note?: string | null;
+  alt_reason?: string | null;
   bought_alternative?: boolean | null;
 }
 
@@ -47,6 +48,8 @@ export interface LookingForFoundPayload {
   productBrand: string | null;
   productPrice: string | null;
   productImageUrl: string | null;
+  // Why she went this way. Optional free text.
+  reason: string | null;
   confidenceAfter: number;
 }
 
@@ -89,7 +92,7 @@ interface Props {
   onStillLooking?: (id: string) => void;
 }
 
-type FoundStep = "idle" | "pick" | "same_or_diff" | "link" | "confidence" | "thanks" | "snoozed";
+type FoundStep = "idle" | "pick" | "same_or_diff" | "link" | "why" | "confidence" | "thanks" | "snoozed";
 
 export default function LookingForCard({
   decision, user, isMobile, activeTab, isSaved, onSave, onHide, navigate, handleDelete, onOpenRecommendations, onAddRecommendation, onSignIn, onFound, onProductPulled, onStillLooking,
@@ -107,6 +110,7 @@ export default function LookingForCard({
   const pulledUrlRef = useRef<string | null>(null);
   // Set when she picked a rec but bought a different piece from that brand.
   const [differentPiece, setDifferentPiece] = useState(false);
+  const [reason, setReason] = useState("");
   // The in-flight link read, and whether she's already finished the flow.
   const pullPromiseRef = useRef<Promise<PulledProduct | null> | null>(null);
   const submittedRef = useRef(false);
@@ -132,6 +136,7 @@ export default function LookingForCard({
   const boughtPrice = outcome?.alt_price_note ?? null;
   const boughtImage = outcome?.alt_product_image_url ?? null;
   const boughtUrl = outcome?.alt_product_url ?? null;
+  const boughtReason = outcome?.alt_reason ?? null;
   const boughtHost = (() => {
     if (!boughtUrl) return null;
     try { return new URL(boughtUrl).hostname.replace(/^www\./, ""); } catch { return null; }
@@ -168,6 +173,7 @@ export default function LookingForCard({
       productBrand: exact ? picked?.brand_name ?? null : (pulled?.brand ?? null),
       productPrice: exact ? picked?.price_note ?? null : (pulled?.price ?? null),
       productImageUrl: exact ? picked?.product_image_url ?? null : (pulled?.image_url ?? null),
+      reason: reason.trim() || null,
       confidenceAfter: confidence,
     });
     setStep("thanks");
@@ -340,6 +346,18 @@ export default function LookingForCard({
                   )}
                 </div>
               </div>
+              {boughtReason && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(110,122,68,0.22)" }}>
+                  <p style={{ ...LBL, marginBottom: 7 }}>Why this one</p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0.9 }}>&ldquo;</span>
+                    <p style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, margin: 0, color: "#3A3530" }}>
+                      {boughtReason}
+                      <span style={{ fontSize: 22, fontWeight: 700, color: "#C2B9A6", lineHeight: 0, verticalAlign: "-0.35em" }}>&rdquo;</span>
+                    </p>
+                  </div>
+                </div>
+              )}
               {winner && (
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(110,122,68,0.22)", display: "flex", alignItems: "center", gap: 7 }}>
                   <Check style={{ width: 13, height: 13, color: OLIVE, flexShrink: 0 }} />
@@ -435,7 +453,7 @@ export default function LookingForCard({
             <div>
               {heading(`Same one, or a different piece from ${brand}?`)}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={BTN_DARK} onClick={() => { setDifferentPiece(false); setStep("confidence"); }}>The exact one {who} recommended</button>
+                <button style={BTN_DARK} onClick={() => { setDifferentPiece(false); setStep("why"); }}>The exact one {who} recommended</button>
                 <button style={BTN_OUTLINE} onClick={() => { setDifferentPiece(true); setStep("link"); }}>A different piece from {brand}</button>
               </div>
               <button style={{ ...BTN_GHOST, marginTop: 10 }} onClick={() => setStep("pick")}>← Back</button>
@@ -475,6 +493,17 @@ export default function LookingForCard({
                 Couldn't read that link, so there won't be an image. Your link still saves.
               </p>
             )}
+            <p style={{ fontSize: 12, fontWeight: 600, color: INK, margin: "14px 2px 0" }}>Why this one?</p>
+            <p style={{ fontSize: 10.5, color: MUTED, margin: "3px 2px 0", lineHeight: 1.4 }}>
+              Optional, and the part women like you will actually read.
+            </p>
+            <textarea
+              rows={3}
+              placeholder="e.g. tried a few of these, the cut on this one was the only one that didn't gape"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              style={{ ...LINK_INPUT, marginTop: 8, resize: "none", fontFamily: "inherit" }}
+            />
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <button
                 style={BTN_DARK}
@@ -484,6 +513,26 @@ export default function LookingForCard({
                 Continue →
               </button>
               <button style={BTN_GHOST} onClick={() => setStep(picked ? "same_or_diff" : "idle")}>← Back</button>
+            </div>
+          </div>
+        );
+
+        if (step === "why") return wrap(
+          <div>
+            {heading("Why this one?")}
+            <p style={{ fontSize: 10.5, color: MUTED, margin: "-6px 0 8px", lineHeight: 1.4 }}>
+              Optional, and the part women like you will actually read.
+            </p>
+            <textarea
+              rows={3}
+              placeholder="e.g. tried a few of these, the cut on this one was the only one that didn't gape"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              style={{ ...LINK_INPUT, resize: "none", fontFamily: "inherit" }}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button style={BTN_DARK} onClick={() => setStep("confidence")}>Continue →</button>
+              <button style={BTN_GHOST} onClick={() => setStep("same_or_diff")}>← Back</button>
             </div>
           </div>
         );
@@ -501,6 +550,7 @@ export default function LookingForCard({
               })}
             </div>
             <p style={{ fontSize: 10, color: MUTED, margin: "8px 0 0" }}>1 = still unsure, 10 = this is the one</p>
+            <button style={{ ...BTN_GHOST, marginTop: 10 }} onClick={() => setStep(picked && !differentPiece ? "why" : "link")}>← Back</button>
           </div>
         );
 

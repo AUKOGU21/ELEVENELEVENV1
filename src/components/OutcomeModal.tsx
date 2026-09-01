@@ -47,6 +47,9 @@ interface StepState {
   bought_alternative: boolean | null;
   alt_product_url: string;
   alt_product_name: string;
+  // Why she went this way instead. Free text, optional, and the most useful
+  // thing on the card for the next woman reading it.
+  alt_reason: string;
 }
 
 const UNCERTAINTY_PRIORITY = [
@@ -426,6 +429,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
     bought_alternative: null,
     alt_product_url: "",
     alt_product_name: "",
+    alt_reason: "",
   });
 
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
@@ -504,6 +508,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
         bought_alternative: null,
         alt_product_url: "",
         alt_product_name: "",
+        alt_reason: "",
       });
       // If pre-seeded, skip the "did you buy?" step and land on the first question.
       setCurrentStepIdx(seeded ? 1 : 0);
@@ -544,6 +549,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
     const altImage = boughtAlt ? pulled?.image_url ?? null : null;
     const altBrand = boughtAlt ? pulled?.brand ?? null : null;
     const altPrice = boughtAlt ? pulled?.price ?? null : null;
+    const altReason = boughtAlt ? finalState.alt_reason.trim() || null : null;
 
     // Persist the outcome. .select() lets us distinguish a real write from a
     // silent no-op: an RLS-filtered write returns NO error but ALSO no rows, so
@@ -572,6 +578,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
           alt_product_image_url: altImage,
           alt_brand_name: altBrand,
           alt_price_note: altPrice,
+          alt_reason: altReason,
         },
         { onConflict: "decision_id" }
       )
@@ -912,12 +919,23 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                         onChange={(e) => setState((s) => ({ ...s, alt_product_name: e.target.value }))}
                         style={{ ...TEXTAREA_STYLE, resize: undefined, marginTop: 8 }}
                       />
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "#1C1712", margin: "14px 2px 0" }}>Why this one instead?</p>
+                      <p style={{ fontSize: 10.5, color: "#8C7A70", margin: "3px 2px 0", lineHeight: 1.4 }}>
+                        Optional, and the part women like you will actually read. What made you switch?
+                      </p>
+                      <textarea
+                        rows={3}
+                        placeholder="e.g. tried the other pair on and the rise was all wrong, these sit better on me"
+                        value={state.alt_reason}
+                        onChange={(e) => setState((s) => ({ ...s, alt_reason: e.target.value }))}
+                        style={TEXTAREA_STYLE}
+                      />
                     </div>
                   )}
                   <button
                     style={state.bought_alternative === false ? OPTION_SELECTED : OPTION_BASE}
                     onClick={() => {
-                      const next = { ...state, bought_alternative: false, alt_product_url: "", alt_product_name: "" };
+                      const next = { ...state, bought_alternative: false, alt_product_url: "", alt_product_name: "", alt_reason: "" };
                       setState(next);
                       saveAndComplete(next, null);
                     }}

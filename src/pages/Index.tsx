@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import logoSymbol from "@/assets/logo-symbol.png";
@@ -69,13 +69,18 @@ const IconGroup = () => (
 // ─── Component ────────────────────────────────────────────────────────────────
 const Index = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading } = useAuth();
+  // The wordmark sends { home: true } — she asked for the landing page, so the
+  // redirect below has to stay out of the way.
+  const wantsHome = (location.state as { home?: boolean } | null)?.home;
 
   // Someone already signed in landing here was being shown a "Sign in" button and
   // typing her password again, session intact. Send her straight to the feed.
   useEffect(() => {
+    if (wantsHome) return;
     if (!loading && user) navigate("/feed", { replace: true });
-  }, [loading, user, navigate]);
+  }, [loading, user, navigate, wantsHome]);
 
   return (
     <div className="min-h-screen" style={{ fontFamily: "'Manrope', sans-serif" }}>

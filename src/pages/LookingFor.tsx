@@ -70,7 +70,7 @@ export default function LookingFor() {
         <button onClick={() => navigate("/feed")} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: MUTED, fontSize: 14 }}>
           <ArrowLeft style={{ width: 16, height: 16 }} /> Feed
         </button>
-        <span onClick={() => navigate("/")} style={{ letterSpacing: "0.32em", fontSize: 16, color: INK, cursor: "pointer" }}>
+        <span onClick={() => navigate("/", { state: { home: true } })} style={{ letterSpacing: "0.32em", fontSize: 16, color: INK, cursor: "pointer" }}>
           <span style={{ fontWeight: 700 }}>ELEVEN</span><span style={{ fontWeight: 300 }}>ELEVEN</span>
         </span>
         <div style={{ width: 48 }} />

@@ -1534,9 +1534,9 @@ const Feed = () => {
         {/* Left: Logo */}
         <div className="flex items-center" style={{ flexShrink: 0 }}>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/", { state: { home: true } })}
             className="font-sans uppercase select-none"
-            style={{ letterSpacing: isMobile ? "0.05em" : "0.32em", fontSize: isMobile ? 9.5 : 15.5, color: "#1C1712", whiteSpace: "nowrap" }}
+            style={{ letterSpacing: isMobile ? "0.05em" : "0.32em", fontSize: isMobile ? 9.5 : 15.5, color: "#1C1712", whiteSpace: "nowrap", cursor: "pointer" }}
           >
             <span style={{ fontWeight: 700 }}>ELEVEN</span>
             <span style={{ fontWeight: 300 }}>ELEVEN</span>

@@ -364,7 +364,7 @@ const PostDecision = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <span onClick={() => navigate("/")} style={{ letterSpacing: "0.32em", fontSize: 18, color: "#1C1712", cursor: "pointer" }}>
+        <span onClick={() => navigate("/", { state: { home: true } })} style={{ letterSpacing: "0.32em", fontSize: 18, color: "#1C1712", cursor: "pointer" }}>
           <span style={{ fontWeight: 700 }}>ELEVEN</span><span style={{ fontWeight: 300 }}>ELEVEN</span>
         </span>
       </div>

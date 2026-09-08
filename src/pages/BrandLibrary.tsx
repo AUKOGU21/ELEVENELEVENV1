@@ -86,7 +86,7 @@ function TopNav() {
   );
   return (
     <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: isMobile ? 8 : 0, padding: isMobile ? "11px 12px" : "14px 22px", borderBottom: `1px solid ${LINE}`, position: "sticky", top: 0, background: "rgba(253,250,246,0.92)", backdropFilter: "blur(8px)", zIndex: 20 }}>
-      <span onClick={() => navigate("/")} style={{ letterSpacing: isMobile ? "0.05em" : "0.28em", fontSize: isMobile ? 11 : 17, color: INK, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+      <span onClick={() => navigate("/", { state: { home: true } })} style={{ letterSpacing: isMobile ? "0.05em" : "0.28em", fontSize: isMobile ? 11 : 17, color: INK, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
         <span style={{ fontWeight: 700 }}>ELEVEN</span><span style={{ fontWeight: 300 }}>ELEVEN</span>
       </span>
       <nav style={{ display: "flex", gap: isMobile ? 15 : 26 }}>

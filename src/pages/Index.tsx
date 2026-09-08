@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { getInitials } from "@/lib/format";
 import logoSymbol from "@/assets/logo-symbol.png";
 import heroImage from "@/assets/hero-editorial.png";
 
@@ -82,6 +84,45 @@ const Index = () => {
     if (!loading && user) navigate("/feed", { replace: true });
   }, [loading, user, navigate, wantsHome]);
 
+  // Signed in, the nav shows her avatar instead of a sign-in button. Only worth
+  // fetching when she is actually staying on this page.
+  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
+  useEffect(() => {
+    if (!user || !wantsHome) return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("display_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled && data) setMyProfile(data); });
+    return () => { cancelled = true; };
+  }, [user, wantsHome]);
+
+  // Her initials chip, sized for whichever nav is showing.
+  const avatarChip = (size: number) => (
+    <button
+      onClick={() => navigate("/feed")}
+      aria-label="Go to your feed"
+      className="rounded-full flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+      style={{
+        width: size,
+        height: size,
+        flexShrink: 0,
+        background: "rgba(255,255,255,0.14)",
+        border: "1px solid rgba(255,255,255,0.45)",
+        color: "rgba(255,255,255,0.95)",
+        fontSize: size * 0.34,
+        fontWeight: 600,
+        letterSpacing: "0.02em",
+      }}
+    >
+      {myProfile?.avatar_url
+        ? <img src={myProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+        : <span>{getInitials(myProfile?.display_name)}</span>}
+    </button>
+  );
+
   return (
     <div className="min-h-screen" style={{ fontFamily: "'Manrope', sans-serif" }}>
 
@@ -126,13 +167,15 @@ const Index = () => {
             >
               Feed
             </button>
-            <button
-              onClick={() => navigate(user ? "/feed" : "/signin")}
-              className="uppercase transition-opacity hover:opacity-60"
-              style={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: 14, letterSpacing: "0.2em" }}
-            >
-              {user ? "Open the app →" : "Sign in →"}
-            </button>
+            {user ? avatarChip(34) : (
+              <button
+                onClick={() => navigate("/signin")}
+                className="uppercase transition-opacity hover:opacity-60"
+                style={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: 14, letterSpacing: "0.2em" }}
+              >
+                Sign in →
+              </button>
+            )}
           </div>
 
           {/* Mobile nav */}
@@ -144,13 +187,15 @@ const Index = () => {
             >
               Feed
             </button>
-            <button
-              onClick={() => navigate(user ? "/feed" : "/signin")}
-              className="text-xs tracking-widest uppercase"
-              style={{ color: "rgba(255,255,255,0.9)" }}
-            >
-              {user ? "Open app" : "Sign in"}
-            </button>
+            {user ? avatarChip(28) : (
+              <button
+                onClick={() => navigate("/signin")}
+                className="text-xs tracking-widest uppercase"
+                style={{ color: "rgba(255,255,255,0.9)" }}
+              >
+                Sign in
+              </button>
+            )}
           </div>
         </nav>
 

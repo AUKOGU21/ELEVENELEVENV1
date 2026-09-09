@@ -11,6 +11,7 @@ import { DialInFitModal, shouldShowFitPrompt } from "@/components/DialInFitModal
 import { imageToJpeg } from "@/lib/image";
 import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDetailOptions, FIT_RESULT_OPTIONS } from "@/components/OutcomeModal";
 import ResponsesDrawer from "@/components/ResponsesDrawer";
+import { type CommentData } from "@/components/CommentThread";
 import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBanner from "@/components/NotificationBanner";
@@ -130,6 +131,7 @@ interface DecisionRow {
   recommendations?: any[];
   matchScore?: number | null;
   responses: ResponseRow[];
+  decision_comments?: CommentData[];
   outcomes: OutcomeRow[] | null;
   profiles: {
     display_name: string | null;
@@ -626,6 +628,10 @@ const Feed = () => {
       responses (
         id, recommendation, reasoning, photo_url, product_url, match_score,
         helpfulness_votes, user_id, created_at,
+        profiles ( display_name, avatar_url )
+      ),
+      decision_comments (
+        id, user_id, body, created_at,
         profiles ( display_name, avatar_url )
       )
     `;
@@ -1217,6 +1223,37 @@ const Feed = () => {
       await supabase.from("response_replies").delete().eq("id", replyId).eq("user_id", user.id);
       await fetchDecisions();
     } catch (e) { console.error("delete reply failed:", e); }
+  };
+
+  // ── Comments on the decision itself ─────────────────────────────────────────
+  // Not a weigh-in: no recommendation, no match score. This is how anyone reaches
+  // the poster on a decided post, where "Weigh in" no longer makes sense.
+  const submitComment = async (decisionId: string, body: string) => {
+    if (!user) { navigate("/signin"); return; }
+    try {
+      const { data, error } = await supabase
+        .from("decision_comments")
+        .insert({ decision_id: decisionId, user_id: user.id, body })
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (data?.id) {
+        supabase.functions
+          .invoke("notify-comment", { body: { comment_id: data.id } })
+          .catch((e) => console.warn("comment notify failed:", e));
+      }
+      await fetchDecisions();
+    } catch (e) {
+      console.error("comment insert failed:", e);
+      throw e;
+    }
+  };
+  const deleteComment = async (commentId: string) => {
+    if (!user) return;
+    try {
+      await supabase.from("decision_comments").delete().eq("id", commentId).eq("user_id", user.id);
+      await fetchDecisions();
+    } catch (e) { console.error("delete comment failed:", e); }
   };
 
   // ── Referral / Shopping Circle ──────────────────────────────────────────────
@@ -2214,6 +2251,8 @@ const Feed = () => {
         onSubmitReply={submitReply}
         onDeleteReply={deleteReply}
         onEditReply={editReply}
+        onSubmitComment={submitComment}
+        onDeleteComment={deleteComment}
         focusResponseId={focusResponseId}
       />
 
@@ -2449,27 +2488,50 @@ const DecisionCard = ({
   // Responses never expand inside the card anymore — a compact summary row opens
   // the right-side drawer instead, so the feed keeps a consistent height.
   const isClosedStatus = decision.status === "purchased" || decision.status === "closed";
-  const responsesSummary = sortedResponses.length > 0 ? (
+  const comments = decision.decision_comments ?? [];
+  // The row that opens the drawer. It has to show on a decided post even with
+  // zero weigh-ins and zero comments — that card used to be a dead end, with no
+  // way to ask the poster what happened.
+  const showThreadRow = sortedResponses.length > 0 || comments.length > 0 || isClosedStatus;
+  // Faces: responders first, then commenters, so the row is never empty-handed.
+  const faces = (sortedResponses.length > 0
+    ? sortedResponses.map((r) => ({ key: r.id, profiles: r.profiles }))
+    : comments.map((c) => ({ key: c.id, profiles: c.profiles ?? null }))
+  ).slice(0, 3);
+  const commentLabel = `${comments.length} comment${comments.length === 1 ? "" : "s"}`;
+  const threadLabel = sortedResponses.length > 0
+    ? `${sortedResponses.length} ${sortedResponses.length === 1 ? "woman" : "women"} ${isClosedStatus ? "shared their thoughts" : (sortedResponses.length === 1 ? "is weighing in" : "are weighing in")}${comments.length > 0 ? ` · ${commentLabel}` : ""}`
+    : comments.length > 0
+    ? commentLabel
+    : "No one weighed in on this one";
+  const threadCta = sortedResponses.length > 0 ? "View responses" : comments.length > 0 ? "View comments" : "Ask about it";
+  const responsesSummary = showThreadRow ? (
     <>
       <div style={{ height: 1, background: "rgba(0,0,0,0.07)", margin: "16px 0" }} />
       <button
         onClick={onOpenResponses}
         style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
       >
-        <div style={{ display: "flex", flexShrink: 0 }}>
-          {sortedResponses.slice(0, 3).map((r, i) => (
-            <div key={r.id} style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", border: "2px solid #F5EFEA", marginLeft: i > 0 ? -10 : 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 700 }}>
-              {r.profiles?.avatar_url
-                ? <img src={r.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : getInitials(r.profiles?.display_name ?? null)}
-            </div>
-          ))}
-        </div>
+        {faces.length > 0 ? (
+          <div style={{ display: "flex", flexShrink: 0 }}>
+            {faces.map((f, i) => (
+              <div key={f.key} style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", border: "2px solid #F5EFEA", marginLeft: i > 0 ? -10 : 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 700 }}>
+                {f.profiles?.avatar_url
+                  ? <img src={f.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : getInitials(f.profiles?.display_name ?? null)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(0,0,0,0.06)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <MessageCircle style={{ width: 15, height: 15, color: "#8C7A70" }} />
+          </div>
+        )}
         <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? 12 : 13, fontWeight: 600, color: "#5A4A42" }}>
-          {sortedResponses.length} {sortedResponses.length === 1 ? "woman" : "women"} {isClosedStatus ? "shared their thoughts" : (sortedResponses.length === 1 ? "is weighing in" : "are weighing in")}
+          {threadLabel}
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: isMobile ? 12 : 13, fontWeight: 700, color: "#A07848", whiteSpace: "nowrap" }}>
-          View responses <ArrowRight style={{ width: 15, height: 15 }} />
+          {threadCta} <ArrowRight style={{ width: 15, height: 15 }} />
         </span>
       </button>
     </>

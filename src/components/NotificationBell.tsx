@@ -36,6 +36,8 @@ function messageFor(n: NotificationRow): string {
     case "weigh_in": return `${who} weighed in on ${item}`;
     case "recommendation": return `${who} recommended a product for “${item}”`;
     case "reply": return `${who} replied to your take on ${item}`;
+    case "comment": return `${who} commented on ${item}`;
+    case "comment_thread": return `${who} also commented on ${item}`;
     case "outcome": return `${who} shared how it turned out`;
     case "save": return `${who} saved your decision`;
     case "helpful": return `${who} found your take helpful`;

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import SideDrawer from "./SideDrawer";
 import ResponseCard, { ResponseCardData } from "./ResponseCard";
+import CommentThread, { CommentData } from "./CommentThread";
 
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
@@ -20,6 +21,7 @@ export interface ResponsesDrawerDecision {
   product_name: string | null;
   brand_name: string | null;
   responses: ResponseCardData[];
+  decision_comments?: CommentData[];
 }
 
 interface Props {
@@ -35,13 +37,20 @@ interface Props {
   onSubmitReply: (responseId: string, body: string) => Promise<void>;
   onDeleteReply: (replyId: string) => Promise<void>;
   onEditReply: (replyId: string, body: string) => Promise<void>;
+  onSubmitComment: (decisionId: string, body: string) => Promise<void>;
+  onDeleteComment: (commentId: string) => Promise<void>;
   focusResponseId?: string | null;
 }
 
 type FilterKey = "all" | "buy" | "do_not_buy";
 
+function count0Title(responseCount: number, isClosed: boolean): string {
+  if (responseCount === 0) return isClosed ? "How it turned out" : "This decision";
+  return isClosed ? "What women like you said" : "What women like you are saying";
+}
+
 export default function ResponsesDrawer({
-  open, onClose, decision, user, voteCounts, userVotes, onHelpful, onAddThoughts, onSignIn, onSubmitReply, onDeleteReply, onEditReply, focusResponseId,
+  open, onClose, decision, user, voteCounts, userVotes, onHelpful, onAddThoughts, onSignIn, onSubmitReply, onDeleteReply, onEditReply, onSubmitComment, onDeleteComment, focusResponseId,
 }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
 
@@ -56,8 +65,14 @@ export default function ResponsesDrawer({
   const noBuyCount = sorted.filter((r) => r.recommendation === "do_not_buy").length;
   const shown = filter === "all" ? sorted : sorted.filter((r) => r.recommendation === filter);
 
-  const title = isClosed ? "What women like you said" : "What women like you are saying";
+  const comments = decision.decision_comments ?? [];
+  // A decided post with no weigh-ins still opens this drawer — the comments are
+  // the whole conversation there, so the header can't promise responses.
+  const title = count0Title(sorted.length, isClosed);
   const count = sorted.length;
+  const subtitle = sorted.length === 0
+    ? (comments.length === 0 ? "No responses yet" : `${comments.length} comment${comments.length === 1 ? "" : "s"}`)
+    : `${count} response${count === 1 ? "" : "s"}`;
 
   const question = (decision.uncertainty_text ?? "").trim();
   const confidence = decision.confidence_score ?? null;
@@ -103,7 +118,7 @@ export default function ResponsesDrawer({
     </div>
   );
 
-  const footer = isOwner ? null : user ? (
+  const footer = isOwner || isClosed ? null : user ? (
     <>
       <button
         onClick={() => { onAddThoughts(decision.id); onClose(); }}
@@ -125,18 +140,22 @@ export default function ResponsesDrawer({
   );
 
   return (
-    <SideDrawer open={open} onClose={onClose} title={title} subtitle={`${count} response${count === 1 ? "" : "s"}`} pinned={pinned} footer={footer}>
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {chip("all", "All", count)}
-        {chip("buy", "Would buy", buyCount)}
-        {chip("do_not_buy", "Wouldn't buy", noBuyCount)}
-      </div>
+    <SideDrawer open={open} onClose={onClose} title={title} subtitle={subtitle} pinned={pinned} footer={footer}>
+      {/* Filters — pointless with nothing to filter */}
+      {count > 0 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {chip("all", "All", count)}
+          {chip("buy", "Would buy", buyCount)}
+          {chip("do_not_buy", "Wouldn't buy", noBuyCount)}
+        </div>
+      )}
 
       {/* Responses */}
       {shown.length === 0 ? (
         <p style={{ fontSize: 12, color: MUTED, textAlign: "center", padding: "28px 0" }}>
-          {count === 0 ? "No responses yet — be the first to weigh in." : "None in this filter."}
+          {count > 0 ? "None in this filter."
+            : isClosed ? "No one weighed in on this one."
+            : "No responses yet — be the first to weigh in."}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -158,6 +177,16 @@ export default function ResponsesDrawer({
           ))}
         </div>
       )}
+
+      <CommentThread
+        comments={comments}
+        user={user}
+        posterId={decision.user_id}
+        isClosed={isClosed}
+        onSubmit={(body) => onSubmitComment(decision.id, body)}
+        onDelete={onDeleteComment}
+        onSignIn={onSignIn}
+      />
     </SideDrawer>
   );
 }

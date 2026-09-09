@@ -1838,7 +1838,7 @@ const Feed = () => {
                     {(() => {
                       const d = followupPending[0];
                       const o = d.outcomes?.[0];
-                      const swap = d.status === "closed" && (o?.bought_alternative === true || d.post_type === "looking_for");
+                      const swap = (d.status === "closed" || d.status === "purchased") && (o?.bought_alternative === true || d.post_type === "looking_for");
                       const name = swap
                         ? [o?.alt_brand_name, o?.alt_product_name].filter(Boolean).join(" ").trim()
                         : [d.brand_name, d.product_name].filter(Boolean).join(" ").trim();

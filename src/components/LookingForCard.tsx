@@ -153,7 +153,11 @@ export default function LookingForCard({
   }, [menuOpen]);
 
   const outcome = decision.outcomes?.[0] ?? null;
-  const isFound = decision.status === "closed" && !!outcome;
+  // A Looking For she closed by buying lands on status "purchased", not "closed"
+  // — that's what the outcome trigger writes. Checking only "closed" hid the
+  // whole She bought panel, Her take included, on every post where she actually
+  // bought the thing.
+  const isFound = (decision.status === "closed" || decision.status === "purchased") && !!outcome;
   const winnerId = outcome?.chosen_recommendation_id ?? null;
   const confAfter = outcome?.confidence_after ?? null;
   const boughtBrand = outcome?.alt_brand_name ?? null;

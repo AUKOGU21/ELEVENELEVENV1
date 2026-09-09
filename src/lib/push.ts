@@ -9,6 +9,24 @@ const VAPID_PUBLIC_KEY =
 
 export type PushState = "unsupported" | "needs-install" | "default" | "granted" | "denied";
 
+// One stamp per device, written even when nobody is signed in.
+const STANDALONE_SEEN_KEY = "ee_standalone_first_seen";
+
+// Stamp at import time, not just on auth. Someone whose session expired inside
+// the installed app still launched it from her home screen, and that used to be
+// invisible: recordHomeScreenUse only ever ran with a signed-in user, so she
+// counted as never having installed.
+if (typeof window !== "undefined") {
+  try {
+    const standalone =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      (navigator as unknown as { standalone?: boolean }).standalone === true;
+    if (standalone && !localStorage.getItem(STANDALONE_SEEN_KEY)) {
+      localStorage.setItem(STANDALONE_SEEN_KEY, new Date().toISOString());
+    }
+  } catch { /* private mode, or no matchMedia */ }
+}
+
 export function isStandalone(): boolean {
   return (
     window.matchMedia?.("(display-mode: standalone)").matches ||
@@ -102,6 +120,14 @@ export async function enablePush(userId: string): Promise<{ ok: boolean; reason?
 export async function recordHomeScreenUse(userId: string): Promise<void> {
   if (!isStandalone()) return;
 
+  // She may have launched from the home screen while signed out, or before this
+  // tracking existed. Either way it never reached the DB and she counted as not
+  // installed. A local stamp survives both, and backfills on the next sign-in.
+  try {
+    const seen = localStorage.getItem(STANDALONE_SEEN_KEY);
+    if (!seen) localStorage.setItem(STANDALONE_SEEN_KEY, new Date().toISOString());
+  } catch { /* private mode */ }
+
   const key = `ee_standalone_ping_${userId}`;
   const today = new Date().toISOString().slice(0, 10);
   try {
@@ -109,6 +135,10 @@ export async function recordHomeScreenUse(userId: string): Promise<void> {
   } catch { /* private mode: fall through and write */ }
 
   const now = new Date().toISOString();
+  // The earliest home screen launch this device ever saw beats "now", so an old
+  // install stops looking like a brand new one.
+  let firstSeen = now;
+  try { firstSeen = localStorage.getItem(STANDALONE_SEEN_KEY) || now; } catch { /* private mode */ }
   try {
     // installed_at is the first launch ever, so only fill it when it's empty.
     const { data } = await supabase
@@ -121,7 +151,7 @@ export async function recordHomeScreenUse(userId: string): Promise<void> {
       .from("profiles")
       .update({
         last_standalone_at: now,
-        ...(data?.installed_at ? {} : { installed_at: now }),
+        ...(data?.installed_at ? {} : { installed_at: firstSeen }),
       })
       .eq("id", userId);
 

@@ -2503,7 +2503,7 @@ const DecisionCard = ({
     ? `${sortedResponses.length} ${sortedResponses.length === 1 ? "woman" : "women"} ${isClosedStatus ? "shared their thoughts" : (sortedResponses.length === 1 ? "is weighing in" : "are weighing in")}${comments.length > 0 ? ` · ${commentLabel}` : ""}`
     : comments.length > 0
     ? commentLabel
-    : "No one weighed in on this one";
+    : "Want to know more?";
   const threadCta = sortedResponses.length > 0 ? "View responses" : comments.length > 0 ? "View comments" : "Ask about it";
   const responsesSummary = showThreadRow ? (
     <>

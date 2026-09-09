@@ -25,11 +25,13 @@ SB = os.environ.get("SUPABASE_ACCESS_TOKEN")
 KEY = os.environ.get("RESEND_API_KEY")
 DRY = os.environ.get("WW_DRY_RUN") == "1"
 TEST_TO = os.environ.get("WW_TEST_TO")
+TEST_SETUP = os.environ.get("WW_TEST_SETUP") == "1"
 SUBJECT = os.environ.get("WW_SUBJECT", "you're missing the good part")
 UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe"
 SITE = "https://geteleveneleven.com"
 EXCLUDE = {"jean.pinatel@essec.edu", "sergeysbelov1@gmail.com", "ahkalex88@gmail.com",
-           "jud.asiruwa@hotmail.com"}
+           "jud.asiruwa@hotmail.com",
+           "styagi@mba2026.hbs"}
 TEMPLATE = os.path.join(os.path.dirname(__file__), "..", "emails", "whats-waiting.html")
 
 if not SB:
@@ -77,8 +79,9 @@ def send(email, first, onboarded=True):
 
 
 if TEST_TO:
-    mid, raw = send(TEST_TO, "there")
-    print(("✓ test sent to " + TEST_TO + " (" + str(mid) + ")") if mid else ("✗ " + raw))
+    mid, raw = send(TEST_TO, "there", onboarded=not TEST_SETUP)
+    which = "finish-setting-up" if TEST_SETUP else "weigh-in"
+    print((f"✓ {which} test sent to {TEST_TO} ({mid})") if mid else ("✗ " + raw))
     sys.exit(0)
 
 rows = query(f"""

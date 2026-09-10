@@ -3,9 +3,9 @@
 // structured buy / don't-buy call; a comment is just a question or a reaction —
 // "what went wrong?", "what size did you try?". It's the only way to reach the
 // poster on a decided post, where weighing in no longer makes sense.
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ringStyle } from "@/lib/tiers";
-import { Trash2 } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { getInitials, timeAgo } from "@/lib/format";
 
 const INK = "#1C1712";
@@ -16,6 +16,7 @@ export interface CommentData {
   user_id: string;
   body: string;
   created_at: string;
+  updated_at?: string | null;
   profiles?: { display_name: string | null; avatar_url: string | null; badge_tier?: string | null } | null;
 }
 
@@ -26,12 +27,41 @@ interface Props {
   isClosed: boolean;
   onSubmit: (body: string) => Promise<void>;
   onDelete: (commentId: string) => Promise<void>;
+  onEdit: (commentId: string, body: string) => Promise<void>;
   onSignIn: () => void;
 }
 
-export default function CommentThread({ comments, user, posterId, isClosed, onSubmit, onDelete, onSignIn }: Props) {
+export default function CommentThread({ comments, user, posterId, isClosed, onSubmit, onDelete, onEdit, onSignIn }: Props) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // Editing her own comment, the same way she can already edit a reply.
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Click anywhere else and the little menu closes.
+  useEffect(() => {
+    if (!menuId) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [menuId]);
+
+  const saveEdit = async (commentId: string) => {
+    const body = editDraft.trim();
+    if (!body || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      await onEdit(commentId, body);
+      setEditingId(null);
+      setEditDraft("");
+    } catch { /* the handler logs; leave her text on screen so nothing is lost */ }
+    setSavingEdit(false);
+  };
 
   const ordered = [...comments].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -68,6 +98,10 @@ export default function CommentThread({ comments, user, posterId, isClosed, onSu
           const name = c.profiles?.display_name ?? null;
           const isPoster = c.user_id === posterId;
           const isMine = !!user && c.user_id === user.id;
+          const editing = editingId === c.id;
+          // A second of slack, so the row a save writes doesn't read as "edited".
+          const edited = !!c.updated_at
+            && new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 1000;
           return (
             <div key={c.id} style={{ display: "flex", gap: 9 }}>
               <div style={{ ...ringStyle(c.profiles?.badge_tier, 1.5), width: 26, height: 26, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff" }}>
@@ -84,19 +118,66 @@ export default function CommentThread({ comments, user, posterId, isClosed, onSu
                     </span>
                   )}
                   <span style={{ fontSize: 11, color: MUTED }}>{timeAgo(c.created_at)}</span>
-                  {isMine && (
-                    <button
-                      onClick={() => { if (confirm("Delete this comment?")) onDelete(c.id); }}
-                      aria-label="Delete comment"
-                      style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 2, display: "inline-flex" }}
-                    >
-                      <Trash2 style={{ width: 13, height: 13 }} />
-                    </button>
+                  {edited && <span style={{ fontSize: 10.5, color: MUTED }}>edited</span>}
+                  {isMine && !editing && (
+                    <div style={{ marginLeft: "auto", position: "relative", flexShrink: 0 }} ref={menuId === c.id ? menuRef : undefined}>
+                      <button
+                        onClick={() => setMenuId(menuId === c.id ? null : c.id)}
+                        aria-label="Comment options"
+                        style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 2, lineHeight: 0 }}
+                      >
+                        <MoreHorizontal style={{ width: 15, height: 15 }} />
+                      </button>
+                      {menuId === c.id && (
+                        <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: "#FDFAF6", borderRadius: 10, border: "1px solid rgba(0,0,0,0.10)", boxShadow: "0 8px 22px rgba(0,0,0,0.14)", minWidth: 110, zIndex: 5, overflow: "hidden" }}>
+                          <button
+                            onClick={() => { setEditingId(c.id); setEditDraft(c.body); setMenuId(null); }}
+                            style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 11, color: INK, cursor: "pointer" }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => { setMenuId(null); if (confirm("Delete this comment?")) onDelete(c.id); }}
+                            style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 11, color: "#c0392b", cursor: "pointer", borderTop: "1px solid rgba(0,0,0,0.06)" }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                <p style={{ fontSize: 13, lineHeight: 1.5, color: "#3A3530", margin: "3px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                  {c.body}
-                </p>
+                {editing ? (
+                  <div style={{ marginTop: 5 }}>
+                    <textarea
+                      autoFocus
+                      value={editDraft}
+                      maxLength={2000}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      rows={2}
+                      style={{ width: "100%", boxSizing: "border-box", resize: "vertical", padding: "9px 11px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", fontSize: 13, lineHeight: 1.45, color: INK, fontFamily: "inherit", outline: "none" }}
+                    />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
+                      <button
+                        onClick={() => { setEditingId(null); setEditDraft(""); }}
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: MUTED, padding: "6px 8px" }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => saveEdit(c.id)}
+                        disabled={!editDraft.trim() || savingEdit}
+                        style={{ background: editDraft.trim() && !savingEdit ? INK : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "7px 16px", fontSize: 11, fontWeight: 600, cursor: editDraft.trim() && !savingEdit ? "pointer" : "default" }}
+                      >
+                        {savingEdit ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 13, lineHeight: 1.5, color: "#3A3530", margin: "3px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                    {c.body}
+                  </p>
+                )}
               </div>
             </div>
           );

@@ -39,6 +39,7 @@ interface Props {
   onEditReply: (replyId: string, body: string) => Promise<void>;
   onSubmitComment: (decisionId: string, body: string) => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
+  onEditComment: (commentId: string, body: string) => Promise<void>;
   focusResponseId?: string | null;
 }
 
@@ -50,7 +51,7 @@ function count0Title(responseCount: number, isClosed: boolean): string {
 }
 
 export default function ResponsesDrawer({
-  open, onClose, decision, user, voteCounts, userVotes, onHelpful, onAddThoughts, onSignIn, onSubmitReply, onDeleteReply, onEditReply, onSubmitComment, onDeleteComment, focusResponseId,
+  open, onClose, decision, user, voteCounts, userVotes, onHelpful, onAddThoughts, onSignIn, onSubmitReply, onDeleteReply, onEditReply, onSubmitComment, onDeleteComment, onEditComment, focusResponseId,
 }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
 
@@ -185,6 +186,7 @@ export default function ResponsesDrawer({
         isClosed={isClosed}
         onSubmit={(body) => onSubmitComment(decision.id, body)}
         onDelete={onDeleteComment}
+        onEdit={onEditComment}
         onSignIn={onSignIn}
       />
     </SideDrawer>

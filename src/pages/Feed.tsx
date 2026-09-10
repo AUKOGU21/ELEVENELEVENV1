@@ -645,7 +645,7 @@ const Feed = () => {
         profiles ( display_name, avatar_url, badge_tier )
       ),
       decision_comments (
-        id, user_id, body, created_at,
+        id, user_id, body, created_at, updated_at,
         profiles ( display_name, avatar_url, badge_tier )
       )
     `;
@@ -1260,6 +1260,23 @@ const Feed = () => {
       await fetchDecisions();
     } catch (e) {
       console.error("comment insert failed:", e);
+      throw e;
+    }
+  };
+  // Karina posted on Kimia's decision and wanted to reword it. Editing writes
+  // updated_at, which is what puts the small "edited" next to the timestamp.
+  const editComment = async (commentId: string, body: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("decision_comments")
+        .update({ body, updated_at: new Date().toISOString() })
+        .eq("id", commentId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await fetchDecisions();
+    } catch (e) {
+      console.error("edit comment failed:", e);
       throw e;
     }
   };
@@ -2305,6 +2322,7 @@ const Feed = () => {
         onEditReply={editReply}
         onSubmitComment={submitComment}
         onDeleteComment={deleteComment}
+        onEditComment={editComment}
         focusResponseId={focusResponseId}
       />
 

@@ -30,6 +30,12 @@ interface Props {
 
 function messageFor(n: NotificationRow): string {
   const d = n.data ?? {};
+  // The notify function writes push_body from the shared copy map, so the bell,
+  // the push and the email all say the same sentence. Everything below is the
+  // fallback for rows written before that existed.
+  if (typeof d.push_body === "string" && d.push_body.trim()) {
+    return d.push_body.replace(/\s*Tap to [^.]*\.?$/i, "").trim();
+  }
   const who = d.actor_name || "Someone";
   const item = d.item || d.product_name || "your decision";
   switch (n.type) {
@@ -37,6 +43,8 @@ function messageFor(n: NotificationRow): string {
     case "recommendation": return `${who} recommended a product for “${item}”`;
     case "reply": return `${who} replied to your take on ${item}`;
     case "relevant": return `${who} needs your take on ${item}`;
+    case "follow": return `${who} followed you`;
+    case "tier": return `You're now a ${d.tier || "Contributor"}`;
     case "follow_post": return `${who} posted ${item}`;
     case "comment": return `${who} commented on ${item}`;
     case "comment_thread": return `${who} also commented on ${item}`;

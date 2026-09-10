@@ -36,6 +36,18 @@ export default function FollowButton({ targetUserId, user, following, onChange, 
     try {
       if (next) {
         await supabase.from("follows").insert({ follower_id: user.id, following_id: targetUserId });
+        // Tell her someone followed her. Email always, push if she has it on.
+        supabase.functions
+          .invoke("notify", {
+            body: {
+              type: "follow",
+              user_id: targetUserId,
+              // notify resolves the follower's name from actor_id, so the copy
+              // can't be spoofed or go stale.
+              data: { actor_id: user.id },
+            },
+          })
+          .catch((e) => console.warn("follow notify failed:", e));
       } else {
         await supabase.from("follows").delete()
           .eq("follower_id", user.id).eq("following_id", targetUserId);

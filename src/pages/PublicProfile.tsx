@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -30,6 +30,15 @@ const PublicProfile = () => {
   const navigate   = useNavigate();
   const { user }   = useAuth();
   const [following, setFollowing] = useState(false);
+  const location = useLocation();
+
+  // Opening this page from a push notification launches straight onto it, so
+  // there is no history entry to go back to and navigate(-1) does nothing.
+  // react-router marks that first entry with key "default".
+  const goBack = () => {
+    if (location.key === "default") navigate("/feed");
+    else navigate(-1);
+  };
 
   useEffect(() => { if (userId) track("profile_open", { userId: user?.id ?? null, meta: { viewed: userId } }); }, [userId, user]);
 
@@ -145,7 +154,7 @@ const PublicProfile = () => {
 
         {/* Nav */}
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 32px" }}>
-          <button onClick={() => navigate(-1)}
+          <button onClick={goBack}
             style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(28,23,18,0.55)", background: "none", border: "none", cursor: "pointer" }}>
             <ArrowLeft style={{ width: 14, height: 14 }} />
             <span style={{ fontSize: 11 }}>Back</span>

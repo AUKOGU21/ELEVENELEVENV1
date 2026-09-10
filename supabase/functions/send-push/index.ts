@@ -70,9 +70,13 @@ Deno.serve(async (req) => {
     const userId: string | undefined = payload.user_id;
     if (!userId) return json({ error: "user_id required" }, 400);
 
-    const title: string = payload.title || "ElevenEleven";
-    const body: string = payload.body || messageFor(payload.type ?? "", payload.data ?? {});
-    const url: string = payload.url || SITE_URL;
+    // The notify function writes push_title / push_body into the notification's
+    // data, generated from the same map as the email, so the phone and the inbox
+    // say the same thing. messageFor stays as the fallback for older rows.
+    const d = payload.data ?? {};
+    const title: string = payload.title || d.push_title || "ElevenEleven";
+    const body: string = payload.body || d.push_body || messageFor(payload.type ?? "", d);
+    const url: string = payload.url || d.url || SITE_URL;
 
     const subs = await rest(
       `push_subscriptions?user_id=eq.${userId}&select=id,endpoint,p256dh,auth`

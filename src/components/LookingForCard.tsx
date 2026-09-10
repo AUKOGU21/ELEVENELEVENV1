@@ -9,6 +9,7 @@ import { Bookmark, MoreHorizontal, ArrowRight, Search, Users, Check, ExternalLin
 import { formatName, getInitials, timeAgo, formatBudget } from "@/lib/format";
 import { pullProduct, type PulledProduct } from "@/lib/productPull";
 import MatchBadge from "./MatchBadge";
+import FollowButton from "./FollowButton";
 import { ProductImage } from "./ProductImage";
 import type { RecommendationData } from "./RecommendationCard";
 
@@ -101,13 +102,15 @@ interface Props {
   // Received-it lifecycle handlers, shared with the decision cards.
   updateOutcome?: (id: string, patch: Record<string, any>) => void;
   submitReceived?: (id: string, data: { primary: string; detailAnswer: string | null; kept: boolean | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null }) => void;
+  isFollowing?: boolean;
+  onToggleFollow?: (targetUserId: string, following: boolean) => void;
   submitReturned?: (id: string, data: { note: string | null; photoFile: File | null }) => void;
 }
 
 type FoundStep = "idle" | "pick" | "same_or_diff" | "link" | "why" | "confidence" | "thanks" | "snoozed";
 
 export default function LookingForCard({
-  decision, user, isMobile, activeTab, isSaved, onSave, onHide, navigate, handleDelete, onOpenRecommendations, onAddRecommendation, onSignIn, onFound, onProductPulled, onStillLooking, updateOutcome, submitReceived, submitReturned,
+  decision, user, isMobile, activeTab, isSaved, onSave, onHide, navigate, handleDelete, onOpenRecommendations, onAddRecommendation, onSignIn, onFound, onProductPulled, onStillLooking, updateOutcome, submitReceived, submitReturned, isFollowing, onToggleFollow,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -267,6 +270,15 @@ export default function LookingForCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <p style={{ fontSize: isMobile ? 12 : 13.5, fontWeight: 700, color: INK, lineHeight: 1.2, margin: 0 }}>{posterName}</p>
+            {onToggleFollow && (
+              <FollowButton
+                targetUserId={decision.user_id}
+                user={user ?? null}
+                following={!!isFollowing}
+                onChange={onToggleFollow}
+                onSignIn={onSignIn}
+              />
+            )}
             {isFound ? (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: OLIVE, background: "rgba(110,122,68,0.12)", border: "1px solid rgba(110,122,68,0.3)", borderRadius: 100, padding: "2px 9px" }}>
                 <Check style={{ width: 10, height: 10 }} /> Found it

@@ -12,6 +12,7 @@ import { imageToJpeg } from "@/lib/image";
 import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDetailOptions, FIT_RESULT_OPTIONS } from "@/components/OutcomeModal";
 import ResponsesDrawer from "@/components/ResponsesDrawer";
 import { type CommentData } from "@/components/CommentThread";
+import FollowButton from "@/components/FollowButton";
 import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBanner from "@/components/NotificationBanner";
@@ -444,6 +445,8 @@ const Feed = () => {
 
   // ── User meta
   const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null } | null>(null);
+  // Who I follow. Ids only — no counts are shown anywhere yet.
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
   // ── Activation nudge: surface one matched decision to brand-new users.
   // Persists until they weigh in once — no manual dismiss.
@@ -1270,6 +1273,24 @@ const Feed = () => {
   };
   // If this user arrived via an invite link, store the shopping-circle relationship.
   useEffect(() => { if (user) ensureReferral(user.id).catch(() => {}); }, [user]);
+
+  // ── Follows ─────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) { setFollowingIds(new Set()); return; }
+    let cancelled = false;
+    supabase.from("follows").select("following_id").eq("follower_id", user.id)
+      .then(({ data }) => {
+        if (!cancelled) setFollowingIds(new Set((data ?? []).map((r: any) => r.following_id)));
+      });
+    return () => { cancelled = true; };
+  }, [user]);
+
+  const setFollowing = (targetId: string, on: boolean) =>
+    setFollowingIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(targetId); else next.delete(targetId);
+      return next;
+    });
   // Show the invite prompt once — after ~12s or a natural scroll through the feed.
   useEffect(() => {
     if (!user || !myProfile || myProfile.referral_prompt_dismissed_at || referralArmedRef.current) return;
@@ -1855,6 +1876,8 @@ const Feed = () => {
             <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80 }}>
             {decision.post_type === "looking_for" ? (
               <LookingForCard
+                isFollowing={followingIds.has(decision.user_id)}
+                onToggleFollow={setFollowing}
                 decision={decision as any}
                 user={user}
                 isMobile={isMobile}
@@ -1876,6 +1899,8 @@ const Feed = () => {
               />
             ) : (
             <DecisionCard
+              isFollowing={followingIds.has(decision.user_id)}
+              onToggleFollow={setFollowing}
               decision={decision}
               user={user}
               voteCounts={voteCounts}
@@ -2327,6 +2352,8 @@ interface CardProps {
   loggedOutcomeIds: Set<string>;
   isMobile: boolean;
   onOpenResponses: () => void;
+  isFollowing: boolean;
+  onToggleFollow: (targetUserId: string, following: boolean) => void;
 }
 
 const DecisionCard = ({
@@ -2357,6 +2384,8 @@ const DecisionCard = ({
   loggedOutcomeIds,
   isMobile,
   onOpenResponses,
+  isFollowing,
+  onToggleFollow,
 }: CardProps) => {
   const [showAllResponses, setShowAllResponses] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -2564,10 +2593,19 @@ const DecisionCard = ({
 
         {/* Name + meta + profile toggle */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Name */}
-          <p style={{ fontSize: isMobile ? 12 : 14.5, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0, marginBottom: 2 }}>
-            {posterName}
-          </p>
+          {/* Name + follow */}
+          <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", marginBottom: 2 }}>
+            <p style={{ fontSize: isMobile ? 12 : 14.5, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0 }}>
+              {posterName}
+            </p>
+            <FollowButton
+              targetUserId={decision.user_id}
+              user={user}
+              following={isFollowing}
+              onChange={onToggleFollow}
+              onSignIn={onSignIn}
+            />
+          </div>
           {/* Age, city · match badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
             <span style={{ fontSize: isMobile ? 11 : 13.5, color: "#8C7A70" }}>

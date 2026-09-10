@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
+import FollowButton from "@/components/FollowButton";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import heroEditorial from "@/assets/hero-editorial.png";
 
@@ -27,6 +28,17 @@ const PublicProfile = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate   = useNavigate();
   const { user }   = useAuth();
+  const [following, setFollowing] = useState(false);
+
+  // Am I following her? Ids only, no counts.
+  useEffect(() => {
+    if (!user || !userId || user.id === userId) { setFollowing(false); return; }
+    let cancelled = false;
+    supabase.from("follows").select("following_id")
+      .eq("follower_id", user.id).eq("following_id", userId).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setFollowing(!!data); });
+    return () => { cancelled = true; };
+  }, [user, userId]);
 
   const [profile, setProfile]   = useState<any>(null);
   const [stats, setStats]       = useState({ decisions: 0, responses: 0, helpfulVotes: 0 });
@@ -160,7 +172,19 @@ const PublicProfile = () => {
                     {badge}
                   </p>
                 )}
-                <h1 style={{ fontSize: 25.5, fontWeight: 700, color: PRIMARY, lineHeight: 1.05, margin: 0, marginBottom: 6 }}>{name}</h1>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+                  <h1 style={{ fontSize: 25.5, fontWeight: 700, color: PRIMARY, lineHeight: 1.05, margin: 0 }}>{name}</h1>
+                  {userId && (
+                    <FollowButton
+                      targetUserId={userId}
+                      user={user}
+                      following={following}
+                      onChange={(_, on) => setFollowing(on)}
+                      onSignIn={() => navigate("/signin")}
+                      size="md"
+                    />
+                  )}
+                </div>
                 {(profile.age || profile.city) && (
                   <p style={{ fontSize: 12, color: MUTED }}>
                     {[profile.age, profile.city?.split(",")[0]].filter(Boolean).join(" · ")}

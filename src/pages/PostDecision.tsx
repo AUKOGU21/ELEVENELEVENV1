@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { shouldShowFitPrompt } from "@/components/DialInFitModal";
 import { imageToJpeg } from "@/lib/image";
 
-type FlowStep = "input" | "extracting" | "preview" | "uncertainty" | "context" | "confidence";
+type FlowStep = "input" | "extracting" | "preview" | "uncertainty" | "context" | "confidence" | "audience";
 
 interface ExtractedProduct {
   brand: string;
@@ -49,6 +49,14 @@ const UNCERTAINTY_OPTIONS = [
   "Other",
 ];
 
+// Stored only, for now. Nothing routes on these yet.
+const AUDIENCE_OPTIONS = [
+  "People with a similar body/fit",
+  "People I follow",
+  "People with similar style/taste",
+  "Other",
+];
+
 const FOLLOWUP_UNCERTAINTIES = [
   "Will it fit right",
   "Will it flatter me",
@@ -63,6 +71,10 @@ const PostDecision = () => {
   const { user } = useAuth();
 
   const [flowStep, setFlowStep] = useState<FlowStep>("input");
+  // "Who would you especially like input from?" — captured to learn what women
+  // pick. No matching or routing reads these yet, deliberately.
+  const [inputFrom, setInputFrom] = useState<string[]>([]);
+  const [inputFromOther, setInputFromOther] = useState("");
   const [product, setProduct] = useState<ExtractedProduct | null>(null);
   const [uncertainties, setUncertainties] = useState<string[]>([]);
   const [priceNote, setPriceNote] = useState("");
@@ -328,7 +340,7 @@ const PostDecision = () => {
       return;
     }
 
-    await supabase.from("decisions").insert({
+    const { data: inserted } = await supabase.from("decisions").insert({
       user_id: user.id,
       product_name: product.name || null,
       brand_name: product.brand || null,
@@ -346,13 +358,27 @@ const PostDecision = () => {
       price_note: priceNote.trim() ? `$${priceNote.trim()}` : null,
       sizes_note: sizesNote.length > 0 ? sizesNote.join(", ") : null,
       context_note: Object.entries(contextNotes).filter(([,v]) => v.trim()).map(([k,v]) => `${k}: ${v.trim()}`).join(" · ") || null,
+      input_from: inputFrom.length > 0 ? inputFrom : null,
+      input_from_other: inputFrom.includes("Other") && inputFromOther.trim() ? inputFromOther.trim() : null,
       is_public: true,
-    });
+    }).select("id").single();
+
+    // Tell anyone following her that she posted. In-app only.
+    if (inserted?.id) {
+      supabase.functions
+        .invoke("notify-followers", { body: { decision_id: inserted.id } })
+        .catch((e) => console.warn("follower notify failed:", e));
+    }
 
     setSubmitting(false);
     const showFit = user && shouldShowFitPrompt(user.id);
     navigate("/feed", { state: showFit ? { fitPromptVariant: "post_decision" } : undefined });
   };
+
+  const toggleInputFrom = (opt: string) =>
+    setInputFrom((prev) =>
+      prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
+    );
 
   const toggleUncertainty = (opt: string) =>
     setUncertainties((prev) =>
@@ -906,6 +932,80 @@ const PostDecision = () => {
               </div>
 
               <button
+                onClick={() => setFlowStep("audience")}
+                className="w-full text-base tracking-[0.18em] uppercase font-medium disabled:opacity-30 transition-all" style={{ background: "#1C1712", color: "#FDFAF6", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", padding: "16px 0" }}
+              >
+                Continue
+              </button>
+              <button
+                onClick={() => setFlowStep("uncertainty")}
+                className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Back
+              </button>
+            </motion.div>
+          )}
+
+          {/* ── STEP 6: WHO SHOULD WEIGH IN (optional) ── */}
+          {flowStep === "audience" && product && (
+            <motion.div key="audience" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border mb-8">
+                {displayImage ? (
+                  <img src={displayImage} alt={product.name} className="w-12 h-14 rounded-lg object-cover bg-muted flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-14 rounded-lg bg-muted flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-medium text-foreground truncate">{product.name || "Unnamed item"}</p>
+                  <p className="text-base text-muted-foreground">{product.brand || product.retailer}</p>
+                </div>
+              </div>
+
+              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">
+                Who would you especially like input from?
+              </h2>
+              <p className="text-muted-foreground text-base mb-8">
+                Optional (select all that apply)
+              </p>
+
+              <div className="flex flex-col gap-3 mb-6">
+                {AUDIENCE_OPTIONS.map((opt) => {
+                  const on = inputFrom.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => toggleInputFrom(opt)}
+                      className="w-full text-left text-base transition-all"
+                      style={{
+                        borderRadius: 8,
+                        padding: "15px 18px",
+                        border: on ? "1px solid #1C1712" : "1px solid hsl(var(--border))",
+                        background: on ? "#1C1712" : "transparent",
+                        color: on ? "#FDFAF6" : "hsl(var(--foreground))",
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {inputFrom.includes("Other") && (
+                <input
+                  type="text"
+                  value={inputFromOther}
+                  onChange={(e) => setInputFromOther(e.target.value)}
+                  placeholder="Who would you like to hear from?"
+                  className="w-full text-base mb-6"
+                  style={{ borderRadius: 8, padding: "15px 18px", border: "1px solid hsl(var(--border))", background: "transparent", color: "hsl(var(--foreground))", outline: "none" }}
+                />
+              )}
+
+              <p className="text-muted-foreground text-sm mb-8">
+                We'll use this to help connect your decision with relevant people.
+              </p>
+
+              <button
                 onClick={submitDecision}
                 disabled={submitting}
                 className="w-full text-base tracking-[0.18em] uppercase font-medium disabled:opacity-30 transition-all" style={{ background: "#1C1712", color: "#FDFAF6", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", padding: "16px 0" }}
@@ -913,7 +1013,7 @@ const PostDecision = () => {
                 {submitting ? "Posting..." : "Post & get input"}
               </button>
               <button
-                onClick={() => setFlowStep("uncertainty")}
+                onClick={() => setFlowStep("confidence")}
                 className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors"
               >
                 Back

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
 import FollowButton from "@/components/FollowButton";
+import { track } from "@/lib/track";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import heroEditorial from "@/assets/hero-editorial.png";
 
@@ -29,6 +30,8 @@ const PublicProfile = () => {
   const navigate   = useNavigate();
   const { user }   = useAuth();
   const [following, setFollowing] = useState(false);
+
+  useEffect(() => { if (userId) track("profile_open", { userId: user?.id ?? null, meta: { viewed: userId } }); }, [userId, user]);
 
   // Am I following her? Ids only, no counts.
   useEffect(() => {

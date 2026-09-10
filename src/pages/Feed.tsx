@@ -13,6 +13,7 @@ import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDe
 import ResponsesDrawer from "@/components/ResponsesDrawer";
 import { type CommentData } from "@/components/CommentThread";
 import FollowButton from "@/components/FollowButton";
+import { track } from "@/lib/track";
 import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBanner from "@/components/NotificationBanner";
@@ -792,6 +793,7 @@ const Feed = () => {
   const weighInDraftIdRef = useRef<string | null>(null);
 
   const startWeighIn = (id: string) => {
+    track("weigh_in_start", { decisionId: id, userId: user?.id ?? null });
     // Starting a new action cancels any pending fit-prompt so it can't pop over this flow
     if (fitTimerRef.current) { clearTimeout(fitTimerRef.current); fitTimerRef.current = null; }
     // Resume an existing draft for this same decision rather than clearing it.
@@ -1927,7 +1929,7 @@ const Feed = () => {
               navigate={navigate}
               loggedOutcomeIds={loggedOutcomeIds}
               isMobile={isMobile}
-              onOpenResponses={() => setResponsesOpenId(decision.id)}
+              onOpenResponses={() => { track("card_open", { decisionId: decision.id, userId: user?.id ?? null }); setResponsesOpenId(decision.id); }}
             />
             )}
             </div>
@@ -2895,6 +2897,7 @@ const DecisionCard = ({
                   href={currentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => track("product_click", { decisionId: decision.id, userId: user?.id ?? null, meta: { url: currentUrl } })}
                   style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,239,234,0.92)", backdropFilter: "blur(8px)", borderRadius: 100, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#5A4A42", textDecoration: "none", zIndex: 2 }}
                 >
                   <ExternalLink style={{ width: 11, height: 11 }} /> View
@@ -2927,6 +2930,7 @@ const DecisionCard = ({
               )}
               {!decision.product_image_url && decision.product_url && (
                 <a href={decision.product_url} target="_blank" rel="noopener noreferrer"
+                  onClick={() => track("product_click", { decisionId: decision.id, userId: user?.id ?? null, meta: { url: decision.product_url } })}
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "#5A4A42", textDecoration: "none", marginTop: 4 }}>
                   <ExternalLink style={{ width: 11, height: 11 }} /> View
                 </a>

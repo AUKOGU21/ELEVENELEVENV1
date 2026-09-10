@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
 import { SILHOUETTE_OPTIONS } from "@/components/onboarding/OnboardingData";
-import { DialInFitModal, shouldShowFitPrompt } from "@/components/DialInFitModal";
+import { DialInFitModal, shouldShowFitPrompt, fitIsEmpty } from "@/components/DialInFitModal";
 import { imageToJpeg } from "@/lib/image";
 import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDetailOptions, FIT_RESULT_OPTIONS } from "@/components/OutcomeModal";
 import ResponsesDrawer from "@/components/ResponsesDrawer";
@@ -445,7 +445,7 @@ const Feed = () => {
   const referralArmedRef = useRef(false);
 
   // ── User meta
-  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null } | null>(null);
+  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null; fit_details?: Record<string, unknown> | null } | null>(null);
   // Who I follow. Ids only — no counts are shown anywhere yet.
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
@@ -655,7 +655,7 @@ const Feed = () => {
     ]);
 
     const myProfileData = (profileResult as any).data ?? null;
-    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url, invite_code: myProfileData.invite_code ?? null, referral_prompt_dismissed_at: myProfileData.referral_prompt_dismissed_at ?? null });
+    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url, invite_code: myProfileData.invite_code ?? null, referral_prompt_dismissed_at: myProfileData.referral_prompt_dismissed_at ?? null, fit_details: myProfileData.fit_details ?? null });
 
     const local = JSON.parse(localStorage.getItem("eleven_decisions") || "[]");
     const localFormatted: DecisionRow[] = local.map((d: any) => ({
@@ -1275,6 +1275,21 @@ const Feed = () => {
   };
   // If this user arrived via an invite link, store the shopping-circle relationship.
   useEffect(() => { if (user) ensureReferral(user.id).catch(() => {}); }, [user]);
+
+  // ── Fit prompt for anyone who never filled it in ────────────────────────────
+  // Fit now lives inside onboarding, so new accounts arrive with it already set.
+  // Everyone who joined before that still needs asking, and it should follow the
+  // account rather than the browser: ask once per visit until she fills it.
+  useEffect(() => {
+    if (!user || !myProfile || fitPromptShownRef.current) return;
+    if (!fitIsEmpty(myProfile.fit_details)) return;
+    const t = setTimeout(() => {
+      fitPromptShownRef.current = true;
+      setFitModalVariant("weigh_in");
+      setShowFitModal(true);
+    }, 3000);   // let the feed land first, so it reads as an invitation
+    return () => clearTimeout(t);
+  }, [user, myProfile]);
 
   // ── Follows ─────────────────────────────────────────────────────────────────
   useEffect(() => {

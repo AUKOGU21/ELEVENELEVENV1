@@ -1,13 +1,35 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, ArrowRight } from "lucide-react";
+import { X, ArrowRight } from "lucide-react";
 import { FIT_CATEGORIES } from "@/components/onboarding/OnboardingData";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import fitEditorial from "@/assets/fit-editorial.jpg";
+
+// Same type system as onboarding and the emails.
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+const INK = "#1C1712";
+const INK_SOFT = "#3A3530";
+const MUTED = "#8C7A70";
+const LINE = "rgba(28,23,18,0.16)";
+const GOLD = "#C49E64";
+const GOLD_TINT = "rgba(196,158,100,0.13)";
+const PAPER = "#F1EFEB";
+const scrim = (a: number) => `rgba(241,239,235,${a})`;
 
 const doneKey = (userId: string) => `eleven_fit_prompt_done_${userId}`;
 const snoozeKey = (userId: string) => `eleven_fit_prompt_snooze_${userId}`;
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000; // stay quiet for 2 weeks after a skip/dismiss
+
+// True when this profile has no fit answers saved yet. This is the real check:
+// localStorage only knows about this device, and 19 of 28 accounts have never
+// filled fit in, so the prompt has to follow the person, not the browser.
+export function fitIsEmpty(fitDetails: Record<string, unknown> | null | undefined): boolean {
+  if (!fitDetails) return true;
+  return !Object.entries(fitDetails).some(
+    ([k, v]) => !k.startsWith("_") && typeof v === "string" && v.trim() !== ""
+  );
+}
 
 // Show the fit prompt until the user saves their fit once (then never again), and
 // stay quiet for a while after they skip or dismiss it so it doesn't nag on every action.
@@ -98,11 +120,6 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
 
   const filledCount = Object.values(answers).filter(Boolean).length;
 
-  const heading =
-    variant === "post_decision"
-      ? "You're one step closer to the right call."
-      : "You're building better context for everyone.";
-
   return (
     <AnimatePresence>
       {open && (
@@ -113,14 +130,8 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
           exit={{ opacity: 0 }}
           onClick={onClose}
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            zIndex: 9000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "8px",
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 9000,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 8,
           }}
         >
           <motion.div
@@ -131,151 +142,106 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "#F5EFEA",
-              borderRadius: 20,
-              position: "relative",
-              width: "100%",
-              maxWidth: 520,
-              maxHeight: "calc(100vh - 32px)",
-              overflowY: "auto",
-              padding: "28px 20px 32px",
+              position: "relative", width: "100%", maxWidth: 520,
+              maxHeight: "calc(100vh - 32px)", overflowY: "auto",
+              borderRadius: 16, overflowX: "hidden", background: PAPER,
             }}
           >
-            {/* Close */}
+            {/* The photograph sits behind everything, knocked back so type stays loudest. */}
+            <div aria-hidden style={{
+              position: "absolute", inset: 0,
+              backgroundImage: `url(${fitEditorial})`, backgroundSize: "cover",
+              backgroundPosition: "60% 4%", filter: "grayscale(1) contrast(1.02)", opacity: 0.62,
+            }} />
+            <div aria-hidden style={{
+              position: "absolute", inset: 0,
+              background: `linear-gradient(180deg, ${scrim(0.34)} 0%, ${scrim(0.72)} 34%, ${scrim(0.94)} 62%, ${scrim(0.985)} 100%)`,
+            }} />
+
             <button
               onClick={handleDismiss}
+              aria-label="Close"
               style={{
-                position: "absolute", top: 18, right: 20,
-                width: 32, height: 32, borderRadius: "50%",
-                border: "1px solid rgba(28,23,18,0.15)",
-                background: "transparent",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer",
+                position: "absolute", top: 16, right: 16, zIndex: 2,
+                width: 30, height: 30, borderRadius: "50%", border: `1px solid ${LINE}`,
+                background: "rgba(255,255,255,0.55)", display: "flex", alignItems: "center",
+                justifyContent: "center", cursor: "pointer", color: INK,
               }}
             >
-              <X style={{ width: 15, height: 15, color: "#8C7A70" }} />
+              <X style={{ width: 14, height: 14 }} />
             </button>
 
-            {/* Header */}
-            <div style={{ marginBottom: 28 }}>
-              <h2
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: "#1C1712",
-                  lineHeight: 1.25,
-                  marginBottom: 10,
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {heading}
+            <div style={{ position: "relative", zIndex: 1, padding: "92px 26px 28px" }}>
+              <h2 style={{
+                fontFamily: SANS, fontSize: 27, lineHeight: 1.1, fontWeight: 700,
+                letterSpacing: "2.6px", textTransform: "uppercase", color: INK, margin: "0 0 14px",
+              }}>
+                Dial in your fit
               </h2>
-              <p
-                style={{
-                  fontSize: 18.5,
-                  fontStyle: "italic",
-                  color: "#C49E64",
-                  marginBottom: 10,
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  lineHeight: 1.3,
-                }}
-              >
-                Let's dial in your fit.
+              <p style={{ fontFamily: SANS, fontSize: 12.5, lineHeight: 1.6, color: INK_SOFT, margin: "0 0 26px", maxWidth: "36ch" }}>
+                Make your matches and responses more precise in seconds.
               </p>
-              <p style={{ fontSize: 12, color: "#8C7A70", lineHeight: 1.5 }}>
-                Make your matches more precise in seconds.
-              </p>
-            </div>
 
-            {/* Fit categories */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              {FIT_CATEGORIES.map(cat => (
-                <div key={cat.label}>
-                  <p
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#1C1712",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {cat.label}
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8 }}>
-                    {cat.options.map(opt => {
-                      const active = answers[cat.label] === opt;
-                      return (
-                        <button
-                          key={opt}
-                          onClick={() => select(cat.label, opt)}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: 999,
-                            border: `1.5px solid ${active ? "#C49E64" : "rgba(28,23,18,0.18)"}`,
-                            background: active ? "rgba(196,158,100,0.10)" : "transparent",
-                            color: active ? "#1C1712" : "#5A4F47",
-                            fontSize: 10,
-                            fontWeight: 500,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 5,
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          {active && (
-                            <Check style={{ width: 12, height: 12, color: "#C49E64", flexShrink: 0 }} />
-                          )}
-                          {opt}
-                        </button>
-                      );
-                    })}
+              <div style={{ height: 1, background: LINE, marginBottom: 24 }} />
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {FIT_CATEGORIES.map(cat => (
+                  <div key={cat.label}>
+                    <p style={{
+                      fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: "2.2px",
+                      textTransform: "uppercase", color: INK, margin: "0 0 10px",
+                    }}>
+                      {cat.label}
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                      {cat.options.map(opt => {
+                        const active = answers[cat.label] === opt;
+                        return (
+                          <button
+                            key={opt}
+                            onClick={() => select(cat.label, opt)}
+                            style={{
+                              padding: "9px 15px", borderRadius: 0,
+                              border: `1.5px solid ${active ? GOLD : LINE}`,
+                              background: active ? GOLD_TINT : "rgba(255,255,255,0.45)",
+                              color: INK_SOFT, fontFamily: SANS, fontSize: 11.5,
+                              fontWeight: active ? 600 : 500, letterSpacing: "0.2px",
+                              cursor: "pointer", whiteSpace: "nowrap", transition: "all .14s",
+                            }}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* Actions */}
-            <div style={{ marginTop: 32 }}>
               <button
                 onClick={handleSave}
                 disabled={filledCount === 0 || saving}
                 style={{
-                  width: "100%",
-                  padding: "16px 24px",
-                  borderRadius: 999,
-                  background: "#1C1712",
-                  color: "#FDFAF6",
-                  border: "none",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: filledCount === 0 ? "default" : "pointer",
-                  opacity: filledCount === 0 ? 0.35 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                  transition: "opacity 0.2s",
-                  letterSpacing: "0.01em",
+                  width: "100%", marginTop: 30, padding: "17px 0", borderRadius: 0,
+                  border: `2px solid ${INK}`, background: "transparent", color: INK,
+                  fontFamily: SANS, fontSize: 13, fontWeight: 700, letterSpacing: "2.4px",
+                  textTransform: "uppercase",
+                  opacity: filledCount === 0 || saving ? 0.32 : 1,
+                  cursor: filledCount === 0 || saving ? "default" : "pointer",
+                  transition: "opacity .15s",
                 }}
               >
-                {saving ? "Saving…" : "Improve my matches"}
-                {!saving && <ArrowRight style={{ width: 16, height: 16 }} />}
+                {saving ? "Saving..." : "Improve my matches"}
+                {!saving && <ArrowRight style={{ width: 14, height: 14, display: "inline", verticalAlign: "-2px", marginLeft: 10 }} />}
               </button>
+
               <button
                 onClick={handleDismiss}
                 style={{
-                  width: "100%",
-                  marginTop: 14,
-                  background: "transparent",
-                  border: "none",
-                  fontSize: 12,
-                  color: "#8C7A70",
-                  cursor: "pointer",
-                  padding: "8px 0",
-                  textAlign: "center",
+                  display: "block", width: "100%", marginTop: 16, background: "none", border: "none",
+                  fontFamily: SANS, fontSize: 11, letterSpacing: "1.6px", textTransform: "uppercase",
+                  color: MUTED, cursor: "pointer", textDecoration: "underline",
+                  textUnderlineOffset: 3, padding: "6px 0",
                 }}
               >
                 Skip for now

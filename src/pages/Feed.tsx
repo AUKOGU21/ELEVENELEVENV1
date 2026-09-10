@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
 import { SILHOUETTE_OPTIONS } from "@/components/onboarding/OnboardingData";
-import { DialInFitModal, shouldShowFitPrompt, fitIsEmpty } from "@/components/DialInFitModal";
+import { DialInFitModal, shouldShowFitPrompt, missingFitCategories } from "@/components/DialInFitModal";
 import { imageToJpeg } from "@/lib/image";
 import OutcomeModal, { parsePrimaryUncertainty, outcomeDetailQuestion, outcomeDetailOptions, FIT_RESULT_OPTIONS } from "@/components/OutcomeModal";
 import ResponsesDrawer from "@/components/ResponsesDrawer";
@@ -446,6 +446,10 @@ const Feed = () => {
 
   // ── User meta
   const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null; fit_details?: Record<string, unknown> | null } | null>(null);
+  // Only the questions she hasn't answered. Empty means she's done, and no
+  // trigger in this file may open the modal.
+  const missingFit = missingFitCategories(myProfile?.fit_details);
+
   // Who I follow. Ids only — no counts are shown anywhere yet.
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
@@ -485,7 +489,7 @@ const Feed = () => {
     // Show fit modal after posting a decision (navigated here with state) — exactly once,
     // even if this effect re-runs when `user` changes (auth resolve / token refresh).
     const variant = (location.state as any)?.fitPromptVariant;
-    if (variant && !fitPromptHandledRef.current && !fitPromptShownRef.current && user && shouldShowFitPrompt(user.id)) {
+    if (variant && !fitPromptHandledRef.current && !fitPromptShownRef.current && user && missingFit.length > 0 && shouldShowFitPrompt(user.id)) {
       fitPromptHandledRef.current = true;
       window.history.replaceState({}, "");
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
@@ -1049,7 +1053,7 @@ const Feed = () => {
     setVote(null);
     setTake("");
     setTakeLink("");
-    if (wasCompleted && user && !fitPromptShownRef.current && shouldShowFitPrompt(user.id)) {
+    if (wasCompleted && user && !fitPromptShownRef.current && missingFit.length > 0 && shouldShowFitPrompt(user.id)) {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
         fitTimerRef.current = null;
@@ -1282,7 +1286,7 @@ const Feed = () => {
   // account rather than the browser: ask once per visit until she fills it.
   useEffect(() => {
     if (!user || !myProfile || fitPromptShownRef.current) return;
-    if (!fitIsEmpty(myProfile.fit_details)) return;
+    if (missingFit.length === 0) return;
     const t = setTimeout(() => {
       fitPromptShownRef.current = true;
       setFitModalVariant("weigh_in");
@@ -2332,7 +2336,7 @@ const Feed = () => {
         </button>
       )}
 
-      <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} />
+      <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} only={missingFit} />
 
       {user && <NotificationPrompt userId={user.id} isMobile={isMobile} />}
     </div>

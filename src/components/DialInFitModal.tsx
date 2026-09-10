@@ -24,11 +24,18 @@ const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000; // stay quiet for 2 weeks after a sk
 // True when this profile has no fit answers saved yet. This is the real check:
 // localStorage only knows about this device, and 19 of 28 accounts have never
 // filled fit in, so the prompt has to follow the person, not the browser.
+export function missingFitCategories(fitDetails: Record<string, unknown> | null | undefined): string[] {
+  const fd = fitDetails ?? {};
+  return FIT_CATEGORIES
+    .map(c => c.label)
+    .filter(label => {
+      const v = fd[label];
+      return !(typeof v === "string" && v.trim() !== "");
+    });
+}
+
 export function fitIsEmpty(fitDetails: Record<string, unknown> | null | undefined): boolean {
-  if (!fitDetails) return true;
-  return !Object.entries(fitDetails).some(
-    ([k, v]) => !k.startsWith("_") && typeof v === "string" && v.trim() !== ""
-  );
+  return missingFitCategories(fitDetails).length === FIT_CATEGORIES.length;
 }
 
 // Show the fit prompt until the user saves their fit once (then never again), and
@@ -53,9 +60,17 @@ interface Props {
   open: boolean;
   onClose: () => void;
   variant?: "weigh_in" | "post_decision";
+  /** Ask only for these categories. Omit to ask for all of them. */
+  only?: string[];
 }
 
-export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
+export function DialInFitModal({ open, onClose, variant = "weigh_in", only }: Props) {
+  // Someone who answered three of five should be asked the other two, not all
+  // five again. Saving merges, so her existing answers are never disturbed.
+  const asking = only && only.length > 0
+    ? FIT_CATEGORIES.filter(c => only.includes(c.label))
+    : FIT_CATEGORIES;
+  const partial = asking.length < FIT_CATEGORIES.length;
   const { user } = useAuth();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -91,10 +106,13 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
   const handleSave = async () => {
     if (!user || saving) return;
     setSaving(true);
+    // "About average" and "About proportional" used to be thrown away here. That
+    // was wrong twice over: matching scores two women who both answered the same
+    // way, so neutral-and-neutral is a real match, and discarding the answer left
+    // the category looking unanswered, which meant she got asked again forever.
     const filtered = Object.fromEntries(
       Object.entries(answers).filter(([k, v]) =>
-        typeof v === "string" && v && !k.startsWith("_") &&
-        !v.toLowerCase().includes("average") && !v.toLowerCase().includes("proportional")
+        typeof v === "string" && v.trim() !== "" && !k.startsWith("_")
       )
     );
     // Merge back the preserved meta (e.g. _fit_photos) so saving answers never wipes uploaded photos
@@ -118,7 +136,7 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
     }
   };
 
-  const filledCount = Object.values(answers).filter(Boolean).length;
+  const filledCount = asking.filter(c => (answers[c.label] ?? "").trim() !== "").length;
 
   return (
     <AnimatePresence>
@@ -179,13 +197,15 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in" }: Props) {
                 Dial in your fit
               </h2>
               <p style={{ fontFamily: SANS, fontSize: 12.5, lineHeight: 1.6, color: INK_SOFT, margin: "0 0 26px", maxWidth: "36ch" }}>
-                Make your matches and responses more precise in seconds.
+                {partial
+                  ? `You're almost there. ${asking.length === 1 ? "One question" : `${asking.length} questions`} left.`
+                  : "Make your matches and responses more precise in seconds."}
               </p>
 
               <div style={{ height: 1, background: LINE, marginBottom: 24 }} />
 
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                {FIT_CATEGORIES.map(cat => (
+                {asking.map(cat => (
                   <div key={cat.label}>
                     <p style={{
                       fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: "2.2px",

@@ -34,7 +34,15 @@ function esc(s: string): string {
 }
 
 interface Event {
+  // The row's type when it differs from the event's key. Two events can be the
+  // same kind of notification told two ways, and the bell shouldn't have to know
+  // about the difference: rec_outcome_alt is stored as a rec_outcome.
+  as?: string;
   hero?: string;          // photograph behind the words; absent means plain white
+  // Some events carry one more fact worth showing: why she in particular is
+  // being asked, or what the poster wrote when she closed the loop. The sentence
+  // still comes from here or from the caller's own template, never free text a
+  // user typed at us, and it renders quiet and italic under the sub.
   subject: string;
   head: string;
   sub: string;
@@ -106,10 +114,29 @@ export const EVENTS: Record<string, Event> = {
   outcome: {
     subject: "{name} closed the loop",
     head: "{name} closed the loop.",
-    sub: "She shared what she decided on {item}.",
+    sub: "She {verdict} the {item} you weighed in on.",
     cta: "See the outcome", path: "/feed",
     foot: "You're receiving this because you weighed in",
-    push: "{name} shared what she decided. Tap to see the outcome.",
+    push: "{name} {verdict} the {item}. Tap to see how it went.",
+  },
+  // She bought the exact thing you recommended.
+  rec_outcome: {
+    subject: "{name} bought your pick",
+    head: "{name} bought your pick.",
+    sub: "She went with the {item}. Your rec is what got her there.",
+    cta: "See what she bought", path: "/feed",
+    foot: "You're receiving this because you recommended it",
+    push: "{name} bought the {item} you recommended. Tap to see it.",
+  },
+  // Same brand, different piece. Still your rec that got her there.
+  rec_outcome_alt: {
+    as: "rec_outcome",
+    subject: "{name} bought the brand you recommended",
+    head: "{name} went with your brand.",
+    sub: "A different piece from them, the {item}. Your rec is what got her there.",
+    cta: "See what she bought", path: "/feed",
+    foot: "You're receiving this because you recommended it",
+    push: "{name} bought {item} from the brand you recommended. Tap to see it.",
   },
   recommendation: {
     subject: "{name} sent you a pick",
@@ -141,6 +168,9 @@ function render(e: Event, v: Record<string, string>): string {
   const cta = esc(fill(e.cta, v));
   const url = SITE + fill(e.path, v);
   const subject = esc(fill(e.subject, v));
+  const note = (v.note ?? "").trim()
+    ? `<div style="font-size:13.5px;line-height:1.6;color:#6F665A;font-style:italic;padding-top:12px;">${esc(v.note)}</div>`
+    : "";
 
   const body = e.hero
     ? `<tr><td background="${e.hero}" bgcolor="#F5F4F2" valign="top" align="center" class="hero px" height="750"
@@ -150,6 +180,7 @@ function render(e: Event, v: Record<string, string>): string {
          <div style="font-size:13px;font-weight:700;letter-spacing:5px;color:#0A0A0A;text-transform:uppercase;padding-bottom:44px;">ELEVENELEVEN</div>
          <div class="h1" style="font-size:32px;line-height:1.12;font-weight:700;letter-spacing:-0.5px;color:#0A0A0A;">${head}</div>
          <div style="font-size:14.5px;line-height:1.6;color:#3A3A36;padding-top:14px;">${sub}</div>
+         ${note}
          <div style="padding-top:30px;"><a href="${url}" target="_blank" style="font-size:12px;font-weight:700;letter-spacing:2.4px;color:#0A0A0A;text-transform:uppercase;text-decoration:underline;">${cta}&nbsp;&rarr;</a></div>
          <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
        </td></tr>`
@@ -159,6 +190,7 @@ function render(e: Event, v: Record<string, string>): string {
        <tr><td align="center" class="px" style="padding:44px 52px 0;">
          <div class="h1" style="font-size:30px;line-height:1.14;font-weight:700;letter-spacing:-0.5px;color:#0A0A0A;">${head}</div>
          <div style="font-size:14.5px;line-height:1.6;color:#3A3A36;padding-top:14px;">${sub}</div>
+         ${note}
        </td></tr>
        <tr><td align="center" style="padding:30px 48px 52px;">
          <a href="${url}" target="_blank" style="font-size:12px;font-weight:700;letter-spacing:2.4px;color:#0A0A0A;text-transform:uppercase;text-decoration:underline;">${cta}&nbsp;&rarr;</a>
@@ -232,6 +264,9 @@ Deno.serve(async (req) => {
       item: trim(data.item ?? "your decision"),
       tier: data.tier ?? "Contributor",
       actor_id: data.actor_id ?? "",
+      // "bought" or "passed on", so the loop-closing email says which way it went
+      verdict: data.verdict ?? "decided on",
+      note: (data.note ?? "").toString().slice(0, 240),
     };
 
     // In-app row. Its insert trigger fires the push, which reads the same copy.
@@ -239,7 +274,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({
-        user_id, type, decision_id,
+        user_id, type: e.as ?? type, decision_id,
         // push_title / push_body ride along so send-push renders the exact same
         // words as the email without keeping its own copy of the map.
         data: {

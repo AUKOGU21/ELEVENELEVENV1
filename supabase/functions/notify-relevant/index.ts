@@ -23,7 +23,7 @@
 // without sending anything.
 //
 // Secrets (all already set for outcome-reminder):
-//   RESEND_API_KEY, REMINDER_SECRET, SITE_URL, EMAIL_FROM
+//   REMINDER_SECRET. The sending secrets now belong to `notify`.
 // Auto-injected: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 //
 // Requires decisions.relevance_notified_at.
@@ -31,10 +31,8 @@
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const REMINDER_SECRET = Deno.env.get("REMINDER_SECRET") ?? "";
-const SITE_URL = Deno.env.get("SITE_URL") ?? "https://geteleveneleven.com";
-const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtaXF1aWtveHh1a2Z1am5waXpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTQ1NTUsImV4cCI6MjA5MDY3MDU1NX0.Q2JOtk1OZjz-XF0XbyDBw3p5cAidnB8_IEuCAqjplEA";
 
 // Give the feed a few hours to answer organically before we go asking.
 const MIN_AGE_HOURS = Number(Deno.env.get("RELEVANCE_MIN_AGE_HOURS") ?? "3");
@@ -50,15 +48,9 @@ const COOLDOWN_HOURS = Number(Deno.env.get("RELEVANCE_COOLDOWN_HOURS") ?? "48");
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
-function esc(s: string): string {
-  return (s || "").split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;");
-}
 function firstName(s: string | null | undefined): string {
   const t = (s || "").trim();
   return t ? t.split(" ")[0] : "Someone";
-}
-function fill(tpl: string, key: string, value: string): string {
-  return tpl.split("{{" + key + "}}").join(value);
 }
 async function sb(path: string): Promise<any> {
   const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
@@ -86,91 +78,6 @@ function lookingForMatchesCategory(text: string, category: string): boolean {
   return words.some((w) => t.includes(w));
 }
 
-// Design shell matches the other ElevenEleven emails.
-const TEMPLATE = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="x-apple-disable-message-reformatting">
-  <meta name="color-scheme" content="light only">
-  <title>she needs your take</title>
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Spline+Sans+Mono:wght@500&display=swap" rel="stylesheet">
-  <style>
-    html,body{margin:0!important;padding:0!important;width:100%!important;background:#ffffff;}
-    table,td{border-collapse:collapse!important;}
-    a{text-decoration:none;}
-    body,td,div,p,a{font-family:'Hanken Grotesk',Helvetica,Arial,sans-serif;}
-    .display{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;}
-    .mono{font-family:'Spline Sans Mono','Courier New',monospace;}
-    .btn:hover{background:#9A3F26!important;}
-    @media only screen and (max-width:620px){
-      .container{width:100%!important;}
-      .px{padding-left:24px!important;padding-right:24px!important;}
-      .h1{font-size:34px!important;line-height:1.08!important;}
-    }
-  </style>
-</head>
-<body style="margin:0;padding:0;background:#ffffff;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;height:0;width:0;">
-    {{POSTER}} is deciding on {{ITEM}} and no one has answered.
-  </div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
-    <tr>
-      <td align="center" style="padding:40px 16px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="width:600px;max-width:600px;background:#ffffff;">
-          <tr>
-            <td align="center" class="px" style="padding:8px 48px 36px;">
-              <span class="mono" style="font-size:13px;letter-spacing:6px;color:#100E0C;text-transform:uppercase;">ELEVENELEVEN</span>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" class="px h1 display" style="padding:8px 48px 8px;font-size:42px;line-height:1.05;font-weight:700;letter-spacing:-1px;color:#100E0C;">
-              {{POSTER}} needs your take.
-            </td>
-          </tr>
-          <tr>
-            <td align="center" class="px" style="padding:26px 56px 8px;font-size:17px;line-height:1.5;color:#3A3530;">
-              she's deciding on {{ITEM}}, and nobody has weighed in yet.
-            </td>
-          </tr>
-          <tr>
-            <td align="center" class="px" style="padding:0 56px 28px;font-size:15px;line-height:1.6;color:#6F665A;">
-              {{REASON}}
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:6px 48px 4px;">
-              <a class="btn mono" href="{{SITE_URL}}/feed" target="_blank"
-                 style="display:inline-block;background:#CB5A3C;color:#ffffff;font-size:13px;letter-spacing:2px;text-transform:uppercase;padding:15px 32px;">
-                Weigh in&nbsp;&rarr;
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td class="px" style="padding:42px 48px 0;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                <td style="border-top:1px solid #ECE7DD;font-size:0;line-height:0;">&nbsp;</td>
-              </tr></table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" class="px mono" style="padding:22px 48px 8px;font-size:10px;letter-spacing:2px;color:#9c9488;text-transform:uppercase;line-height:1.8;">
-              The Trust Layer For Online Decision Making
-            </td>
-          </tr>
-          <tr>
-            <td align="center" class="px" style="padding:0 48px 36px;font-size:11px;line-height:1.7;color:#b3ab9e;">
-              you're getting this because you know this category.<br>
-              questions? <a href="mailto:hello@geteleveneleven.com" style="color:#b3ab9e;text-decoration:underline;">hello@geteleveneleven.com</a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
 
 interface Candidate { userId: string; score: number; reason: string; }
 
@@ -182,7 +89,6 @@ Deno.serve(async (req) => {
   }
   const body = await req.json().catch(() => ({}));
   const dryRun = body?.dry_run === true;
-  if (!dryRun && !RESEND_API_KEY) return json({ error: "RESEND_API_KEY not set" }, 500);
 
   const now = Date.now();
   const notBefore = new Date(now - MAX_AGE_DAYS * 86400000).toISOString();
@@ -291,32 +197,20 @@ Deno.serve(async (req) => {
       detail.picks.push({ user_id: pick.userId, name: await nameFor(pick.userId), email, score: pick.score, reason: pick.reason });
       if (dryRun || !email) continue;
 
-      // In-app bell, and push for anyone who has it on, via the notifications trigger.
-      await fetch(SUPABASE_URL + "/rest/v1/notifications", {
+      // The bell row, the push and the email all come out of `notify`, which
+      // holds the words. The reason this particular woman was picked rides along
+      // as the quiet line, since it's the whole argument for interrupting her.
+      const send = await fetch(SUPABASE_URL + "/functions/v1/notify", {
         method: "POST",
-        headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + ANON_KEY },
         body: JSON.stringify({
-          user_id: pick.userId, type: "relevant", decision_id: post.id,
-          data: { actor_name: poster, item, reason: pick.reason }, email_sent: true,
-        }),
-      }).catch((e) => console.error("notification insert failed:", e));
-
-      let html = fill(TEMPLATE, "POSTER", esc(poster));
-      html = fill(html, "ITEM", esc(item));
-      html = fill(html, "REASON", esc(pick.reason));
-      html = fill(html, "SITE_URL", SITE_URL);
-
-      const send = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: EMAIL_FROM, to: [email],
-          subject: poster + " needs your take on " + item,
-          html,
-          headers: { "List-Unsubscribe": "<mailto:hello@geteleveneleven.com?subject=Unsubscribe>" },
+          type: "relevant",
+          user_id: pick.userId,
+          decision_id: post.id,
+          data: { actor_id: post.user_id, item, note: pick.reason },
         }),
       });
-      if (!send.ok) { console.error("send failed:", send.status, await send.text()); continue; }
+      if (!send.ok) { console.error("notify failed:", send.status, await send.text()); continue; }
       onCooldown.add(pick.userId);
       sent++;
     }

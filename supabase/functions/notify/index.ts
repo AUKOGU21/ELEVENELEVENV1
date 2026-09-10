@@ -216,9 +216,20 @@ Deno.serve(async (req) => {
       resolved = full.trim() ? full.trim().split(" ")[0] : null;
     }
 
+    // Product names run long ("Bottega Veneta Pre-Owned 2012-2026 Medium Suede
+    // Maxi Intrecciato Arco tote bag"). A push notification shows about two lines,
+    // so trim on a word boundary rather than letting the phone cut mid-word.
+    const trim = (t: string, max = 44) => {
+      const s0 = (t ?? "").trim();
+      if (s0.length <= max) return s0;
+      const cut = s0.slice(0, max);
+      const sp = cut.lastIndexOf(" ");
+      return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[,\s]+$/, "") + "\u2026";
+    };
+
     const v: Record<string, string> = {
       name: resolved ?? data.name ?? data.actor_name ?? "Someone",
-      item: data.item ?? "your decision",
+      item: trim(data.item ?? "your decision"),
       tier: data.tier ?? "Contributor",
       actor_id: data.actor_id ?? "",
     };

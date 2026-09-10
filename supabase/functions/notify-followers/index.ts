@@ -28,6 +28,17 @@ function firstName(s: string | null | undefined): string {
   return t ? t.split(" ")[0] : "Someone";
 }
 
+
+// Hand off to `notify`, which owns the copy, the email and the in-app row.
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtaXF1aWtveHh1a2Z1am5waXpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTQ1NTUsImV4cCI6MjA5MDY3MDU1NX0.Q2JOtk1OZjz-XF0XbyDBw3p5cAidnB8_IEuCAqjplEA";
+async function notify(type: string, user_id: string, data: Record<string, unknown>, decision_id: string | null = null) {
+  await fetch(SUPABASE_URL + "/functions/v1/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + ANON_KEY },
+    body: JSON.stringify({ type, user_id, data, decision_id }),
+  }).catch((e) => console.error("notify failed:", e));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -45,22 +56,15 @@ Deno.serve(async (req) => {
     const actorName = firstName(prof?.display_name);
     const item = [d.brand_name, d.product_name].filter(Boolean).join(" ").trim() || d.lf_title || "something new";
 
-    const rows = followers
+    const targets = followers
       .map((f: any) => f.follower_id)
-      .filter((uid: string) => uid !== d.user_id)
-      .map((uid: string) => ({
-        user_id: uid, type: "follow_post", decision_id,
-        data: { actor_name: actorName, item }, email_sent: false,
-      }));
-    if (rows.length === 0) return json({ ok: true, notified: 0 });
+      .filter((uid: string) => uid !== d.user_id);
+    if (targets.length === 0) return json({ ok: true, notified: 0 });
+    for (const uid of targets) {
+      await notify("follow_post", uid, { actor_id: d.user_id, name: actorName, item }, decision_id);
+    }
 
-    await fetch(SUPABASE_URL + "/rest/v1/notifications", {
-      method: "POST",
-      headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify(rows),
-    }).catch((e) => console.error("notification insert failed:", e));
-
-    return json({ ok: true, notified: rows.length });
+    return json({ ok: true, notified: targets.length });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }

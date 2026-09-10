@@ -90,7 +90,10 @@ export const FIT_CATEGORIES: FitCategory[] = [
 export const STEPS: OnboardingStep[] = [
   { key: "account", type: "account" },
   { key: "transition", type: "transition" },
-  { key: "demographics", type: "demographics" },
+  // Was `demographics`, which asked age and city a second time after the account
+  // step had already collected both. Replaced with fit, which is the thing we
+  // actually lack and the thing women say matters most.
+  { key: "fit", type: "fit" },
   {
     key: "height",
     type: "select",

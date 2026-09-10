@@ -124,7 +124,7 @@ const Index = () => {
   );
 
   return (
-    <div className="min-h-screen" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="min-h-screen" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
 
       {/* ═══ HERO ═══════════════════════════════════════════════════════════════ */}
       <section

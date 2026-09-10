@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ArrowRight, Lock, Calendar, MapPin } from "lucide-react";
-import { STEPS, SIZE_OPTIONS } from "@/components/onboarding/OnboardingData";
+import { STEPS, SIZE_OPTIONS, FIT_CATEGORIES } from "@/components/onboarding/OnboardingData";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { computeMatchScore } from "@/lib/matching";
@@ -61,6 +61,36 @@ const BAND_TO_SIL_IDX: Record<string, number> = {
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
+// ── Type system ───────────────────────────────────────────────────────────────
+// Matches the email: Helvetica only, black and white, square edges. No serif, no
+// gold. Uppercase letterspaced labels carry the hierarchy instead of colour.
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+const INK = "#1C1712";          // the app's ink brown, not pure black
+const INK_SOFT = "#3A3530";
+const MUTED = "#8C7A70";
+const LINE = "rgba(28,23,18,0.16)";
+const GOLD = "#C49E64";
+const GOLD_TINT = "rgba(196,158,100,0.13)";
+
+const H1: React.CSSProperties = {
+  // Sentence case, not caps. The weight and the tight tracking carry it.
+  fontFamily: SANS, fontSize: "clamp(25px, 6.6vw, 34px)", lineHeight: 1.08,
+  fontWeight: 700, letterSpacing: "-0.6px",
+  color: INK, margin: "0 0 13px",
+};
+const SUB: React.CSSProperties = {
+  fontFamily: SANS, fontSize: 13, lineHeight: 1.6, color: MUTED,
+  margin: "0 0 30px", maxWidth: "40ch",
+};
+const LABEL: React.CSSProperties = {
+  fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: "2.2px",
+  textTransform: "uppercase", color: INK, margin: "0 0 10px",
+};
+const INPUT: React.CSSProperties = {
+  width: "100%", padding: "14px 16px", border: `1px solid ${LINE}`, borderRadius: 0,
+  background: "#FFFFFF", fontFamily: SANS, fontSize: 15, color: INK, outline: "none",
+};
+
 const Onboarding = () => {
   const navigate = useNavigate();
   const { signInWithEmail, user } = useAuth();
@@ -80,6 +110,9 @@ const Onboarding = () => {
   const [bottomSizeValue, setBottomSizeValue] = useState("");
   const [bottomSizeMode, setBottomSizeMode]   = useState<"letter" | "number">("letter");
   const [fitAnswers, setFitAnswers]     = useState<Record<string, string>>({});
+  // Tapping the chosen option again clears it, so nothing is forced.
+  const toggleFit = (category: string, option: string) =>
+    setFitAnswers(prev => ({ ...prev, [category]: prev[category] === option ? "" : option }));
   const [authLoading, setAuthLoading]   = useState(false);
   const [quickWinPhase, setQuickWinPhase] = useState<"loading" | "ready">("loading");
   // If they arrived via an invite link, the inviter's name for the circle confirmation.
@@ -165,7 +198,7 @@ const Onboarding = () => {
   // Step number for the segmented progress bar (1–6); null for account/quickwin/pinterest
   const stepNum: number | null = (() => {
     if (current.type === "transition")   return 1;
-    if (current.type === "demographics") return 2;
+    if (current.type === "fit")          return 2;
     if (current.key  === "height")       return 3;
     if (current.key  === "sizing_top" || current.key === "sizing_bottom") return 4;
     if (current.key  === "silhouette")   return 5;
@@ -195,7 +228,7 @@ const Onboarding = () => {
   const canContinue = () => {
     if (current.type === "account")      return !!(firstName.trim() && lastName.trim() && email.trim() && age.trim() && city.trim());
     if (current.type === "transition")   return true;
-    if (current.type === "demographics") return !!age.trim();
+    if (current.type === "fit")          return true;   // every answer is optional
     if (current.type === "pinterest")    return true;
     if (current.type === "quickwin")     return true; // auto-advances, no button shown
     if (current.key === "sizing_top")    return !!topSizeValue;
@@ -285,7 +318,7 @@ const Onboarding = () => {
   const progress =
     current.type === "account"      ? 0 :
     current.type === "transition"   ? 3 :
-    current.type === "demographics" ? 6 :
+    current.type === "fit"          ? 6 :
     current.type === "quickwin" || current.type === "pinterest" ? 100 :
     ((currentProfileIndex + 1) / profileSteps.length) * 100;
 
@@ -314,10 +347,10 @@ const Onboarding = () => {
     return (
       <div style={{ minHeight: "100vh", background: "#FDFAF6", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", textAlign: "center" }}>
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} style={{ maxWidth: 440, width: "100%" }}>
-          <div style={{ width: 62, height: 62, borderRadius: "50%", margin: "0 auto 22px", background: "rgba(196,158,100,0.14)", border: "1px solid #C49E64", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Users style={{ width: 28, height: 28, color: "#A07848" }} />
+          <div style={{ width: 62, height: 62, borderRadius: "50%", margin: "0 auto 22px", background: "rgba(196,158,100,0.14)", border: `1px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Users style={{ width: 26, height: 26, color: INK }} />
           </div>
-          <h1 style={{ fontFamily: "Georgia, serif", fontSize: 32, lineHeight: 1.15, color: "#1C1712", margin: "0 0 14px", letterSpacing: "-0.01em" }}>
+          <h1 style={{ ...H1, fontSize: "clamp(20px, 5.4vw, 26px)", margin: "0 0 14px" }}>
             You're now part of {circleInviter}'s shopping circle.
           </h1>
           <p style={{ fontSize: 16, lineHeight: 1.6, color: "#5A4A42", margin: "0 0 32px" }}>
@@ -340,10 +373,10 @@ const Onboarding = () => {
             <div
               key={i}
               style={{
-                height: 4,
+                height: 2,
                 flex: 1,
-                borderRadius: 999,
-                background: i < stepNum! ? "#C49E64" : "rgba(196,158,100,0.18)",
+                borderRadius: 0,
+                background: i < stepNum! ? GOLD : "rgba(196,158,100,0.18)",
                 transition: "background 0.3s",
               }}
             />
@@ -353,10 +386,10 @@ const Onboarding = () => {
 
       {/* Header / logo */}
       <div className="flex items-center justify-between px-6 py-3">
-        <span className="font-sans text-lg tracking-widest text-foreground">ELEVENELEVEN</span>
+        <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 700, letterSpacing: "5px", textTransform: "uppercase", color: INK }}>ELEVENELEVEN</span>
         {stepNum !== null && (
-          <span className="text-base text-muted-foreground tracking-wider">
-            Step {stepNum} of {TOTAL_STEPS}
+          <span style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: MUTED }}>
+            {stepNum} / {TOTAL_STEPS}
           </span>
         )}
       </div>
@@ -370,24 +403,24 @@ const Onboarding = () => {
           {/* ACCOUNT */}
           {current.type === "account" && (
             <motion.div key="account" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">Let's get started</h2>
-              <p className="text-muted-foreground text-base mb-8">Just the basics.</p>
+              <h2 style={H1}>Let's get started</h2>
+              <p style={SUB}>Just the basics.</p>
               <div className="space-y-4">
                 <div className="flex gap-3">
                   <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name"
-                    className="flex-1 px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent" />
+                    style={{ ...INPUT, flex: 1 }} />
                   <input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name"
-                    className="flex-1 px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent" />
+                    style={{ ...INPUT, flex: 1 }} />
                 </div>
                 <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent" />
+                  style={INPUT} />
                 <input value={age} onChange={e => setAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" type="text" inputMode="numeric" maxLength={3}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent" />
+                  style={INPUT} />
                 <div className="relative">
                   <input value={city} onChange={e => setCity(e.target.value)} placeholder="City (e.g. New York)"
-                    className="w-full px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent" />
+                    style={INPUT} />
                   {citySuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl overflow-hidden shadow-lg z-10">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border overflow-hidden shadow-lg z-10">
                       {citySuggestions.map(c => (
                         <button key={c} type="button" onClick={() => { setCity(c); setCitySuggestions([]); }}
                           className="w-full text-left px-4 py-2.5 text-base text-foreground hover:bg-muted transition-colors">{c}</button>
@@ -455,11 +488,10 @@ const Onboarding = () => {
 
               {/* Title with "you" in gold */}
               <h2
-                className="font-sans font-light text-foreground mb-5"
-                style={{ fontSize: "clamp(2rem, 8vw, 2.5rem)", lineHeight: 1.15, zIndex: 1, position: "relative" }}
+                style={{ ...H1, fontSize: "clamp(27px, 7.4vw, 38px)", marginBottom: 20, zIndex: 1, position: "relative" }}
               >
                 Tell us a bit about{" "}
-                <span style={{ color: "#C49E64" }}>you</span>
+                <span style={{ color: GOLD }}>you</span>
               </h2>
 
               <p className="text-muted-foreground text-base" style={{ zIndex: 1, position: "relative", maxWidth: 280 }}>
@@ -469,75 +501,52 @@ const Onboarding = () => {
           )}
 
           {/* DEMOGRAPHICS */}
-          {current.type === "demographics" && (
-            <motion.div key="demographics" {...slideVariants} transition={{ duration: 0.3 }}>
+          {/* FIT — replaces the old duplicate age/city screen. Same questions as the
+              Dial in your fit modal, asked once, here, where she is already answering. */}
+          {current.type === "fit" && (
+            <motion.div key="fit" {...slideVariants} transition={{ duration: 0.3 }}>
+              <h2 style={H1}>Dial in your fit</h2>
+              <p style={SUB}>Make your matches and responses more precise in seconds.</p>
 
-              {/* Topographic circle graphic */}
-              <div className="flex justify-center mb-8">
-                <svg viewBox="0 0 160 160" width="130" height="130" style={{ overflow: "visible" }}>
-                  <circle cx="80" cy="80" r="76" fill="rgba(196,158,100,0.07)" />
-                  <ellipse cx="80" cy="80" rx="70" ry="62" fill="none" stroke="rgba(196,158,100,0.12)" strokeWidth="0.9"/>
-                  <ellipse cx="80" cy="80" rx="60" ry="53" fill="none" stroke="rgba(196,158,100,0.17)" strokeWidth="0.9"/>
-                  <ellipse cx="80" cy="80" rx="50" ry="44" fill="none" stroke="rgba(196,158,100,0.22)" strokeWidth="0.9"/>
-                  <ellipse cx="80" cy="80" rx="40" ry="35" fill="none" stroke="rgba(196,158,100,0.27)" strokeWidth="0.9"/>
-                  <ellipse cx="80" cy="80" rx="30" ry="26" fill="none" stroke="rgba(196,158,100,0.32)" strokeWidth="0.9"/>
-                  <ellipse cx="80" cy="80" rx="20" ry="17" fill="none" stroke="rgba(196,158,100,0.38)" strokeWidth="0.9"/>
-                  <ellipse cx="80" cy="80" rx="11" ry="9" fill="none" stroke="rgba(196,158,100,0.44)" strokeWidth="0.9"/>
-                  <circle cx="80" cy="80" r="2.5" fill="rgba(92,61,30,0.65)" />
-                </svg>
-              </div>
-
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2 text-center">Add a little context</h2>
-              <p className="text-muted-foreground text-base mb-8 text-center">Helps us fine tune your matches</p>
-
-              <div className="space-y-5">
-                {/* Age field */}
-                <div>
-                  <label className="block text-base font-semibold tracking-widest text-muted-foreground uppercase mb-2">Age</label>
-                  <div className="relative">
-                    <input
-                      autoFocus
-                      value={age}
-                      onChange={e => setAge(e.target.value.replace(/\D/g, ""))}
-                      placeholder="Your age"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={3}
-                      className="w-full px-4 py-4 pr-12 rounded-2xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#C49E64] transition-colors"
-                    />
-                    <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground" style={{ width: 17, height: 17 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+                {FIT_CATEGORIES.map(cat => (
+                  <div key={cat.label}>
+                    <p style={LABEL}>{cat.label}</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                      {cat.options.map(opt => {
+                        const active = fitAnswers[cat.label] === opt;
+                        return (
+                          <button
+                            key={opt}
+                            onClick={() => toggleFit(cat.label, opt)}
+                            style={{
+                              padding: "10px 16px",
+                              border: `1.5px solid ${active ? GOLD : LINE}`,
+                              background: active ? GOLD_TINT : "transparent",
+                              color: INK_SOFT,
+                              fontFamily: SANS,
+                              fontSize: 12.5,
+                              fontWeight: active ? 600 : 500,
+                              letterSpacing: "0.2px",
+                              cursor: "pointer",
+                              transition: "all .14s",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-
-                {/* Location field */}
-                <div>
-                  <label className="block text-base font-semibold tracking-widest text-muted-foreground uppercase mb-2">Location</label>
-                  <div className="relative">
-                    <input
-                      value={city}
-                      onChange={e => setCity(e.target.value)}
-                      placeholder="City (optional)"
-                      className="w-full px-4 py-4 pr-12 rounded-2xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#C49E64] transition-colors"
-                    />
-                    <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground" style={{ width: 17, height: 17 }} />
-                    {citySuggestions.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl overflow-hidden shadow-lg z-10">
-                        {citySuggestions.map(c => (
-                          <button key={c} type="button" onClick={() => { setCity(c); setCitySuggestions([]); }}
-                            className="w-full text-left px-4 py-2.5 text-base text-foreground hover:bg-muted transition-colors">{c}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
             </motion.div>
           )}
-
           {/* HEIGHT — abstract icon height picker */}
           {current.type === "select" && (
             <motion.div key="height" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2 text-center">
+              <h2 style={{ ...H1, textAlign: "center" }}>
                 {current.title}
               </h2>
 
@@ -548,10 +557,10 @@ const Onboarding = () => {
                   return (
                     <button key={band}
                       onClick={() => { toggleOption(band); setExactHeight(""); }}
-                      className="relative flex items-center justify-center rounded-xl border text-base font-medium transition-all duration-200 py-4 px-3"
+                      className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4 px-3"
                       style={{
-                        background: active ? "rgba(196,158,100,0.13)" : "hsl(var(--background))",
-                        borderColor: active ? "#C49E64" : "hsl(var(--border))",
+                        background: active ? GOLD_TINT : "transparent",
+                        borderColor: active ? GOLD : LINE,
                         color: "hsl(var(--foreground))",
                       }}
                     >
@@ -582,10 +591,10 @@ const Onboarding = () => {
                       const active = exactHeight === ht;
                       return (
                         <button key={ht} onClick={() => setExactHeight(ht)}
-                          className="relative flex items-center justify-center rounded-xl border text-base font-medium transition-all duration-200 py-3"
+                          className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-3"
                           style={{
-                            background: active ? "rgba(196,158,100,0.13)" : "hsl(var(--background))",
-                            borderColor: active ? "#C49E64" : "hsl(var(--border))",
+                            background: active ? GOLD_TINT : "transparent",
+                            borderColor: active ? GOLD : LINE,
                             color: "hsl(var(--foreground))",
                           }}
                         >
@@ -609,13 +618,13 @@ const Onboarding = () => {
           {/* SIZING — 3A: Top */}
           {current.key === "sizing_top" && (
             <motion.div key="sizing_top" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-1 text-center">Top size</h2>
+              <h2 style={{ ...H1, textAlign: "center", marginBottom: 4 }}>Top size</h2>
               <p className="text-muted-foreground text-base mb-5 text-center">What size do you usually reach for?</p>
 
               {/* Toggle */}
               <button
                 onClick={() => { setTopSizeMode(m => m === "letter" ? "number" : "letter"); setTopSizeValue(""); }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border bg-background text-base font-medium text-foreground hover:bg-muted/60 transition-colors mb-5"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-border bg-background text-base font-medium text-foreground hover:bg-muted/60 transition-colors mb-5"
               >
                 {topSizeMode === "letter" ? "Use number sizing instead" : "Use letter sizing instead"}
                 <span style={{ fontSize: 15 }}>⇄</span>
@@ -630,10 +639,10 @@ const Onboarding = () => {
                         const active = topSizeValue === s;
                         return (
                           <button key={s} onClick={() => setTopSizeValue(v => v === s ? "" : s)}
-                            className="relative flex items-center justify-center rounded-xl border text-base font-medium transition-all duration-200 py-4"
+                            className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
                             style={{
-                              background: active ? "rgba(196,158,100,0.13)" : "hsl(var(--background))",
-                              borderColor: active ? "#C49E64" : "hsl(var(--border))",
+                              background: active ? GOLD_TINT : "transparent",
+                              borderColor: active ? GOLD : LINE,
                               color: "hsl(var(--foreground))",
                             }}
                           >
@@ -657,10 +666,10 @@ const Onboarding = () => {
                     const active = topSizeValue === s;
                     return (
                       <button key={s} onClick={() => setTopSizeValue(v => v === s ? "" : s)}
-                        className="relative flex items-center justify-center rounded-xl border text-base font-medium transition-all duration-200 py-4"
+                        className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
                         style={{
-                          background: active ? "rgba(196,158,100,0.13)" : "hsl(var(--background))",
-                          borderColor: active ? "#C49E64" : "hsl(var(--border))",
+                          background: active ? GOLD_TINT : "transparent",
+                          borderColor: active ? GOLD : LINE,
                           color: "hsl(var(--foreground))",
                         }}
                       >
@@ -683,13 +692,13 @@ const Onboarding = () => {
           {/* SIZING — 3B: Bottom */}
           {current.key === "sizing_bottom" && (
             <motion.div key="sizing_bottom" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-1 text-center">Bottom size</h2>
+              <h2 style={{ ...H1, textAlign: "center", marginBottom: 4 }}>Bottom size</h2>
               <p className="text-muted-foreground text-base mb-5 text-center">What size do you usually reach for?</p>
 
               {/* Toggle */}
               <button
                 onClick={() => { setBottomSizeMode(m => m === "letter" ? "number" : "letter"); setBottomSizeValue(""); }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border bg-background text-base font-medium text-foreground hover:bg-muted/60 transition-colors mb-5"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-border bg-background text-base font-medium text-foreground hover:bg-muted/60 transition-colors mb-5"
               >
                 {bottomSizeMode === "letter" ? "Use number sizing instead" : "Use letter sizing instead"}
                 <span style={{ fontSize: 15 }}>⇄</span>
@@ -704,10 +713,10 @@ const Onboarding = () => {
                         const active = bottomSizeValue === s;
                         return (
                           <button key={s} onClick={() => setBottomSizeValue(v => v === s ? "" : s)}
-                            className="relative flex items-center justify-center rounded-xl border text-base font-medium transition-all duration-200 py-4"
+                            className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
                             style={{
-                              background: active ? "rgba(196,158,100,0.13)" : "hsl(var(--background))",
-                              borderColor: active ? "#C49E64" : "hsl(var(--border))",
+                              background: active ? GOLD_TINT : "transparent",
+                              borderColor: active ? GOLD : LINE,
                               color: "hsl(var(--foreground))",
                             }}
                           >
@@ -731,10 +740,10 @@ const Onboarding = () => {
                     const active = bottomSizeValue === s;
                     return (
                       <button key={s} onClick={() => setBottomSizeValue(v => v === s ? "" : s)}
-                        className="relative flex items-center justify-center rounded-xl border text-base font-medium transition-all duration-200 py-4"
+                        className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
                         style={{
-                          background: active ? "rgba(196,158,100,0.13)" : "hsl(var(--background))",
-                          borderColor: active ? "#C49E64" : "hsl(var(--border))",
+                          background: active ? GOLD_TINT : "transparent",
+                          borderColor: active ? GOLD : LINE,
                           color: "hsl(var(--foreground))",
                         }}
                       >
@@ -757,7 +766,7 @@ const Onboarding = () => {
           {/* SILHOUETTE & STYLE */}
           {current.type === "image-select" && (
             <motion.div key={current.key} {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">{current.title}</h2>
+              <h2 style={H1}>{current.title}</h2>
               <p className="text-muted-foreground text-base mb-6">{current.subtitle}</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {current.options?.map(opt => {
@@ -765,16 +774,16 @@ const Onboarding = () => {
                   return (
                   <button key={opt.label} onClick={() => toggleOption(opt.label)}
                     onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = "#C49E64";
+                      e.currentTarget.style.borderColor = GOLD;
                       e.currentTarget.style.transform = "scale(1.04)";
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = isSelected ? "#C49E64" : "var(--border)";
+                      e.currentTarget.style.borderColor = isSelected ? GOLD : LINE;
                       e.currentTarget.style.transform = "scale(1)";
                     }}
                     style={{
-                      borderRadius: 16,
-                      border: `2px solid ${isSelected ? "#C49E64" : "var(--border)"}`,
+                      borderRadius: 0,
+                      border: `2px solid ${isSelected ? GOLD : LINE}`,
                       textAlign: "left",
                       background: "var(--card)",
                       cursor: "pointer",
@@ -803,7 +812,7 @@ const Onboarding = () => {
               <AnimatePresence mode="wait">
                 {quickWinPhase === "loading" ? (
                   <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <p className="font-sans text-2xl md:text-3xl font-light text-foreground mb-10">
+                    <p style={{ ...H1, fontSize: "clamp(21px, 5.6vw, 28px)", marginBottom: 40 }}>
                       We're finding your closest matches
                     </p>
                     <div className="flex gap-3 justify-center">
@@ -816,7 +825,7 @@ const Onboarding = () => {
                   </motion.div>
                 ) : (
                   <motion.div key="ready" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-                    <p className="font-sans text-2xl md:text-3xl font-light text-foreground mb-10">
+                    <p style={{ ...H1, fontSize: "clamp(21px, 5.6vw, 28px)", marginBottom: 40 }}>
                       You're already matching with<br />people similar to you
                     </p>
                     <div className="flex gap-3 justify-center">
@@ -849,13 +858,13 @@ const Onboarding = () => {
 
               {/* Heading */}
               <p className="text-base tracking-widest uppercase text-muted-foreground mb-3">Profile complete</p>
-              <h2 className="font-sans font-light text-foreground" style={{ fontSize: "clamp(2.4rem, 8vw, 3rem)", lineHeight: 1.1, marginBottom: 14 }}>
+              <h2 style={{ ...H1, fontSize: "clamp(32px, 9vw, 46px)", marginBottom: 14 }}>
                 You're in.
               </h2>
               <p className="text-muted-foreground text-base leading-relaxed mb-1">
                 We've matched you with women who share your fit, size, and style.
               </p>
-              <p style={{ fontSize: 16, fontWeight: 700, color: "#8E3A3A", marginBottom: 28 }}>Your feed is ready.</p>
+              <p style={{ fontFamily: SANS, fontSize: 15, fontWeight: 700, color: INK, marginBottom: 28 }}>Your feed is ready.</p>
 
               {/* ── Fan of match cards ── */}
               <div style={{ position: "relative", width: "100%", maxWidth: 370, height: 215, margin: "0 auto 28px", overflow: "visible" }}>
@@ -876,7 +885,7 @@ const Onboarding = () => {
                         top: cfg.y,
                         width: 110,
                         height: 180,
-                        borderRadius: 16,
+                        borderRadius: 0,
                         overflow: "hidden",
                         background: m?.avatar_url ? "transparent" : `hsl(${20 + i * 18}, 22%, ${82 - i * 3}%)`,
                         boxShadow: isCenter ? "0 10px 36px rgba(0,0,0,0.20)" : "0 4px 14px rgba(0,0,0,0.11)",
@@ -909,13 +918,18 @@ const Onboarding = () => {
 
               {/* CTA */}
               <button onClick={next}
-                style={{ width: "100%", padding: "16px 0", borderRadius: 100, background: "#1C1712", color: "#FDFAF6", border: "none", cursor: "pointer", fontSize: 16, letterSpacing: "0.22em", textTransform: "uppercase" as const, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                style={{
+                  width: "100%", padding: "17px 0", borderRadius: 0, background: INK, color: "#FFFFFF",
+                  border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 13, fontWeight: 700,
+                  letterSpacing: "2.4px", textTransform: "uppercase",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                }}>
                 Go to my feed
                 <ArrowRight style={{ width: 14, height: 14 }} />
               </button>
 
               {/* Welcome-email confirmation */}
-              <p style={{ marginTop: 16, fontSize: 14, lineHeight: 1.5, color: "rgba(120,105,88,0.75)", textAlign: "center" }}>
+              <p style={{ marginTop: 16, fontFamily: SANS, fontSize: 12.5, lineHeight: 1.55, color: MUTED, textAlign: "center" }}>
                 ✉️ we just sent a welcome to your inbox — check spam or promotions if you don't see it.
               </p>
             </motion.div>
@@ -928,19 +942,27 @@ const Onboarding = () => {
       {current.type !== "quickwin" && current.type !== "pinterest" && (
         <div className="px-6 pb-8 max-w-3xl mx-auto w-full">
           <button onClick={next} disabled={!canContinue() || authLoading}
-            className="w-full py-4 rounded-full bg-secondary text-secondary-foreground text-base tracking-widest uppercase font-medium disabled:opacity-30 transition-all hover:bg-secondary/90">
+            style={{
+              width: "100%", padding: "17px 0", border: `2px solid ${INK}`, borderRadius: 0,
+              background: INK, color: "#FFFFFF", fontFamily: SANS, fontSize: 13, fontWeight: 700,
+              letterSpacing: "2.4px", textTransform: "uppercase",
+              cursor: (!canContinue() || authLoading) ? "default" : "pointer",
+              opacity: (!canContinue() || authLoading) ? 0.28 : 1, transition: "opacity .15s",
+            }}>
             {authLoading ? "Sending..." : current.type === "transition" ? "Get started" : "Continue"}
           </button>
           {step > 0 && current.type !== "transition" && (
             <button onClick={() => setStep(step - 1)}
-              className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors">
+              style={{ width: "100%", marginTop: 14, background: "none", border: "none", fontFamily: SANS,
+                       fontSize: 11, letterSpacing: "1.8px", textTransform: "uppercase", color: MUTED,
+                       cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: "6px 0" }}>
               Back
             </button>
           )}
           {/* Privacy note — shown on all onboarding screens */}
           <div className="flex items-center justify-center gap-1.5 mt-4">
             <Lock style={{ width: 11, height: 11, color: "rgba(120,105,88,0.45)" }} />
-            <span style={{ fontSize: 15, color: "rgba(120,105,88,0.45)", letterSpacing: "0.03em" }}>
+            <span style={{ fontFamily: SANS, fontSize: 10, color: MUTED, letterSpacing: "1.6px", textTransform: "uppercase" }}>
               We keep your info private
             </span>
           </div>

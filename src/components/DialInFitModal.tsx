@@ -38,6 +38,22 @@ export function fitIsEmpty(fitDetails: Record<string, unknown> | null | undefine
   return missingFitCategories(fitDetails).length === FIT_CATEGORIES.length;
 }
 
+// The account-level record that we already asked her once, unprompted. It lives
+// on the profile rather than in localStorage so it follows her to every device
+// and every browser: the auto-prompt gets exactly one shot per account, ever.
+// Opening the modal herself from her profile doesn't count and doesn't stamp.
+export async function markFitPromptAsked(userId: string): Promise<void> {
+  markFitPromptDone(userId);   // stop this device immediately, before the round trip
+  try {
+    await supabase
+      .from("profiles")
+      .update({ fit_prompt_dismissed_at: new Date().toISOString() })
+      .eq("id", userId);
+  } catch (err) {
+    console.warn("could not record the fit prompt as asked:", err);
+  }
+}
+
 // Show the fit prompt until the user saves their fit once (then never again), and
 // stay quiet for a while after they skip or dismiss it so it doesn't nag on every action.
 export function shouldShowFitPrompt(userId: string): boolean {
@@ -60,11 +76,13 @@ interface Props {
   open: boolean;
   onClose: () => void;
   variant?: "weigh_in" | "post_decision";
+  /** True when the app opened this on its own. Auto-opens get one shot per account. */
+  auto?: boolean;
   /** Ask only for these categories. Omit to ask for all of them. */
   only?: string[];
 }
 
-export function DialInFitModal({ open, onClose, variant = "weigh_in", only }: Props) {
+export function DialInFitModal({ open, onClose, variant = "weigh_in", only, auto = false }: Props) {
   // Someone who answered three of five should be asked the other two, not all
   // five again. Saving merges, so her existing answers are never disturbed.
   const asking = only && only.length > 0
@@ -79,6 +97,12 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in", only }: Pr
 
   // Closing without saving snoozes the prompt so it stops reappearing on every action.
   const handleDismiss = () => { if (user) snoozeFitPrompt(user.id); onClose(); };
+
+  // An auto-open is spent the moment she sees it. Whether she answers, skips, or
+  // closes the tab on it, we don't ask again on our own initiative.
+  useEffect(() => {
+    if (open && auto && user) markFitPromptAsked(user.id);
+  }, [open, auto, user]);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -264,8 +288,16 @@ export function DialInFitModal({ open, onClose, variant = "weigh_in", only }: Pr
                   textUnderlineOffset: 3, padding: "6px 0",
                 }}
               >
-                Skip for now
+                {auto ? "Not now" : "Skip for now"}
               </button>
+              {auto && (
+                <p style={{
+                  fontFamily: SANS, fontSize: 9.5, letterSpacing: "1.4px", textTransform: "uppercase",
+                  color: MUTED, textAlign: "center", margin: "10px 0 0",
+                }}>
+                  You can always do this from your profile
+                </p>
+              )}
             </div>
           </motion.div>
         </motion.div>

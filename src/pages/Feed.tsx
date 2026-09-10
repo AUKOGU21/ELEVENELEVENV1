@@ -447,10 +447,14 @@ const Feed = () => {
   const referralArmedRef = useRef(false);
 
   // ── User meta
-  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null; fit_details?: Record<string, unknown> | null; badge_tier?: string | null } | null>(null);
+  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null; fit_details?: Record<string, unknown> | null; badge_tier?: string | null; fit_prompt_dismissed_at?: string | null } | null>(null);
   // Only the questions she hasn't answered. Empty means she's done, and no
   // trigger in this file may open the modal.
   const missingFit = missingFitCategories(myProfile?.fit_details);
+  // She gets asked once, on our initiative, ever. The stamp lives on her profile
+  // so it holds across devices: no localStorage, no second chance from a new
+  // browser. Anything still missing after that she can fill from her profile.
+  const mayAskAboutFit = !!myProfile && !myProfile.fit_prompt_dismissed_at && missingFit.length > 0;
 
   // Who I follow. Ids only — no counts are shown anywhere yet.
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
@@ -491,7 +495,7 @@ const Feed = () => {
     // Show fit modal after posting a decision (navigated here with state) — exactly once,
     // even if this effect re-runs when `user` changes (auth resolve / token refresh).
     const variant = (location.state as any)?.fitPromptVariant;
-    if (variant && !fitPromptHandledRef.current && !fitPromptShownRef.current && user && missingFit.length > 0 && shouldShowFitPrompt(user.id)) {
+    if (variant && !fitPromptHandledRef.current && !fitPromptShownRef.current && user && mayAskAboutFit && shouldShowFitPrompt(user.id)) {
       fitPromptHandledRef.current = true;
       window.history.replaceState({}, "");
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
@@ -1055,7 +1059,7 @@ const Feed = () => {
     setVote(null);
     setTake("");
     setTakeLink("");
-    if (wasCompleted && user && !fitPromptShownRef.current && missingFit.length > 0 && shouldShowFitPrompt(user.id)) {
+    if (wasCompleted && user && !fitPromptShownRef.current && mayAskAboutFit && shouldShowFitPrompt(user.id)) {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
         fitTimerRef.current = null;
@@ -1282,13 +1286,13 @@ const Feed = () => {
   // If this user arrived via an invite link, store the shopping-circle relationship.
   useEffect(() => { if (user) ensureReferral(user.id).catch(() => {}); }, [user]);
 
-  // ── Fit prompt for anyone who never filled it in ────────────────────────────
-  // Fit now lives inside onboarding, so new accounts arrive with it already set.
-  // Everyone who joined before that still needs asking, and it should follow the
-  // account rather than the browser: ask once per visit until she fills it.
+  // ── Fit prompt for anyone who joined before fit moved into onboarding ───────
+  // New accounts arrive with fit already set. The women who joined before that
+  // get one ask, the next time they're active, and only for the questions they
+  // actually skipped. After that the modal never opens by itself again.
   useEffect(() => {
     if (!user || !myProfile || fitPromptShownRef.current) return;
-    if (missingFit.length === 0) return;
+    if (!mayAskAboutFit) return;
     const t = setTimeout(() => {
       fitPromptShownRef.current = true;
       setFitModalVariant("weigh_in");
@@ -2338,7 +2342,7 @@ const Feed = () => {
         </button>
       )}
 
-      <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} only={missingFit} />
+      <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} only={missingFit} auto />
 
       {user && <NotificationPrompt userId={user.id} isMobile={isMobile} />}
     </div>

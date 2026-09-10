@@ -2,6 +2,7 @@
 // One product recommendation on a Looking For post. Like ResponseCard, but the
 // product itself (image, brand, name, price) is the centerpiece.
 import { ThumbsUp, Check, ExternalLink } from "lucide-react";
+import { ringStyle } from "@/lib/tiers";
 import MatchBadge from "./MatchBadge";
 import { ProductImage } from "./ProductImage";
 import { formatName, getInitials, recommendationLabel, timeAgo } from "@/lib/format";
@@ -20,7 +21,7 @@ export interface RecommendationData {
   match_score: number | null;
   user_id: string;
   created_at: string;
-  profiles: { display_name: string | null; avatar_url?: string | null } | null;
+  profiles: { display_name: string | null; avatar_url?: string | null; badge_tier?: string | null } | null;
 }
 
 interface Props {
@@ -42,7 +43,7 @@ export default function RecommendationCard({ rec, counts, myVote, canVote, onHel
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, color: "white", fontWeight: 700 }}>
+          <div style={{ ...ringStyle(rec.profiles?.badge_tier, 1.5), width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, color: "white", fontWeight: 700 }}>
             {rec.profiles?.avatar_url
               ? <img src={rec.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : getInitials(rec.profiles?.display_name ?? null)}

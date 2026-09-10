@@ -14,6 +14,7 @@ import ResponsesDrawer from "@/components/ResponsesDrawer";
 import { type CommentData } from "@/components/CommentThread";
 import FollowButton from "@/components/FollowButton";
 import { track } from "@/lib/track";
+import { ringStyle } from "@/lib/tiers";
 import { ProductImage } from "@/components/ProductImage";
 import FeedBanner from "@/components/FeedBanner";
 import NotificationBanner from "@/components/NotificationBanner";
@@ -66,7 +67,7 @@ interface ResponseRow {
   user_id: string;
   created_at: string;
   profiles: { display_name: string | null; avatar_url?: string | null } | null;
-  replies?: { id: string; user_id: string; body: string; created_at: string; profiles: { display_name: string | null; avatar_url?: string | null } | null }[];
+  replies?: { id: string; user_id: string; body: string; created_at: string; profiles: { display_name: string | null; avatar_url?: string | null; badge_tier?: string | null } | null }[];
 }
 
 interface OutcomeRow {
@@ -138,6 +139,7 @@ interface DecisionRow {
   profiles: {
     display_name: string | null;
     avatar_url: string | null;
+    badge_tier?: string | null;
     height_range: string | null;
     silhouette_preference: string[] | null;
     style_aesthetics: string[] | null;
@@ -445,7 +447,7 @@ const Feed = () => {
   const referralArmedRef = useRef(false);
 
   // ── User meta
-  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null; fit_details?: Record<string, unknown> | null } | null>(null);
+  const [myProfile, setMyProfile] = useState<{ display_name: string | null; avatar_url: string | null; invite_code?: string | null; referral_prompt_dismissed_at?: string | null; fit_details?: Record<string, unknown> | null; badge_tier?: string | null } | null>(null);
   // Only the questions she hasn't answered. Empty means she's done, and no
   // trigger in this file may open the modal.
   const missingFit = missingFitCategories(myProfile?.fit_details);
@@ -569,7 +571,7 @@ const Feed = () => {
         // FK to profiles, so an embed would 400 the whole select.
         const recUserIds = [...new Set(recs.map((r: any) => r.user_id))];
         if (recUserIds.length > 0) {
-          const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", recUserIds);
+          const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url, badge_tier").in("id", recUserIds);
           const profMap: Record<string, any> = {};
           (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url }; });
           recs.forEach((r: any) => { r.profiles = profMap[r.user_id] ?? null; });
@@ -614,8 +616,8 @@ const Feed = () => {
         const uids = [...new Set(rep.map((r: any) => r.user_id))];
         const profMap: Record<string, any> = {};
         if (uids.length) {
-          const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", uids);
-          (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url }; });
+          const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url, badge_tier").in("id", uids);
+          (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url, badge_tier: p.badge_tier }; });
         }
         const byResp: Record<string, any[]> = {};
         rep.forEach((r: any) => { (byResp[r.response_id] ??= []).push({ ...r, profiles: profMap[r.user_id] ?? null }); });
@@ -632,15 +634,15 @@ const Feed = () => {
       id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_name_2, brand_name_2, price_note_2, product_category,
       price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
       post_type, lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
-      profiles ( display_name, avatar_url, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
+      profiles ( display_name, avatar_url, badge_tier, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
         id, recommendation, reasoning, photo_url, product_url, match_score,
         helpfulness_votes, user_id, created_at,
-        profiles ( display_name, avatar_url )
+        profiles ( display_name, avatar_url, badge_tier )
       ),
       decision_comments (
         id, user_id, body, created_at,
-        profiles ( display_name, avatar_url )
+        profiles ( display_name, avatar_url, badge_tier )
       )
     `;
 
@@ -1689,7 +1691,7 @@ const Feed = () => {
             <button
               onClick={() => navigate("/profile")}
               className="rounded-full flex items-center justify-center text-[9px] font-semibold text-white overflow-hidden shrink-0"
-              style={{ width: isMobile ? 30 : 32, height: isMobile ? 30 : 32, background: "#3A3530" }}
+              style={{ width: isMobile ? 30 : 32, height: isMobile ? 30 : 32, background: "#3A3530", ...ringStyle(myProfile?.badge_tier, 2) }}
             >
               {avatarContent(myProfile?.avatar_url ?? null, myProfile?.display_name ?? null)}
             </button>
@@ -2605,7 +2607,7 @@ const DecisionCard = ({
         borderRadius: "20px 20px 0 0",
       }}>
         {/* Avatar */}
-        <div style={{ width: isMobile ? 44 : 72, height: isMobile ? 44 : 72, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 13 : 18.5, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+        <div style={{ width: isMobile ? 44 : 72, height: isMobile ? 44 : 72, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 13 : 18.5, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden", ...ringStyle(decision.profiles?.badge_tier, isMobile ? 2 : 2.5) }}>
           {decision.profiles?.avatar_url
             ? <img src={decision.profiles.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <span>{getInitials(decision.profiles?.display_name ?? null)}</span>

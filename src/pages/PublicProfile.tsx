@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
 import FollowButton from "@/components/FollowButton";
+import { tierFor, ringStyle } from "@/lib/tiers";
 import { track } from "@/lib/track";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import heroEditorial from "@/assets/hero-editorial.png";
@@ -19,10 +20,7 @@ const PILL_BG  = "rgba(0,0,0,0.05)";
 const PILL_BDR = "rgba(0,0,0,0.09)";
 
 function getBadge(v: number) {
-  if (v >= 50) return "Top Voice";
-  if (v >= 25) return "Trusted Voice";
-  if (v >= 5)  return "Contributor";
-  return "";
+  return tierFor(v)?.label ?? "";
 }
 
 const PublicProfile = () => {
@@ -171,7 +169,7 @@ const PublicProfile = () => {
 
             <div style={{ padding: "32px 36px 28px", display: "flex", gap: 24, alignItems: "flex-start" }}>
               {/* Avatar */}
-              <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 29, fontWeight: 700, color: "white", overflow: "hidden", flexShrink: 0 }}>
+              <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 29, fontWeight: 700, color: "white", overflow: "hidden", flexShrink: 0, ...ringStyle(badge || null, 3) }}>
                 {profile.avatar_url
                   ? <img src={profile.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : initial}

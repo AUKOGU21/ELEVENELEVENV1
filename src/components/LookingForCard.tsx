@@ -10,6 +10,7 @@ import { formatName, getInitials, timeAgo, formatBudget } from "@/lib/format";
 import { pullProduct, type PulledProduct } from "@/lib/productPull";
 import MatchBadge from "./MatchBadge";
 import FollowButton from "./FollowButton";
+import { ringStyle } from "@/lib/tiers";
 import { ProductImage } from "./ProductImage";
 import type { RecommendationData } from "./RecommendationCard";
 
@@ -76,7 +77,7 @@ export interface LookingForDecision {
   matchScore?: number | null;
   recommendations: RecommendationData[];
   outcomes?: LookingForOutcome[] | null;
-  profiles: { display_name: string | null; avatar_url: string | null; city: string | null } | null;
+  profiles: { display_name: string | null; avatar_url: string | null; city: string | null; badge_tier?: string | null } | null;
 }
 
 interface Props {
@@ -264,7 +265,7 @@ export default function LookingForCard({
     <div style={{ background: "#F5EFEA", borderRadius: 20, boxShadow: "0 6px 24px rgba(0,0,0,0.08)", overflow: "visible", marginBottom: 20, position: "relative" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "10px 12px 8px" : "14px 16px 12px" }}>
-        <div style={{ width: isMobile ? 44 : 56, height: isMobile ? 44 : 56, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 13 : 16, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+        <div style={{ width: isMobile ? 44 : 56, height: isMobile ? 44 : 56, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 13 : 16, color: "white", fontWeight: 700, flexShrink: 0, overflow: "hidden", ...ringStyle(decision.profiles?.badge_tier, 2) }}>
           {decision.profiles?.avatar_url ? <img src={decision.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span>{getInitials(decision.profiles?.display_name ?? null)}</span>}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>

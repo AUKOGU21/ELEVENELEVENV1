@@ -7,17 +7,23 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS, HEIGHT_OPTIONS, SIZE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { DialInFitModal } from "@/components/DialInFitModal";
+import { tierFor, nextTier, ringStyle } from "@/lib/tiers";
 import { computeMatchScore } from "@/lib/matching";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { imageToJpeg } from "@/lib/image";
 import heroEditorial from "@/assets/hero-editorial.png";
 
 // ─── Badge levels ─────────────────────────────────────────────────────────────
+// Ladder and ring colours live in src/lib/tiers.ts so the profile, the avatar
+// ring and the promotion trigger can never disagree.
 function getBadge(v: number): { label: string; next: string; threshold: number } {
-  if (v >= 50) return { label: "Top Voice",      next: "Top Voice",    threshold: 50 };
-  if (v >= 25) return { label: "Trusted Voice",  next: "Top Voice",    threshold: 50 };
-  if (v >= 5)  return { label: "Contributor",    next: "Trusted Voice",threshold: 25 };
-  return        { label: "",                      next: "Contributor",  threshold: 5  };
+  const earned = tierFor(v);
+  const next = nextTier(v);
+  return {
+    label: earned?.label ?? "",
+    next: next?.label ?? earned?.label ?? "Contributor",
+    threshold: next?.min ?? earned?.min ?? 5,
+  };
 }
 
 // ─── Canvas crop ──────────────────────────────────────────────────────────────
@@ -752,7 +758,7 @@ const Profile = () => {
 
             {/* Avatar */}
             <div style={{ position: "relative", display: "inline-block", flexShrink: 0 }}>
-              <div style={{ width: 130, height: 130, borderRadius: "50%", background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 35.5, fontWeight: 700, color: "white", overflow: "hidden" }}>
+              <div style={{ width: 130, height: 130, borderRadius: "50%", background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 35.5, fontWeight: 700, color: "white", overflow: "hidden" , ...ringStyle(badgeInfo.label || null, 3) }}>
                 {profile?.avatar_url
                   ? <img src={profile.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : initial}

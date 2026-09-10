@@ -4,6 +4,7 @@
 // "what went wrong?", "what size did you try?". It's the only way to reach the
 // poster on a decided post, where weighing in no longer makes sense.
 import { useState } from "react";
+import { ringStyle } from "@/lib/tiers";
 import { Trash2 } from "lucide-react";
 import { getInitials, timeAgo } from "@/lib/format";
 
@@ -15,7 +16,7 @@ export interface CommentData {
   user_id: string;
   body: string;
   created_at: string;
-  profiles?: { display_name: string | null; avatar_url: string | null } | null;
+  profiles?: { display_name: string | null; avatar_url: string | null; badge_tier?: string | null } | null;
 }
 
 interface Props {
@@ -69,7 +70,7 @@ export default function CommentThread({ comments, user, posterId, isClosed, onSu
           const isMine = !!user && c.user_id === user.id;
           return (
             <div key={c.id} style={{ display: "flex", gap: 9 }}>
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff" }}>
+              <div style={{ ...ringStyle(c.profiles?.badge_tier, 1.5), width: 26, height: 26, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff" }}>
                 {c.profiles?.avatar_url
                   ? <img src={c.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : getInitials(name)}

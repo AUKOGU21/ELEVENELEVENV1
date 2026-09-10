@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ThumbsUp, Check, ExternalLink, CornerDownRight, MoreHorizontal } from "lucide-react";
 import MatchBadge from "./MatchBadge";
+import { ringStyle } from "@/lib/tiers";
 import { formatName, getInitials, recommendationLabel, prettyHost, timeAgo } from "@/lib/format";
 
 export interface ReplyData {
@@ -13,7 +14,7 @@ export interface ReplyData {
   user_id: string;
   body: string;
   created_at: string;
-  profiles: { display_name: string | null; avatar_url?: string | null } | null;
+  profiles: { display_name: string | null; avatar_url?: string | null; badge_tier?: string | null } | null;
 }
 
 export interface ResponseCardData {
@@ -25,7 +26,7 @@ export interface ResponseCardData {
   match_score: number | null;
   user_id: string;
   created_at: string;
-  profiles: { display_name: string | null; avatar_url?: string | null } | null;
+  profiles: { display_name: string | null; avatar_url?: string | null; badge_tier?: string | null } | null;
   replies?: ReplyData[];
 }
 
@@ -109,7 +110,7 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, color: "white", fontWeight: 700 }}>
+          <div style={{ ...ringStyle(resp.profiles?.badge_tier, 1.5), width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, color: "white", fontWeight: 700 }}>
             {resp.profiles?.avatar_url
               ? <img src={resp.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : getInitials(resp.profiles?.display_name ?? null)}
@@ -172,7 +173,7 @@ export default function ResponseCard({ resp, counts, myVote, canVote, onHelpful,
             const editing = editingReplyId === rp.id;
             return (
               <div key={rp.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#8C7A70", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white", fontWeight: 700 }}>
+                <div style={{ ...ringStyle(rp.profiles?.badge_tier, 1.5), width: 22, height: 22, borderRadius: "50%", background: "#8C7A70", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white", fontWeight: 700 }}>
                   {rp.profiles?.avatar_url ? <img src={rp.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : getInitials(rp.profiles?.display_name ?? null)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

@@ -22,7 +22,12 @@ self.addEventListener("push", (event) => {
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     data: { url: payload.url || "/" },
+    // A tag is how a phone recognises "this is the same notification again" and
+    // silently swaps it for the old one. Every notification we send is its own
+    // event, so each gets its own tag, and renotify makes the phone actually
+    // alert rather than quietly updating a banner she already dismissed.
     tag: payload.tag || undefined,
+    renotify: !!payload.tag,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

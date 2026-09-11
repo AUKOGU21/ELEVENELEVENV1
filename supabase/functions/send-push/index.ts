@@ -83,7 +83,11 @@ Deno.serve(async (req) => {
     ).then((r) => (r.ok ? r.json() : []));
     if (!Array.isArray(subs) || subs.length === 0) return json({ sent: 0, skipped: "no subscriptions" });
 
-    const notification = JSON.stringify({ title, body, url, tag: payload.type || undefined });
+    // One tag per notification, not per type. Tagging by type meant two women
+    // weighing in on two different posts collapsed into a single banner, with
+    // the second one silently replacing the first.
+    const tag: string = payload.notification_id || d.notification_id || payload.type || undefined;
+    const notification = JSON.stringify({ title, body, url, tag });
     let sent = 0;
     const dead: string[] = [];
     // Per device, not just a count. "sent: 2 of 2" told us Apple accepted both

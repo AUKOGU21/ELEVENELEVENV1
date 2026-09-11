@@ -155,6 +155,7 @@ export async function syncPushSubscription(userId: string): Promise<void> {
         p256dh: json.keys?.p256dh,
         auth: json.keys?.auth,
         user_agent: navigator.userAgent,
+        last_seen_at: new Date().toISOString(),
       },
       { onConflict: "endpoint" },
     );

@@ -94,6 +94,11 @@ Deno.serve(async (req) => {
     // and nothing about which device was which, so a phone that stays silent
     // looks identical to one that rang.
     const devices: { device: string; status: string | number }[] = [];
+    // Written back to each row, so "is this phone still getting anything" is a
+    // question the daily report can answer instead of a thing we find out when
+    // someone says they heard nothing.
+    const ok: { id: string; status: string }[] = [];
+    const bad: { id: string; status: string }[] = [];
     const deviceOf = (ua: string | null) =>
       /iPhone|iPad/i.test(ua ?? "") ? "iPhone" : /Macintosh/i.test(ua ?? "") ? "Mac" : "other";
 
@@ -103,15 +108,30 @@ Deno.serve(async (req) => {
         try {
           const r = await webpush.sendNotification(
             { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-            notification
+            notification,
+            {
+              // Default urgency is "normal", which lets the push service hold a
+              // message back to save the phone's battery and hand it over when it
+              // next feels like it. That is how three notifications arrive
+              // together, two hours late. These are worth waking a screen for.
+              urgency: "high",
+              // And if we could not reach her within a day, the moment has passed.
+              // Better nothing than a notification about yesterday.
+              TTL: 86400,
+            },
           );
           sent++;
-          devices.push({ device, status: (r as { statusCode?: number })?.statusCode ?? "accepted" });
+          const code = (r as { statusCode?: number })?.statusCode ?? 201;
+          devices.push({ device, status: code });
+          ok.push({ id: s.id, status: String(code) });
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;
           devices.push({ device, status: code ?? "error" });
           if (code === 404 || code === 410) dead.push(s.id);
-          else console.error("push send failed:", device, code, (e as Error).message);
+          else {
+            bad.push({ id: s.id, status: String(code ?? "error") });
+            console.error("push send failed:", device, code, (e as Error).message);
+          }
         }
       })
     );
@@ -119,6 +139,24 @@ Deno.serve(async (req) => {
     if (dead.length) {
       await rest(`push_subscriptions?id=in.(${dead.join(",")})`, { method: "DELETE" }).catch(() => {});
     }
+
+    const stamp = new Date().toISOString();
+    await Promise.allSettled([
+      ...ok.map((r) =>
+        rest(`push_subscriptions?id=eq.${r.id}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ last_push_at: stamp, last_push_status: r.status, push_failures: 0 }),
+        })
+      ),
+      ...bad.map((r) =>
+        rest(`push_subscriptions?id=eq.${r.id}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ last_push_at: stamp, last_push_status: r.status }),
+        })
+      ),
+    ]).catch(() => {});
     return json({ sent, pruned: dead.length, of: subs.length, devices });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);

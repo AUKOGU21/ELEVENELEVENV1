@@ -2,6 +2,7 @@
 // The primary posting surface at the top of the feed. Replaces the old floating
 // "+ Post" as the main entry point. Decision dominates; Looking For is secondary.
 import { ShoppingBag, Search, ArrowRight, Users } from "lucide-react";
+import { SANS_APP } from "@/lib/type";
 
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
@@ -22,7 +23,7 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
       boxShadow: "0 6px 24px rgba(0,0,0,0.06)", marginTop: isMobile ? 18 : 34, marginBottom: 20, border: "1px solid rgba(0,0,0,0.04)",
     }}>
       <div style={{ textAlign: "center", marginBottom: isMobile ? 18 : 22 }}>
-        <p style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 18.5 : 24, color: INK, margin: 0, lineHeight: 1.15, letterSpacing: "-0.01em" }}>
+        <p style={{ fontFamily: SANS_APP, fontSize: isMobile ? 18.5 : 23, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15, letterSpacing: "-0.015em" }}>
           What are you deciding on today?
         </p>
         <p style={{ fontSize: isMobile ? 11.5 : 13, color: MUTED, margin: "7px 0 0" }}>

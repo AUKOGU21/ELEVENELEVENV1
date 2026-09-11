@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeUrl, pullProduct, type PulledProduct } from "@/lib/productPull";
+import { SANS_APP } from "@/lib/type";
 
 interface OutcomeModalProps {
   open: boolean;
@@ -408,7 +409,8 @@ const QUESTION_STYLE: React.CSSProperties = {
   fontSize: 18.5,
   fontWeight: 700,
   color: "#1C1712",
-  fontFamily: "Georgia, serif",
+  fontFamily: SANS_APP,
+  letterSpacing: "-0.015em",
   marginBottom: 20,
   lineHeight: 1.3,
 };
@@ -1115,7 +1117,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                     style={{
                       fontSize: 15.5,
                       color: "#1C1712",
-                      fontFamily: "Georgia, serif",
+                      fontFamily: SANS_APP,
                       lineHeight: 1.4,
                       maxWidth: 280,
                     }}

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell } from "lucide-react";
 import { pushState, enablePush, isStandalone, type PushState } from "@/lib/push";
+import { SANS_APP } from "@/lib/type";
 
 const INK = "#1C1712";
 const MUTED = "#8C7A70";
@@ -139,7 +140,7 @@ export default function NotificationPrompt({ userId, isMobile }: { userId: strin
             <Bell style={{ width: 24, height: 24, color: "#A07848" }} />
           </div>
 
-          <p style={{ fontFamily: "Georgia, serif", fontSize: 19.5, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.25 }}>
+          <p style={{ fontFamily: SANS_APP, fontSize: 19.5, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.25, letterSpacing: "-0.015em" }}>
             {title}
           </p>
           <p style={{ fontSize: 13.5, color: MUTED, margin: "9px 0 0", lineHeight: 1.5 }}>

@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Search, ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { SANS_APP } from "@/lib/type";
 
 const INK = "#1C1712";
 const CREAM = "#FDFAF6";
@@ -80,7 +81,7 @@ export default function LookingFor() {
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: LF, background: "rgba(122,106,174,0.12)", border: "1px solid rgba(122,106,174,0.28)", borderRadius: 100, padding: "4px 12px", marginBottom: 14 }}>
           <Search style={{ width: 12, height: 12 }} /> Looking for
         </span>
-        <h1 style={{ fontFamily: "Georgia, serif", fontSize: 30, color: INK, margin: "0 0 6px", lineHeight: 1.12 }}>What are you looking for?</h1>
+        <h1 style={{ fontFamily: SANS_APP, fontSize: 29, fontWeight: 700, color: INK, margin: "0 0 6px", lineHeight: 1.1, letterSpacing: "-0.02em" }}>What are you looking for?</h1>
         <p style={{ fontSize: 15, color: MUTED, margin: "0 0 26px" }}>Tell the community what you want and get matched product picks from women like you.</p>
 
         {/* Title */}

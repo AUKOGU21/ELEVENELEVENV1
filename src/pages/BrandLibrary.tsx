@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { imageToJpeg } from "@/lib/image";
 import { BRANDS, brandBySlug, seededCount, INSIGHT_CATEGORIES, INSIGHT_CONTEXTS, type Brand } from "@/lib/brands";
+import { SANS_APP } from "@/lib/type";
 
 // ── palette ───────────────────────────────────────────────────────────────────
 const INK = "#1C1712";
@@ -54,7 +55,7 @@ function BrandLogo({ brand, size = 64 }: { brand: Brand; size?: number }) {
   if (failed) {
     return (
       <div style={box}>
-        <span style={{ fontFamily: "Georgia, serif", fontSize: Math.max(9, size / 6.5), letterSpacing: "0.06em", color: INK, textAlign: "center", padding: 4, lineHeight: 1.1 }}>
+        <span style={{ fontFamily: SANS_APP, fontSize: Math.max(9, size / 6.5), letterSpacing: "0.06em", color: INK, textAlign: "center", padding: 4, lineHeight: 1.1 }}>
           {brand.name}
         </span>
       </div>
@@ -159,7 +160,7 @@ export default function BrandLibrary() {
             user={user} navigate={navigate} reload={() => loadBrand(brand)} />
         : (
           <div style={{ maxWidth: 720, margin: "0 auto", padding: "36px 20px 60px" }}>
-            <h1 style={{ fontFamily: "Georgia, serif", fontSize: 40, color: INK, margin: "0 0 8px", letterSpacing: "-0.01em" }}>Brand Library</h1>
+            <h1 style={{ fontFamily: SANS_APP, fontSize: 38, fontWeight: 700, color: INK, margin: "0 0 8px", letterSpacing: "-0.025em" }}>Brand Library</h1>
             <p style={{ fontSize: 16, color: MUTED, margin: "0 0 26px" }}>Real insights from real women, so you can shop with confidence.</p>
 
             <div style={{ position: "relative", marginBottom: 28 }}>
@@ -224,7 +225,7 @@ function BrandDetail({ brand, insights, recent, onBack, onPick, user, navigate, 
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start", marginBottom: 26 }}>
           <BrandLogo brand={brand} size={72} />
           <div>
-            <h1 style={{ fontFamily: "Georgia, serif", fontSize: 34, color: INK, margin: "0 0 6px" }}>{brand.name}</h1>
+            <h1 style={{ fontFamily: SANS_APP, fontSize: 32, fontWeight: 700, color: INK, margin: "0 0 6px", letterSpacing: "-0.025em" }}>{brand.name}</h1>
             <span style={{ fontSize: 12, fontWeight: 600, color: MUTED, background: "rgba(0,0,0,0.05)", borderRadius: 100, padding: "3px 11px" }}>{totalCount} community insights</span>
             <p style={{ fontSize: 15, color: MUTED, margin: "12px 0 0", lineHeight: 1.5 }}>{brand.description}</p>
           </div>
@@ -360,7 +361,7 @@ function ShareInsightModal({ brand, user, onClose, onDone }: { brand: Brand; use
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} />
       <div style={modalCard}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-          <p style={{ fontFamily: "Georgia, serif", fontSize: 21, color: INK, margin: 0 }}>Share an insight about {brand.name}</p>
+          <p style={{ fontFamily: SANS_APP, fontSize: 20, fontWeight: 700, color: INK, margin: 0, letterSpacing: "-0.015em" }}>Share an insight about {brand.name}</p>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED }}><X style={{ width: 18, height: 18 }} /></button>
         </div>
         <p style={{ fontSize: 13, color: MUTED, margin: "0 0 18px" }}>You're contributing knowledge, not writing a review.</p>
@@ -465,7 +466,7 @@ function SuggestBrandModal({ user, onClose }: { user: any; onClose: () => void }
             <div style={{ width: 46, height: 46, borderRadius: "50%", background: INK, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Check style={{ width: 22, height: 22, color: CREAM }} />
             </div>
-            <p style={{ fontFamily: "Georgia, serif", fontSize: 22, color: INK, margin: "0 0 10px" }}>Thanks!</p>
+            <p style={{ fontFamily: SANS_APP, fontSize: 21, fontWeight: 700, color: INK, margin: "0 0 10px", letterSpacing: "-0.015em" }}>Thanks!</p>
             <p style={{ fontSize: 15, color: "#3A3530", lineHeight: 1.55, margin: "0 auto", maxWidth: 340 }}>
               We're reviewing this brand for the Brand Library. We'll notify you when it's added. In the meantime, we'll use your suggestion to prioritize future interviews and community insights.
             </p>
@@ -473,7 +474,7 @@ function SuggestBrandModal({ user, onClose }: { user: any; onClose: () => void }
           </div>
         ) : (
           <div>
-            <p style={{ fontFamily: "Georgia, serif", fontSize: 22, color: INK, margin: "0 0 18px" }}>Suggest a brand</p>
+            <p style={{ fontFamily: SANS_APP, fontSize: 21, fontWeight: 700, color: INK, margin: "0 0 18px", letterSpacing: "-0.015em" }}>Suggest a brand</p>
             <p style={sectionLbl}>What brand should we add next?</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Type the brand name" style={{ ...field, marginBottom: 18 }} />
             <p style={sectionLbl}>What would you want to know before buying this brand?</p>

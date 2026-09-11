@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Users, Check, Link as LinkIcon } from "lucide-react";
 import { shareInvite } from "@/lib/referral";
+import { SANS_APP } from "@/lib/type";
 
 const INK = "#1C1712";
 const CREAM = "#FDFAF6";
@@ -55,7 +56,7 @@ export default function ReferralPopup({ open, code, onDismiss }: Props) {
               <Users style={{ width: 24, height: 24, color: "#A07848" }} />
             </div>
 
-            <h2 style={{ fontFamily: "Georgia, serif", fontSize: 24, lineHeight: 1.2, color: INK, margin: "0 0 14px", letterSpacing: "-0.01em" }}>
+            <h2 style={{ fontFamily: SANS_APP, fontSize: 23, fontWeight: 700, lineHeight: 1.18, color: INK, margin: "0 0 14px", letterSpacing: "-0.02em" }}>
               Every great recommendation starts with someone you trust.
             </h2>
             <p style={{ fontSize: 15, lineHeight: 1.6, color: "#5A4A42", margin: "0 0 24px" }}>

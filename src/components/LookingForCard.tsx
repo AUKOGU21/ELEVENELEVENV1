@@ -13,6 +13,7 @@ import FollowButton from "./FollowButton";
 import { ringStyle } from "@/lib/tiers";
 import { ProductImage } from "./ProductImage";
 import type { RecommendationData } from "./RecommendationCard";
+import { SANS_APP } from "@/lib/type";
 
 const INK = "#1A1A1A";
 const MUTED = "#8C7A70";
@@ -322,7 +323,7 @@ export default function LookingForCard({
         {/* Left — the ask */}
         <div style={{ width: isMobile ? "100%" : "42%", flexShrink: 0, padding: isMobile ? "14px 14px 16px" : "18px 20px 20px", borderRight: isMobile ? "none" : "1px solid rgba(0,0,0,0.06)", borderBottom: isMobile ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
           <p style={{ fontSize: 9.5, letterSpacing: "0.22em", textTransform: "uppercase", color: LF, margin: "0 0 8px" }}>Looking for</p>
-          <p style={{ fontSize: isMobile ? 17 : 19.5, fontWeight: 700, color: INK, lineHeight: 1.18, margin: 0, fontFamily: "Georgia, serif" }}>{decision.lf_title || "Recommendations"}</p>
+          <p style={{ fontSize: isMobile ? 17 : 19.5, fontWeight: 700, color: INK, lineHeight: 1.18, margin: 0, fontFamily: SANS_APP, letterSpacing: "-0.015em" }}>{decision.lf_title || "Recommendations"}</p>
           {decision.lf_context && <p style={{ fontSize: 12.5, lineHeight: 1.5, color: "#5A4A42", margin: "10px 0 0" }}>{decision.lf_context}</p>}
 
           <div style={{ marginTop: 14, background: "rgba(0,0,0,0.03)", borderRadius: 12, padding: "6px 14px" }}>

@@ -7,6 +7,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Users, ArrowRight } from "lucide-react";
 import { resolveInviter, rememberReferrer } from "@/lib/referral";
+import { SANS_APP } from "@/lib/type";
 
 const INK = "#1C1712";
 const CREAM = "#FDFAF6";
@@ -36,7 +37,7 @@ export default function InvitePage() {
           <Users style={{ width: 27, height: 27, color: "#A07848" }} />
         </div>
 
-        <h1 style={{ fontFamily: "Georgia, serif", fontSize: 38, lineHeight: 1.08, color: INK, margin: "0 0 18px", letterSpacing: "-0.01em" }}>
+        <h1 style={{ fontFamily: SANS_APP, fontSize: 36, fontWeight: 700, lineHeight: 1.06, color: INK, margin: "0 0 18px", letterSpacing: "-0.02em" }}>
           {loading ? " " : name ? `${name} invited you.` : "You're invited to ELEVENELEVEN."}
         </h1>
         <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", margin: "0 0 34px" }}>

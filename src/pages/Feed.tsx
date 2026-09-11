@@ -26,6 +26,7 @@ import RecommendationModal, { RecommendationDraft } from "@/components/Recommend
 import ReferralPopup from "@/components/ReferralPopup";
 import { ensureInviteCode, ensureReferral } from "@/lib/referral";
 import { toast } from "sonner";
+import { SANS_APP } from "@/lib/type";
 
 // ─── Product-link helpers ───────────────────────────────────────────────────
 // Normalize a user-pasted URL (add https:// if the scheme is missing) and
@@ -2785,7 +2786,7 @@ const DecisionCard = ({
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={() => setEditing(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} />
           <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 460, maxHeight: "88vh", overflowY: "auto", background: "#FDFAF6", borderRadius: 16, padding: 22, boxShadow: "0 12px 40px rgba(0,0,0,0.28)" }}>
-            <p style={{ fontFamily: "Georgia, serif", fontSize: 18.5, color: "#1A1A1A", margin: "0 0 4px" }}>Edit your post</p>
+            <p style={{ fontFamily: SANS_APP, fontSize: 18.5, fontWeight: 700, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: "-0.015em" }}>Edit your post</p>
             <p style={{ fontSize: 12, color: "#8C7A70", margin: "0 0 18px" }}>Add more context, adjust your confidence, or fix a detail.</p>
             {editConsiderations.map((u) => (
               <div key={u} style={{ marginBottom: 14 }}>

@@ -79,26 +79,35 @@ Deno.serve(async (req) => {
     const url: string = payload.url || d.url || SITE_URL;
 
     const subs = await rest(
-      `push_subscriptions?user_id=eq.${userId}&select=id,endpoint,p256dh,auth`
+      `push_subscriptions?user_id=eq.${userId}&select=id,endpoint,p256dh,auth,user_agent`
     ).then((r) => (r.ok ? r.json() : []));
     if (!Array.isArray(subs) || subs.length === 0) return json({ sent: 0, skipped: "no subscriptions" });
 
     const notification = JSON.stringify({ title, body, url, tag: payload.type || undefined });
     let sent = 0;
     const dead: string[] = [];
+    // Per device, not just a count. "sent: 2 of 2" told us Apple accepted both
+    // and nothing about which device was which, so a phone that stays silent
+    // looks identical to one that rang.
+    const devices: { device: string; status: string | number }[] = [];
+    const deviceOf = (ua: string | null) =>
+      /iPhone|iPad/i.test(ua ?? "") ? "iPhone" : /Macintosh/i.test(ua ?? "") ? "Mac" : "other";
 
     await Promise.allSettled(
-      subs.map(async (s: { id: string; endpoint: string; p256dh: string; auth: string }) => {
+      subs.map(async (s: { id: string; endpoint: string; p256dh: string; auth: string; user_agent: string | null }) => {
+        const device = deviceOf(s.user_agent);
         try {
-          await webpush.sendNotification(
+          const r = await webpush.sendNotification(
             { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
             notification
           );
           sent++;
+          devices.push({ device, status: (r as { statusCode?: number })?.statusCode ?? "accepted" });
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;
+          devices.push({ device, status: code ?? "error" });
           if (code === 404 || code === 410) dead.push(s.id);
-          else console.error("push send failed:", code, (e as Error).message);
+          else console.error("push send failed:", device, code, (e as Error).message);
         }
       })
     );
@@ -106,7 +115,7 @@ Deno.serve(async (req) => {
     if (dead.length) {
       await rest(`push_subscriptions?id=in.(${dead.join(",")})`, { method: "DELETE" }).catch(() => {});
     }
-    return json({ sent, pruned: dead.length, of: subs.length });
+    return json({ sent, pruned: dead.length, of: subs.length, devices });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }

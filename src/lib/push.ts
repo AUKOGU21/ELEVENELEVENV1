@@ -39,6 +39,16 @@ function isIOS(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+// Which device a stored row belongs to, roughly. Safari's version string changes
+// with every update, so the full user agent can't be used to recognise the same
+// phone twice.
+function deviceFamily(ua: string): string {
+  if (/iphone|ipad|ipod/i.test(ua)) return "ios";
+  if (/android/i.test(ua)) return "android";
+  if (/macintosh/i.test(ua)) return "mac";
+  return "other";
+}
+
 export function pushSupported(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -110,6 +120,60 @@ export async function enablePush(userId: string): Promise<{ ok: boolean; reason?
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: (e as Error).message };
+  }
+}
+
+// ── Keeping the subscription fresh ────────────────────────────────────────────
+// A push subscription is not permanent. iOS drops them when the installed app
+// sits unused, when storage is reclaimed, and across some OS updates, and it
+// hands out a new one when the app comes back. Nothing tells the server: Apple
+// keeps returning 201 for the dead token for a while, so from our side a phone
+// that has gone silent looks exactly like one that is ringing.
+//
+// So on every launch, if she has already said yes, we read whatever subscription
+// the browser holds right now and write it down again. Any older row for the
+// same device is removed, so one phone can't sit in the table three times.
+export async function syncPushSubscription(userId: string): Promise<void> {
+  if (!pushSupported() || Notification.permission !== "granted") return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      // Permission stands but the subscription is gone. Re-create it quietly:
+      // she already agreed to this, so there's no prompt and nothing to see.
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const json = sub.toJSON();
+    await supabase.from("push_subscriptions").upsert(
+      {
+        user_id: userId,
+        endpoint: sub.endpoint,
+        p256dh: json.keys?.p256dh,
+        auth: json.keys?.auth,
+        user_agent: navigator.userAgent,
+      },
+      { onConflict: "endpoint" },
+    );
+
+    // Retire this device's previous tokens. Only this device's: her laptop is a
+    // separate row and has every right to stay.
+    const family = deviceFamily(navigator.userAgent);
+    const { data: mine } = await supabase
+      .from("push_subscriptions")
+      .select("id, endpoint, user_agent")
+      .eq("user_id", userId);
+    const stale = (mine ?? [])
+      .filter((r) => r.endpoint !== sub!.endpoint && deviceFamily(r.user_agent ?? "") === family)
+      .map((r) => r.id);
+    if (stale.length) {
+      await supabase.from("push_subscriptions").delete().in("id", stale);
+    }
+  } catch {
+    // Push is a nice-to-have. It never breaks the launch.
   }
 }
 

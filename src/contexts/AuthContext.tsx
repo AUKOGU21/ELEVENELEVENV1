@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { recordHomeScreenUse } from '@/lib/push'
+import { recordHomeScreenUse, syncPushSubscription } from '@/lib/push'
 
 interface AuthContextType {
   user: User | null
@@ -87,8 +87,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
-      // Note a home screen launch so we can see how many people installed it.
-      if (session?.user) recordHomeScreenUse(session.user.id)
+      // Note a home screen launch so we can see how many people installed it,
+      // and re-register push, since iOS quietly hands out a new subscription and
+      // never tells us the old one stopped working.
+      if (session?.user) {
+        recordHomeScreenUse(session.user.id)
+        syncPushSubscription(session.user.id)
+      }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // When a user signs in, sync their locally stored profile data
       if (event === 'SIGNED_IN' && session?.user) {
         recordHomeScreenUse(session.user.id)
+        syncPushSubscription(session.user.id)
         syncLocalProfileToDb(session.user.id)
         // NOTE: decisions are never synced from localStorage — decisions must be
         // posted while authenticated so they always have the correct user_id.

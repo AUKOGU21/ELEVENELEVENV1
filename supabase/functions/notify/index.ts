@@ -50,6 +50,7 @@ interface Event {
   path: string;
   foot: string;
   push: string;
+  note?: string;          // a quiet line that belongs to the event itself
 }
 
 export const EVENTS: Record<string, Event> = {
@@ -146,6 +147,20 @@ export const EVENTS: Record<string, Event> = {
     foot: "You're receiving this because you asked the community",
     push: "{name} sent you a pick for {item}. Tap to see it.",
   },
+  // She made an account and never finished her profile. Warm, not a diagnosis:
+  // she may not know anything went wrong, and she shouldn't have to. Stored as a
+  // welcome row, which the bell already knows how to show.
+  finish_profile: {
+    as: "welcome",
+    hero: CHERRY,
+    subject: "We miss you",
+    head: "We miss you, {name}.",
+    sub: "Finish your profile and see what women like you are deciding on right now.",
+    cta: "Finish your profile", path: "/signin",
+    foot: "You're receiving this because you created an ElevenEleven account",
+    push: "Finish your profile and see what women like you are deciding on. Tap to finish.",
+    note: "Forgot your password? Tap \u201cEmail me a sign-in link\u201d and you're in.",
+  },
   follow_post: {
     subject: "{name} posted",
     head: "{name} posted.",
@@ -168,8 +183,9 @@ function render(e: Event, v: Record<string, string>): string {
   const cta = esc(fill(e.cta, v));
   const url = SITE + fill(e.path, v);
   const subject = esc(fill(e.subject, v));
-  const note = (v.note ?? "").trim()
-    ? `<div style="font-size:13.5px;line-height:1.6;color:#6F665A;font-style:italic;padding-top:12px;">${esc(v.note)}</div>`
+  const noteText = (v.note ?? "").trim() || fill(e.note ?? "", v).trim();
+  const note = noteText
+    ? `<div style="font-size:13.5px;line-height:1.6;color:#6F665A;font-style:italic;padding-top:12px;">${esc(noteText)}</div>`
     : "";
 
   const body = e.hero

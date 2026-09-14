@@ -14,28 +14,54 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Sync any locally stored onboarding profile to Supabase on auth
+// Copy what she typed before she had an account into her profile, on sign-in.
+//
+// Fill blanks, never overwrite. This runs on every sign-in, and it used to upsert
+// every field it didn't have as null. A name left behind by an abandoned signup
+// was enough to trigger it, so a member who tapped Create account by mistake and
+// then signed in would have had her age, city, sizes and fit wiped, and been
+// marked as having finished onboarding she never went through.
 async function syncLocalProfileToDb(userId: string) {
   const raw = localStorage.getItem('eleven_profile')
   const firstName = localStorage.getItem('eleven_first_name')
   if (!raw && !firstName) return
 
   const profile = raw ? JSON.parse(raw) : {}
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('display_name, age, city, height_range, top_size, bottom_size, fit_preference, fit_details, silhouette_preference, style_aesthetics')
+    .eq('id', userId)
+    .maybeSingle()
 
-  await supabase.from('profiles').upsert({
-    id: userId,
-    display_name: firstName ?? profile.display_name ?? null,
-    age: profile.age ?? null,
-    city: profile.city ?? null,
-    height_range: profile.height ?? null,
-    top_size: profile.top_size ?? null,
-    bottom_size: profile.bottom_size ?? null,
-    silhouette_preference: profile.silhouette ?? [],
-    style_aesthetics: profile.style ?? [],
-    fit_preference: profile.fit_preference ?? null,
-    fit_details: profile.fit_details ?? null,
-    onboarding_completed: true,
-  }).eq('id', userId)
+  const candidate: Record<string, unknown> = {
+    display_name: firstName ?? profile.display_name,
+    age: profile.age,
+    city: profile.city,
+    height_range: profile.height,
+    top_size: profile.top_size,
+    bottom_size: profile.bottom_size,
+    silhouette_preference: profile.silhouette,
+    style_aesthetics: profile.style,
+    fit_preference: profile.fit_preference,
+    fit_details: profile.fit_details,
+  }
+  const blank = (v: unknown) =>
+    v == null || v === '' ||
+    (Array.isArray(v) && v.length === 0) ||
+    (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0)
+
+  const patch: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(candidate)) {
+    if (!blank(v) && blank((existing as Record<string, unknown> | null)?.[k])) patch[k] = v
+  }
+  // Onboarding is done only when she actually went through it on this device.
+  // A name typed on the signup page doesn't count.
+  if (raw) patch.onboarding_completed = true
+
+  if (Object.keys(patch).length) {
+    if (existing) await supabase.from('profiles').update(patch).eq('id', userId)
+    else await supabase.from('profiles').upsert({ id: userId, ...patch })
+  }
 
   localStorage.removeItem('eleven_profile')
   localStorage.removeItem('eleven_first_name')
@@ -101,14 +127,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null)
       setLoading(false)
 
-      // When a user signs in, sync their locally stored profile data
+      // When she signs in, catch up everything that waited for an account.
+      //
+      // Not inside this callback. The auth library awaits every listener and
+      // rethrows the first error, from inside signUp itself, so one failed side
+      // effect here reports a signup the server already accepted as a failure.
+      // Supabase's own guidance is to never call Supabase from in here. Deferring
+      // one tick keeps all of this out of signup's way, and none of it may throw.
       if (event === 'SIGNED_IN' && session?.user) {
-        recordHomeScreenUse(session.user.id)
-        syncPushSubscription(session.user.id)
-        syncLocalProfileToDb(session.user.id)
-        // NOTE: decisions are never synced from localStorage — decisions must be
-        // posted while authenticated so they always have the correct user_id.
-        localStorage.removeItem('eleven_decisions')
+        const id = session.user.id
+        setTimeout(() => {
+          recordHomeScreenUse(id).catch(() => {})
+          syncPushSubscription(id).catch(() => {})
+          syncLocalProfileToDb(id).catch((e) => console.error('profile sync failed:', e))
+          // Decisions are never synced from localStorage. They must be posted
+          // while signed in so they always carry the right user_id.
+          try { localStorage.removeItem('eleven_decisions') } catch { /* storage blocked */ }
+        }, 0)
       }
     })
 

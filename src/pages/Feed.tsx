@@ -667,6 +667,12 @@ const Feed = () => {
 
     const myProfileData = (profileResult as any).data ?? null;
     if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url, invite_code: myProfileData.invite_code ?? null, referral_prompt_dismissed_at: myProfileData.referral_prompt_dismissed_at ?? null, fit_details: myProfileData.fit_details ?? null });
+    // Signed in, never finished onboarding: no name, no fit. Three accounts are in
+    // this state and not one of them got past the door. Send her back to finish
+    // instead of dropping her into a feed that calls her "Someone".
+    if (myProfileData && myProfileData.onboarding_completed === false) {
+      navigate("/onboarding?resume=true", { replace: true });
+    }
 
     const local = JSON.parse(localStorage.getItem("eleven_decisions") || "[]");
     const localFormatted: DecisionRow[] = local.map((d: any) => ({

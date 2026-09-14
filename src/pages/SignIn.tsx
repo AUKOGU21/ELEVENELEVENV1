@@ -24,6 +24,10 @@ const SignIn = () => {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A neutral line, for when the page is steering her rather than scolding her.
+  const [notice, setNotice] = useState<string | null>(null);
+  // The way back in when the password fails: a link to her inbox.
+  const [linkState, setLinkState] = useState<"idle" | "sending" | "sent">("idle");
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) return;
@@ -31,7 +35,9 @@ const SignIn = () => {
     setError(null);
     const { error } = await signInWithPassword(email.trim(), password);
     if (error) {
-      setError(error);
+      setError(/invalid login credentials/i.test(error)
+        ? "That password doesn't match this email. Try again, or get a sign-in link by email."
+        : error);
       setLoading(false);
     } else {
       navigate("/feed");
@@ -60,12 +66,37 @@ const SignIn = () => {
 
     const { error } = await supabase.auth.signUp({ email: email.trim(), password });
     if (error) {
-      setError(error.message);
       setLoading(false);
+      if (/already registered|already exists/i.test(error.message)) {
+        // She already has an account. Sending her back to Create account is how a
+        // browser ends up saving a second generated password over the real one,
+        // so clear the fields and move her to Sign in with the link on offer.
+        setPassword("");
+        setConfirm("");
+        setMode("signin");
+        setError(null);
+        setNotice("You already have an account with this email. Sign in, or get a sign-in link by email.");
+        return;
+      }
+      setError(error.message);
       return;
     }
 
     navigate("/onboarding?fromSignup=true");
+  };
+
+  const sendSignInLink = async () => {
+    if (!email.trim()) { setError("Enter your email first."); return; }
+    setError(null);
+    setLinkState("sending");
+    const { error } = await supabase.functions.invoke("send-sign-in-link", { body: { email: email.trim() } });
+    if (error) {
+      setLinkState("idle");
+      setError("Couldn't send the link. Try again in a minute.");
+      return;
+    }
+    setNotice(null);
+    setLinkState("sent");
   };
 
   const canSubmit = mode === "signin"
@@ -88,7 +119,7 @@ const SignIn = () => {
           {/* Mode toggle */}
           <div className="flex gap-1 p-1 bg-muted rounded-xl mb-8">
             <button
-              onClick={() => { setMode("signin"); setError(null); }}
+              onClick={() => { setMode("signin"); setError(null); setNotice(null); setLinkState("idle"); }}
               className={`flex-1 py-2 rounded-lg text-base font-medium transition-all ${
                 mode === "signin" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
               }`}
@@ -96,7 +127,7 @@ const SignIn = () => {
               Sign in
             </button>
             <button
-              onClick={() => { setMode("signup"); setError(null); }}
+              onClick={() => { setMode("signup"); setError(null); setNotice(null); setLinkState("idle"); }}
               className={`flex-1 py-2 rounded-lg text-base font-medium transition-all ${
                 mode === "signup" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
               }`}
@@ -160,6 +191,9 @@ const SignIn = () => {
                 />
               )}
 
+              {notice && !error && (
+                <p className="text-base text-muted-foreground text-center">{notice}</p>
+              )}
               {error && (
                 <p className="text-base text-red-500 text-center">{error}</p>
               )}
@@ -171,6 +205,23 @@ const SignIn = () => {
               >
                 {loading ? "..." : mode === "signin" ? "Sign in" : "Create account"}
               </button>
+
+              {mode === "signin" && (
+                linkState === "sent" ? (
+                  <p className="text-sm text-muted-foreground text-center pt-2">
+                    Sent. Check {email.trim()} for a link to sign in. It works for an hour.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={sendSignInLink}
+                    disabled={linkState === "sending"}
+                    className="w-full text-sm text-muted-foreground underline underline-offset-4 pt-2 disabled:opacity-40"
+                  >
+                    {linkState === "sending" ? "Sending..." : "Email me a sign-in link"}
+                  </button>
+                )
+              )}
             </motion.div>
           </AnimatePresence>
         </div>

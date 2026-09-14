@@ -96,7 +96,12 @@ const Onboarding = () => {
   const { signInWithEmail, user } = useAuth();
   const [searchParams] = useSearchParams();
   const skipAccount = searchParams.get("fromSignup") === "true";
-  const [step, setStep] = useState(skipAccount ? 1 : 0);
+  // Back to finish: she's signed in but her profile never got a name, because
+  // signup handed her a session her browser never picked up. The account step
+  // asks for the basics again, without the email field and without sending
+  // anything, since she's already in.
+  const resuming = searchParams.get("resume") === "true" && !!user;
+  const [step, setStep] = useState(skipAccount && searchParams.get("resume") !== "true" ? 1 : 0);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName]   = useState("");
   const [email, setEmail]         = useState("");
@@ -226,7 +231,7 @@ const Onboarding = () => {
     || "";
 
   const canContinue = () => {
-    if (current.type === "account")      return !!(firstName.trim() && lastName.trim() && email.trim() && age.trim() && city.trim());
+    if (current.type === "account")      return !!(firstName.trim() && lastName.trim() && (resuming || email.trim()) && age.trim() && city.trim());
     if (current.type === "transition")   return true;
     if (current.type === "fit")          return true;   // every answer is optional
     if (current.type === "pinterest")    return true;
@@ -271,6 +276,17 @@ const Onboarding = () => {
   };
 
   const next = async () => {
+    if (current.key === "account" && resuming && user) {
+      setAuthLoading(true);
+      await supabase.from("profiles").update({
+        display_name: fullName || null,
+        age: age ? parseInt(age) : null,
+        city: city || null,
+      }).eq("id", user.id);
+      setAuthLoading(false);
+      setStep(step + 1);
+      return;
+    }
     if (current.key === "account") {
       setAuthLoading(true);
       localStorage.setItem("eleven_first_name", fullName);
@@ -403,7 +419,7 @@ const Onboarding = () => {
           {/* ACCOUNT */}
           {current.type === "account" && (
             <motion.div key="account" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={H1}>Let's get started</h2>
+              <h2 style={H1}>{resuming ? "Let's finish your account" : "Let's get started"}</h2>
               <p style={SUB}>Just the basics.</p>
               <div className="space-y-4">
                 <div className="flex gap-3">
@@ -412,8 +428,10 @@ const Onboarding = () => {
                   <input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name"
                     style={{ ...INPUT, flex: 1 }} />
                 </div>
-                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
-                  style={INPUT} />
+                {!resuming && (
+                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
+                    style={INPUT} />
+                )}
                 <input value={age} onChange={e => setAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" type="text" inputMode="numeric" maxLength={3}
                   style={INPUT} />
                 <div className="relative">

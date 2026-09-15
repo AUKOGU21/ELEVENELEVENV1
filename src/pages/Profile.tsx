@@ -225,7 +225,7 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
     whiteSpace: "nowrap",
   };
   return (
-    <header style={{ position: "sticky", top: 0, zIndex: 40, background: C.paper, borderBottom: `1px solid ${C.rule}` }}>
+    <header style={{ position: "sticky", top: 0, zIndex: 40, background: C.paper, borderBottom: `1px solid ${C.rule}`, transform: "translateZ(0)", WebkitTransform: "translateZ(0)" }}>
       <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "12px 16px" : "20px 40px" }}>
         <button
           onClick={() => navigate("/", { state: { home: true } })}
@@ -268,8 +268,9 @@ export function Hero({ isMobile, isWide, portrait, identity, irl }: {
 }) {
   if (isMobile) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
-        {portrait}
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        {/* Capped, so her name and her decisions are on the first screen. */}
+        <div style={{ width: "min(62%, 220px)" }}>{portrait}</div>
         {identity}
         {irl}
       </div>
@@ -292,7 +293,7 @@ export function Hero({ isMobile, isWide, portrait, identity, irl }: {
 
 export function Portrait({ url, name, onPick }: { url: string | null; name: string; onPick?: () => void }) {
   const box: React.CSSProperties = {
-    width: "100%", aspectRatio: "1 / 1", background: C.well, borderRadius: RADIUS, overflow: "hidden",
+    width: "100%", aspectRatio: "1 / 1", height: "auto", background: C.well, borderRadius: RADIUS, overflow: "hidden",
     display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: "none",
   };
   const inner = url
@@ -322,9 +323,10 @@ export function BigName({ name, isMobile }: { name: string; isMobile: boolean })
   // Long names step down so a surname never has to break mid-word.
   const longest = Math.max(1, ...parts.flatMap((p) => p.split(/\s+/)).map((w) => w.length));
   const scale = longest > 12 ? 0.62 : longest > 9 ? 0.78 : 1;
-  const base = isMobile ? "clamp(52px, 17vw, 76px)" : "clamp(56px, 5.8vw, 96px)";
+  const [min, vw, max] = isMobile ? [50, 16, 72] : [56, 5.8, 96];
+  const size = `clamp(${Math.round(min * scale)}px, ${(vw * scale).toFixed(2)}vw, ${Math.round(max * scale)}px)`;
   return (
-    <h1 style={{ ...display(`calc(${base} * ${scale})`), lineHeight: 0.88, overflowWrap: "anywhere" }}>
+    <h1 style={{ ...display(size), lineHeight: 0.88, overflowWrap: "anywhere" }}>
       {parts.map((p, i) => <span key={i} style={{ display: "block" }}>{p}</span>)}
     </h1>
   );

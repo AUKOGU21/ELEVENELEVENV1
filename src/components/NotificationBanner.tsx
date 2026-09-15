@@ -2,21 +2,112 @@
 // A one-time, dismissible nudge at the top of the feed to turn on push alerts.
 // Shows only when push is available but not yet enabled. On iPhones still in
 // Safari (not installed), it guides the user to add to Home Screen instead.
+//
+// One line, set on rules rather than in a tinted box. iPhone can't be sent to
+// the Home Screen by script, so tapping it opens the steps instead of failing
+// silently.
 import { useEffect, useState } from "react";
-import { Bell, X, Plus } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { pushState, enablePush, canInstall, promptInstall, isStandalone } from "@/lib/push";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
+import { C, RADIUS, SANS, body, display, meta } from "@/lib/design";
 
 // A dismissal quiets the nudge for three weeks rather than killing it forever.
 const RESHOW_DAYS = 21;
+
+const STEPS: { label: string; title: string; note?: string; items: React.ReactNode[] }[] = [
+  {
+    label: "Step one",
+    title: "Add ElevenEleven to your home screen",
+    items: [
+      <>Tap <b>Share</b>, the square with the arrow. On Android, tap the <b>⋮</b> menu, top right.</>,
+      <>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</>,
+    ],
+  },
+  {
+    label: "Step two",
+    title: "Turn notifications on",
+    note: "Do this from the icon you just added, not from your browser.",
+    items: [
+      <>Open <b>ElevenEleven</b> from your home screen.</>,
+      <>Tap the <b>bell</b> in the top right.</>,
+      <>Tap <b>Turn on push notifications</b>.</>,
+      <>Tap <b>Allow</b> when your phone asks.</>,
+    ],
+  },
+];
+
+export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add ElevenEleven to your home screen"
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 330, background: C.scrim, display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 0 : 24, boxSizing: "border-box" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="no-scrollbar"
+        style={{
+          position: "relative", width: isMobile ? "100%" : "min(520px, 100%)", height: isMobile ? "100%" : "auto",
+          maxHeight: isMobile ? "100%" : "88vh", overflowY: "auto", boxSizing: "border-box", borderRadius: isMobile ? 0 : RADIUS,
+          background: "linear-gradient(rgba(247,244,239,0.94), rgba(247,244,239,0.94)), #EDECEA url(/email/legs-faded.jpg) center 45% / cover no-repeat",
+          fontFamily: SANS, padding: isMobile ? "26px 22px 40px" : "34px 38px 40px",
+          boxShadow: isMobile ? "none" : "0 30px 70px rgba(20,18,16,0.35)",
+        }}
+      >
+        <button onClick={onClose} aria-label="Close" className="e11-close"
+          style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", padding: 6, cursor: "pointer", color: C.ink, lineHeight: 0 }}>
+          <X style={{ width: 22, height: 22 }} strokeWidth={1.5} />
+        </button>
+
+        <p style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>Never miss a weigh-in</p>
+        <h2 style={{ ...display(isMobile ? 38 : 44), marginTop: 12, maxWidth: "14ch" }}>
+          Put us on your home screen.
+        </h2>
+
+        {STEPS.map((s) => (
+          <section key={s.label} style={{ marginTop: 30, borderTop: `1px solid ${C.rule}`, paddingTop: 18 }}>
+            <p style={meta(10.5, C.muted)}>{s.label}</p>
+            <p style={{ ...display(isMobile ? 24 : 28), marginTop: 8 }}>{s.title}</p>
+            {s.note && <p style={{ ...body(13.5, C.inkSoft), marginTop: 10 }}>{s.note}</p>}
+            <ol style={{ margin: "14px 0 0", padding: 0, listStyle: "none" }}>
+              {s.items.map((item, i) => (
+                <li key={i} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "9px 0", borderBottom: `1px solid ${C.rule}` }}>
+                  <span style={meta(11, C.burgundy)}>{i + 1}</span>
+                  <span style={body(14, C.ink)}>{item}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+
+        <button onClick={onClose} style={{
+          ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em",
+          width: "100%", background: C.burgundy, border: "none", borderRadius: RADIUS,
+          padding: "16px 0", marginTop: 28, cursor: "pointer",
+        }}>
+          Got it
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 export default function NotificationBanner({ userId, isMobile }: { userId: string; isMobile: boolean }) {
   const dismissKey = `ee_push_prompt_dismissed_${userId}`;
   const [state, setState] = useState(() => pushState());
   const [installable, setInstallable] = useState(() => canInstall());
   const [busy, setBusy] = useState(false);
+  const [howTo, setHowTo] = useState(false);
 
   const [dismissed, setDismissed] = useState(() => {
     try {
@@ -77,46 +168,38 @@ export default function NotificationBanner({ userId, isMobile }: { userId: strin
     setBusy(false);
   };
 
+  const line = install
+    ? "Add us to your home screen and never miss a weigh-in."
+    : "Turn notifications on and never miss a weigh-in.";
+  const actionLabel = busy ? "..." : androidInstall ? "Install" : iosInstall ? "Show me how" : "Turn on";
+  const onAction = androidInstall ? addToHome : iosInstall ? () => setHowTo(true) : turnOn;
+
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: isMobile ? 11 : 14,
-      background: "rgba(196,158,100,0.10)", border: "1px solid rgba(196,158,100,0.55)",
-      borderRadius: 16, padding: isMobile ? "12px 13px" : "14px 16px", marginTop: isMobile ? 18 : 34,
-    }}>
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(196,158,100,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        {install
-          ? <Plus style={{ width: 22, height: 22, color: "#A07848" }} />
-          : <Bell style={{ width: 21, height: 21, color: "#A07848" }} />}
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.25 }}>
-          {install ? "add ElevenEleven to your home screen" : <>know the second<br />she weighs in</>}
-        </p>
-        <p style={{ fontSize: 13, color: MUTED, margin: "3px 0 0", lineHeight: 1.4 }}>
-          {iosInstall
-            ? "on iphone, notifications turn on once we're on your home screen. tap share, then add to home screen."
-            : androidInstall
-            ? "notifications turn on once we're on your home screen. tap install."
-            : "turn on notifications and we'll ping you when someone responds to your decision."}
-        </p>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        {androidInstall && (
-          <button onClick={addToHome} disabled={busy}
-            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: INK, color: "#FDFAF6", borderRadius: 100, padding: isMobile ? "8px 14px" : "9px 18px", fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer", opacity: busy ? 0.6 : 1 }}>
-            {busy ? "…" : "install"}
-          </button>
-        )}
-        {!install && (
-          <button onClick={turnOn} disabled={busy}
-            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: INK, color: "#FDFAF6", borderRadius: 100, padding: isMobile ? "8px 14px" : "9px 18px", fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer", opacity: busy ? 0.6 : 1 }}>
-            {busy ? "…" : "turn on"}
-          </button>
-        )}
-        <button onClick={dismiss} aria-label="Dismiss" style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: MUTED, background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>
-          <X style={{ width: 15, height: 15 }} />
+    <>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: isMobile ? 12 : 18,
+        borderTop: `1px solid ${C.rule}`, borderBottom: `1px solid ${C.rule}`,
+        padding: isMobile ? "12px 0" : "14px 0", marginTop: isMobile ? 14 : 30,
+      }}>
+        <button
+          onClick={onAction}
+          disabled={busy}
+          style={{ ...body(isMobile ? 13.5 : 14.5, C.ink), textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", minWidth: 0 }}
+        >
+          {line}
         </button>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 16, flexShrink: 0 }}>
+          <button onClick={onAction} disabled={busy}
+            style={{ ...meta(11, C.burgundy), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
+            {actionLabel}
+          </button>
+          <button onClick={dismiss} aria-label="Dismiss"
+            style={{ background: "none", border: "none", padding: 4, cursor: "pointer", color: C.muted, lineHeight: 0 }}>
+            <X style={{ width: 16, height: 16 }} strokeWidth={1.6} />
+          </button>
+        </div>
       </div>
-    </div>
+      {howTo && <HowTo isMobile={isMobile} onClose={() => setHowTo(false)} />}
+    </>
   );
 }

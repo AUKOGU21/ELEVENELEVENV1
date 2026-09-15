@@ -762,7 +762,7 @@ export default function DecisionView(props: Props) {
     <section ref={convoRef} style={{ marginTop: isMobile ? 34 : 48, scrollMarginTop: 96 }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, borderBottom: `1px solid ${C.rule}` }}>
         <div style={{ display: "flex", gap: isMobile ? 22 : 34 }}>
-          {tabBtn("responses", isLFPost ? `Questions (${before.length})` : `Responses (${d.responses.length + before.length})`)}
+          {tabBtn("responses", isLFPost ? `Comments (${before.length})` : `Responses (${d.responses.length + before.length})`)}
           {resolved && tabBtn("followups", `Follow-ups (${after.length})`)}
         </div>
         {tab === "responses" && d.responses.length > 1 && (
@@ -828,23 +828,21 @@ export default function DecisionView(props: Props) {
             </button>
           )}
 
-          {/* Questions asked while she was deciding. Once she's decided these stay
-              here, read-only, and new questions go to Follow-ups. */}
-          {isLFPost && resolved && before.length === 0 && (
-            <p style={{ ...body(14, C.muted), padding: "22px 0" }}>No questions were asked while she was looking.</p>
-          )}
-          {(!resolved || before.length > 0) && (
+          {/* Whatever was said while she was deciding stays here, read-only.
+              Weighing in is how you join an open decision, and anything asked
+              after she decides belongs in Follow-ups, so there's no composer. */}
+          {before.length > 0 && (
             <div style={{ marginTop: isLFPost ? 8 : 36 }}>
               <CommentThread
                 comments={before}
                 user={viewer}
                 posterId={d.user_id}
                 isClosed={false}
-                heading={isLFPost ? null : before.length > 0 ? `Questions (${before.length})` : "Questions"}
-                emptyHint={isOwn ? null : isLFPost ? "Ask her anything you need to know before you recommend something." : "Ask her anything you need to know before you weigh in."}
+                heading={isLFPost ? null : `Comments (${before.length})`}
+                emptyHint={null}
                 placeholder="Ask a question..."
                 submitLabel="Ask"
-                hideComposer={resolved}
+                hideComposer
                 onSubmit={onSubmitComment}
                 onDelete={onDeleteComment}
                 onEdit={onEditComment}
@@ -998,7 +996,7 @@ export default function DecisionView(props: Props) {
             {isValidElement<{ followUp?: React.ReactNode }>(customBody)
               ? cloneElement(customBody, { followUp: followUpPrompt || null })
               : customBody}
-            {conversation}
+            {(!isLFPost || resolved || before.length > 0) && conversation}
           </div>
         ) : (
         <div style={{ padding: isMobile ? "0 18px 60px" : "0 44px 80px" }}>

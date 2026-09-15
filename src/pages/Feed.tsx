@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import heroEditorial from "@/assets/hero-editorial.png";
+import DecisionTile from "@/components/DecisionTile";
+import DecisionView from "@/components/DecisionView";
+import { C as E11, SANS as E11_SANS, meta as e11Meta } from "@/lib/design";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, ThumbsUp, Check, ExternalLink, SlidersHorizontal, Search, X, User, Info, ChevronDown, ChevronUp, Camera, ArrowRight, Bookmark, MoreHorizontal, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -65,6 +67,8 @@ interface ResponseRow {
   product_url: string | null;
   match_score: number | null;
   helpfulness_votes: number;
+  // Her exact words from the weigh-in context step (CONTEXT_OPTIONS).
+  personal_experience?: string | null;
   user_id: string;
   created_at: string;
   profiles: { display_name: string | null; avatar_url?: string | null } | null;
@@ -123,6 +127,8 @@ interface DecisionRow {
   confidence_score: number;
   uncertainty_text: string | null;
   status: string;
+  // When she decided. Comments after this are follow-ups.
+  resolved_at?: string | null;
   user_id: string;
   created_at: string;
   // Looking For (post_type === "looking_for") — otherwise a normal decision.
@@ -403,6 +409,7 @@ const Feed = () => {
     return () => clearTimeout(t);
   }, [scrollTargetId, activeTab]);
   const [loading, setLoading] = useState(true);
+  const loadedOnceRef = useRef(false);
 
   // ── Filters
   const [filterBrand, setFilterBrand] = useState("");
@@ -438,6 +445,17 @@ const Feed = () => {
   const [responsesOpenId, setResponsesOpenId] = useState<string | null>(null);
   // Response to auto-expand/scroll to when the drawer opens (reply deep-link).
   const [focusResponseId, setFocusResponseId] = useState<string | null>(null);
+  // The decision view. Opening a tile lays her decision over the feed; the feed
+  // stays mounted underneath, so closing lands you exactly where you were.
+  const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
+  const [openTab, setOpenTab] = useState<"responses" | "followups">("responses");
+  const openDecision = (id: string, responseId: string | null = null, tabName: "responses" | "followups" = "responses") => {
+    track("card_open", { decisionId: id, userId: user?.id ?? null });
+    setFocusResponseId(responseId);
+    setOpenTab(tabName);
+    setOpenDecisionId(id);
+  };
+  const closeDecision = () => { setOpenDecisionId(null); setFocusResponseId(null); };
   // Looking For: which post's recommendations drawer is open, and the recommend modal.
   const [recsOpenId, setRecsOpenId] = useState<string | null>(null);
   const [recModalFor, setRecModalFor] = useState<string | null>(null);
@@ -557,7 +575,7 @@ const Feed = () => {
   // ─── Data fetch ──────────────────────────────────────────────────────────────
 
   const fetchDecisions = async () => {
-    setLoading(true);
+    if (!loadedOnceRef.current) setLoading(true);
 
     // Attach community recommendations (+ their helpful votes) to Looking For posts.
     // Fetched separately from the main feed query so a recommendations hiccup can
@@ -637,11 +655,11 @@ const Feed = () => {
     // PostgREST FK detection issues causing the join to silently return null.
     const query = `
       id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_name_2, brand_name_2, price_note_2, product_category,
-      price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, user_id, created_at,
+      price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, resolved_at, user_id, created_at,
       post_type, lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
       profiles ( display_name, avatar_url, badge_tier, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
-        id, recommendation, reasoning, photo_url, product_url, match_score,
+        id, recommendation, reasoning, photo_url, product_url, match_score, personal_experience,
         helpfulness_votes, user_id, created_at,
         profiles ( display_name, avatar_url, badge_tier )
       ),
@@ -666,7 +684,7 @@ const Feed = () => {
     ]);
 
     const myProfileData = (profileResult as any).data ?? null;
-    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url, invite_code: myProfileData.invite_code ?? null, referral_prompt_dismissed_at: myProfileData.referral_prompt_dismissed_at ?? null, fit_details: myProfileData.fit_details ?? null });
+    if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url, invite_code: myProfileData.invite_code ?? null, referral_prompt_dismissed_at: myProfileData.referral_prompt_dismissed_at ?? null, fit_details: myProfileData.fit_details ?? null, badge_tier: myProfileData.badge_tier ?? null, fit_prompt_dismissed_at: myProfileData.fit_prompt_dismissed_at ?? null });
     // Signed in, never finished onboarding: no name, no fit. Three accounts are in
     // this state and not one of them got past the door. Send her back to finish
     // instead of dropping her into a feed that calls her "Someone".
@@ -801,6 +819,7 @@ const Feed = () => {
     }
 
     setLoading(false);
+    loadedOnceRef.current = true;
   };
 
   // ─── Actions ────────────────────────────────────────────────────────────────
@@ -1614,227 +1633,115 @@ const Feed = () => {
   // ─── Main render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 overflow-hidden flex justify-center">
+    <div className="fixed inset-0 overflow-hidden flex justify-center" style={{ background: E11.paper }}>
 
-      {/* ── Full-bleed editorial background — mirrors + light beams show on sides ── */}
-      <img
-        src={heroEditorial}
-        aria-hidden
-        alt=""
-        className="absolute inset-0 w-full h-full pointer-events-none select-none"
-        style={{ objectFit: "cover", objectPosition: "60% center", filter: "brightness(1.08) saturate(0.85)" }}
-      />
-      {/* Centre overlay so cards remain readable; sides stay fully exposed */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(to right, rgba(240,236,230,0.18) 0%, rgba(240,236,230,0.62) 22%, rgba(240,236,230,0.72) 38%, rgba(240,236,230,0.72) 62%, rgba(240,236,230,0.62) 78%, rgba(240,236,230,0.18) 100%)",
-        }}
-      />
-
-
-      {/* ── Floating header ───────────────────────────────────────────────────── */}
-      <header
-        ref={headerRef}
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between py-3"
-        style={{ background: "rgba(235,230,222,0.96)", backdropFilter: "blur(12px)", padding: isMobile ? "9px 10px" : "16px 40px", gap: isMobile ? 6 : 0 }}
-      >
-        {/* Left: Logo */}
-        <div className="flex items-center" style={{ flexShrink: 0 }}>
+      {/* ── Header: type, not pills ───────────────────────────────────────────── */}
+      <header ref={headerRef} className="fixed top-0 left-0 right-0 z-50" style={{ background: E11.paper, borderBottom: `1px solid ${E11.rule}` }}>
+        <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "12px 16px" : "20px 40px" }}>
           <button
             onClick={() => navigate("/", { state: { home: true } })}
-            className="font-sans uppercase select-none"
-            style={{ letterSpacing: isMobile ? "0.05em" : "0.32em", fontSize: isMobile ? 9.5 : 15.5, color: "#1C1712", whiteSpace: "nowrap", cursor: "pointer" }}
+            className="select-none"
+            style={{ justifySelf: "start", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: E11_SANS, textTransform: "uppercase", letterSpacing: isMobile ? "0.12em" : "0.32em", fontSize: isMobile ? 10.5 : 15, color: E11.ink, whiteSpace: "nowrap" }}
           >
             <span style={{ fontWeight: 700 }}>ELEVEN</span>
             <span style={{ fontWeight: 300 }}>ELEVEN</span>
           </button>
-        </div>
 
-        {/* Center: Feed | Mine toggle */}
-        <div
-          className="flex items-center rounded-full px-1 py-1 gap-1"
-          style={{ background: "rgba(28,23,18,0.07)" }}
-        >
-          <button
-            onClick={() => setActiveTab("feed")}
-            className="rounded-full font-medium transition-all"
-            style={{
-              fontSize: isMobile ? 10 : 12,
-              padding: isMobile ? "4px 9px" : "6px 16px",
-              ...(activeTab === "feed"
-                ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
-                : { color: "rgba(28,23,18,0.45)" })
-            }}
-          >
-            Feed
-          </button>
-          {/* Brands tab hidden for now — too much for launch. Restore this button to bring it back. */}
-          <button
-            onClick={() => setActiveTab("mine")}
-            className="rounded-full font-medium transition-all"
-            style={{
-              fontSize: isMobile ? 10 : 12,
-              padding: isMobile ? "4px 9px" : "6px 16px",
-              ...(activeTab === "mine"
-                ? { background: "rgba(28,23,18,0.10)", color: "#1C1712" }
-                : { color: "rgba(28,23,18,0.45)" })
-            }}
-          >
-            Mine {myDecisions.length > 0 && `(${myDecisions.length})`}
-          </button>
-        </div>
+          <nav style={{ display: "flex", gap: isMobile ? 20 : 56 }}>
+            {(["feed", "mine"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                style={{ ...e11Meta(isMobile ? 10.5 : 12, activeTab === t ? E11.ink : E11.muted), fontWeight: 700, background: "none", border: "none", padding: "2px 0 8px", cursor: "pointer", borderBottom: `2px solid ${activeTab === t ? E11.burgundy : "transparent"}`, whiteSpace: "nowrap" }}
+              >
+                {t === "feed" ? "Feed" : `Mine${myDecisions.length > 0 ? ` (${myDecisions.length})` : ""}`}
+              </button>
+            ))}
+          </nav>
 
-        {/* Right controls */}
-        <div className="flex items-center" style={{ gap: isMobile ? 6 : 8, flexShrink: 0 }}>
-          {/* Filter icon */}
-          <button
-            onClick={() => setFilterOpen((v) => !v)}
-            className="rounded-full flex items-center justify-center transition-all"
-            style={{
-              width: isMobile ? 30 : 32, height: isMobile ? 30 : 32,
-              background: filterOpen || filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest"
-                ? "#1C1712"
-                : "rgba(28,23,18,0.08)",
-              color: filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest"
-                ? "#FDFAF6"
-                : "rgba(28,23,18,0.50)",
-            }}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Notification center (replaces the old + Post — posting now lives in the feed banner) */}
-          {user && (
-            <NotificationBell
-              user={user}
-              isMobile={isMobile}
-              onOpenDecision={(id, responseId) => { setResponsesOpenId(id); setFocusResponseId(responseId ?? null); }}
-            />
-          )}
-
-          {/* Profile avatar */}
-          {user ? (
+          <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: isMobile ? 8 : 18 }}>
             <button
-              onClick={() => navigate("/profile")}
-              className="rounded-full flex items-center justify-center text-[9px] font-semibold text-white overflow-hidden shrink-0"
-              style={{ width: isMobile ? 30 : 32, height: isMobile ? 30 : 32, background: "#3A3530", ...ringStyle(myProfile?.badge_tier, 2) }}
+              onClick={() => setFilterOpen((v) => !v)}
+              aria-label="Search and filter"
+              style={{ background: "none", border: "none", padding: 4, cursor: "pointer", lineHeight: 0, color: filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest" ? E11.burgundy : E11.ink }}
             >
-              {avatarContent(myProfile?.avatar_url ?? null, myProfile?.display_name ?? null)}
+              <Search style={{ width: isMobile ? 18 : 20, height: isMobile ? 18 : 20 }} strokeWidth={1.75} />
             </button>
-          ) : (
-            <button
-              onClick={() => navigate("/signin")}
-              className="rounded-full flex items-center justify-center"
-              style={{ width: isMobile ? 30 : 32, height: isMobile ? 30 : 32, background: "rgba(255,255,255,0.08)", color: "rgba(28,23,18,0.45)" }}
-            >
-              <User className="w-3.5 h-3.5" />
-            </button>
-          )}
+            {user && (
+              <NotificationBell
+                user={user}
+                isMobile={isMobile}
+                onOpenDecision={(id, responseId) => openDecision(id, responseId ?? null)}
+              />
+            )}
+            {user ? (
+              <button
+                onClick={() => navigate("/profile")}
+                aria-label="Your profile"
+                className="rounded-full flex items-center justify-center text-[9px] font-semibold text-white overflow-hidden shrink-0"
+                style={{ width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, background: "#3A3530", ...ringStyle(myProfile?.badge_tier, 2) }}
+              >
+                {avatarContent(myProfile?.avatar_url ?? null, myProfile?.display_name ?? null)}
+              </button>
+            ) : (
+              <button onClick={() => navigate("/signin")} style={{ ...e11Meta(isMobile ? 10 : 11, E11.ink), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", whiteSpace: "nowrap" }}>
+                Sign in
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* ── Filter dropdown ───────────────────────────────────────────────────── */}
+      {/* ── Search and filter: a flat panel under the header ─────────────────── */}
       <AnimatePresence>
         {filterOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
-            className="fixed top-16 left-0 right-0 z-40 px-4 flex justify-center"
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.16 }}
+            className="fixed left-0 right-0 z-40"
+            style={{ top: headerH, background: E11.paper, borderBottom: `1px solid ${E11.rule}` }}
           >
-            <div className="w-full max-w-[1160px]">
-              <div
-                className="rounded-2xl p-4 shadow-2xl"
-                style={{ background: "rgba(240,236,230,0.97)", border: "1px solid rgba(255,255,255,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}
-              >
-                {/* Brand / item search */}
-                <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "rgba(28,23,18,0.35)" }} />
-                  <input
-                    type="text"
-                    value={filterBrand}
-                    onChange={(e) => setFilterBrand(e.target.value)}
-                    placeholder="Search brand or item name"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-[13.5px] focus:outline-none"
-                    style={{ background: "rgba(28,23,18,0.06)", color: "#1C1712", border: "1px solid rgba(28,23,18,0.10)" }}
-                  />
-                </div>
-
-                {/* Category */}
-                <p className="text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Category</p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {CATEGORY_OPTIONS.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setFilterCategory(cat)}
-                      className="px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
-                      style={
-                        filterCategory === cat
-                          ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
-                          : { background: "rgba(28,23,18,0.06)", color: "rgba(28,23,18,0.55)", border: "1px solid rgba(28,23,18,0.10)" }
-                      }
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Status */}
-                <p className="text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Status</p>
-                <div className="flex gap-2 mb-4">
-                  {(["all", "open", "closed"] as const).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setFilterStatus(s)}
-                      className="px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
-                      style={
-                        filterStatus === s
-                          ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
-                          : { background: "rgba(28,23,18,0.06)", color: "rgba(28,23,18,0.55)", border: "1px solid rgba(28,23,18,0.10)" }
-                      }
-                    >
-                      {s === "all" ? "All" : s === "open" ? "Open only" : "Closed"}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Sort */}
-                <p className="text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: "rgba(28,23,18,0.40)" }}>Sort by</p>
-                <div className="flex gap-2 mb-3">
-                  {([
-                    { value: "newest", label: "Newest" },
-                    { value: "relevant", label: "Most relevant" },
-                    { value: "discussed", label: "Most discussed" },
-                    { value: "needs_input", label: "Needs input" },
-                  ] as const).map(({ value, label }) => (
-                    <button
-                      key={value}
-                      onClick={() => setSortBy(value)}
-                      className="px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
-                      style={
-                        sortBy === value
-                          ? { background: "#1C1712", color: "#FDFAF6", border: "1px solid #1C1712" }
-                          : { background: "rgba(28,23,18,0.06)", color: "rgba(28,23,18,0.55)", border: "1px solid rgba(28,23,18,0.10)" }
-                      }
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {(filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest") && (
-                  <button
-                    onClick={() => { setFilterBrand(""); setFilterCategory("All"); setFilterStatus("all"); setSortBy("newest"); }}
-                    className="text-[12px] flex items-center gap-1 mt-1"
-                    style={{ color: "rgba(28,23,18,0.40)" }}
-                  >
-                    <X className="w-3 h-3" /> Clear all
-                  </button>
-                )}
+            <div style={{ maxWidth: 1320, margin: "0 auto", padding: isMobile ? "16px 16px 20px" : "24px 40px 28px" }}>
+              <input
+                autoFocus
+                type="text"
+                value={filterBrand}
+                onChange={(e) => setFilterBrand(e.target.value)}
+                placeholder="Search brand or item name"
+                style={{ width: "100%", border: "none", borderBottom: `1px solid ${E11.ink}`, borderRadius: 0, background: "transparent", padding: "6px 0 10px", fontFamily: E11_SANS, fontSize: isMobile ? 18 : 24, color: E11.ink, outline: "none" }}
+              />
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "auto auto 1fr", gap: isMobile ? 18 : 56, marginTop: 22, alignItems: "start" }}>
+                {([
+                  ["Category", CATEGORY_OPTIONS.map((c) => ({ value: c, label: c })), filterCategory, (v: string) => setFilterCategory(v)],
+                  ["Status", [{ value: "all", label: "All" }, { value: "open", label: "Open only" }, { value: "closed", label: "Closed" }], filterStatus, (v: string) => setFilterStatus(v as "all" | "open" | "closed")],
+                  ["Sort by", [{ value: "newest", label: "Newest" }, { value: "relevant", label: "Most relevant" }, { value: "discussed", label: "Most discussed" }, { value: "needs_input", label: "Needs input" }], sortBy, (v: string) => setSortBy(v as typeof sortBy)],
+                ] as [string, { value: string; label: string }[], string, (v: string) => void][]).map(([label, items, current, pick]) => (
+                  <div key={label}>
+                    <p style={{ ...e11Meta(10, E11.muted), marginBottom: 10 }}>{label}</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", columnGap: 18, rowGap: 10 }}>
+                      {items.map((it) => (
+                        <button
+                          key={it.value}
+                          onClick={() => pick(it.value)}
+                          style={{ ...e11Meta(11, current === it.value ? E11.ink : E11.muted), fontWeight: current === it.value ? 700 : 600, background: "none", border: "none", padding: "0 0 4px", cursor: "pointer", borderBottom: `1px solid ${current === it.value ? E11.burgundy : "transparent"}` }}
+                        >
+                          {it.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
+              {(filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest") && (
+                <button
+                  onClick={() => { setFilterBrand(""); setFilterCategory("All"); setFilterStatus("all"); setSortBy("newest"); }}
+                  style={{ ...e11Meta(10.5, E11.burgundy), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 20, display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <X className="w-3 h-3" /> Clear all
+                </button>
+              )}
             </div>
           </motion.div>
         )}
@@ -1843,15 +1750,15 @@ const Feed = () => {
       {/* ── Feed scroll container ─────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
-        className="w-full max-w-[1160px] no-scrollbar feed-scroll"
+        className="w-full max-w-[1320px] no-scrollbar feed-scroll"
         style={{
           overflowY: "scroll",
           // Clear the fixed header exactly, plus one deliberate gap. The first
           // card's own top margin is zeroed in CSS so the two don't stack.
           paddingTop: headerH + (isMobile ? 14 : 20),
           paddingBottom: 40,
-          paddingLeft: 16,
-          paddingRight: 16,
+          paddingLeft: isMobile ? 16 : 40,
+          paddingRight: isMobile ? 16 : 40,
         }}
         onClick={() => filterOpen && setFilterOpen(false)}
       >
@@ -1865,6 +1772,32 @@ const Feed = () => {
             onLookingFor={() => navigate(user ? "/looking-for" : "/signin")}
             onInvite={user ? openReferralManually : undefined}
           />
+        )}
+        {!loading && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: activeTab === "feed" ? (isMobile ? "18px 0 16px" : "26px 0 24px") : (isMobile ? "10px 0 16px" : "14px 0 24px") }}>
+            <div className="no-scrollbar" style={{ display: "flex", gap: isMobile ? 20 : 40, overflowX: "auto", minWidth: 0 }}>
+              {CATEGORY_OPTIONS.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setFilterCategory(cat)}
+                  style={{ ...e11Meta(11, filterCategory === cat ? E11.burgundy : E11.ink), fontWeight: filterCategory === cat ? 700 : 600, letterSpacing: "0.2em", background: "none", border: "none", padding: "0 0 8px", cursor: "pointer", whiteSpace: "nowrap", borderBottom: `2px solid ${filterCategory === cat ? E11.burgundy : "transparent"}` }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <select
+              aria-label="Sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              style={{ ...e11Meta(11, E11.ink), fontWeight: 700, letterSpacing: "0.2em", background: "transparent", border: "none", cursor: "pointer", outline: "none", flexShrink: 0, paddingBottom: 8 }}
+            >
+              <option value="newest">Newest</option>
+              <option value="relevant">Most relevant</option>
+              <option value="discussed">Most discussed</option>
+              <option value="needs_input">Needs input</option>
+            </select>
+          </div>
         )}
         {loading ? (
           <div className="flex items-center justify-center" style={{ minHeight: "60vh" }}>
@@ -1900,7 +1833,7 @@ const Feed = () => {
         ) : (
           <>
             {showFollowupBanner && (
-              <button onClick={() => { setScrollTargetId(followupPending[0].id); setActiveTab("mine"); }} style={{ position: "relative", zIndex: 10, display: "flex", width: "100%", textAlign: "left", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer", boxShadow: "0 2px 14px rgba(120,60,20,0.10)" }}>
+              <button onClick={() => { setScrollTargetId(followupPending[0].id); setActiveTab("mine"); openDecision(followupPending[0].id); }} style={{ position: "relative", zIndex: 10, display: "flex", width: "100%", textAlign: "left", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#F6F1EA", border: "1px solid rgba(196,158,100,0.6)", borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer", boxShadow: "0 2px 14px rgba(120,60,20,0.10)" }}>
                 <div>
                   <p style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A6620", margin: 0 }}>Follow up</p>
                   <p style={{ fontSize: 12, fontWeight: 600, color: "#1C1712", margin: "4px 0 0" }}>
@@ -1922,67 +1855,15 @@ const Feed = () => {
               </button>
             )}
             {showActivation && renderActivationCard()}
-            {/* Feed items: Looking For posts render a LookingForCard, decisions a DecisionCard. */}
-            {displayList.map((decision) => (
-            <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80 }}>
-            {decision.post_type === "looking_for" ? (
-              <LookingForCard
-                isFollowing={followingIds.has(decision.user_id)}
-                onToggleFollow={setFollowing}
-                decision={decision as any}
-                user={user}
-                isMobile={isMobile}
-                activeTab={activeTab}
-                isSaved={savedDecisionIds.has(decision.id)}
-                onSave={() => toggleSave(decision.id)}
-                onHide={() => hideDecision(decision.id)}
-                navigate={navigate}
-                handleDelete={handleDelete}
-                onOpenRecommendations={() => setRecsOpenId(decision.id)}
-                onAddRecommendation={() => (user ? setRecModalFor(decision.id) : navigate("/signin"))}
-                onSignIn={() => navigate("/signin")}
-                onFound={saveLookingForOutcome}
-                onProductPulled={patchLookingForProduct}
-                onStillLooking={quickStillLooking}
-                updateOutcome={updateOutcome}
-                submitReceived={submitReceived}
-                submitReturned={submitReturned}
-              />
-            ) : (
-            <DecisionCard
-              isFollowing={followingIds.has(decision.user_id)}
-              onToggleFollow={setFollowing}
-              decision={decision}
-              user={user}
-              voteCounts={voteCounts}
-              userVotes={userVotes}
-              setLightboxUrl={setLightboxUrl}
-              setTrackingId={setTrackingId}
-              setOutcomeInitial={setOutcomeInitial}
-              setOutcomeChosen={setOutcomeChosen}
-              quickLogOutcome={quickLogOutcome}
-              quickStillDeciding={quickStillDeciding}
-              submitFollowup={submitFollowup}
-              updateOutcome={updateOutcome}
-              submitReceived={submitReceived}
-              submitReturned={submitReturned}
-              startWeighIn={startWeighIn}
-              handleDelete={handleDelete}
-              saveDecisionEdit={saveDecisionEdit}
-              handleHelpfulVote={handleHelpfulVote}
-              activeTab={activeTab}
-              onSignIn={() => navigate("/signin")}
-              isSaved={savedDecisionIds.has(decision.id)}
-              onSave={() => toggleSave(decision.id)}
-              onHide={() => hideDecision(decision.id)}
-              navigate={navigate}
-              loggedOutcomeIds={loggedOutcomeIds}
-              isMobile={isMobile}
-              onOpenResponses={() => { track("card_open", { decisionId: decision.id, userId: user?.id ?? null }); setResponsesOpenId(decision.id); }}
-            />
-            )}
+            {/* The feed: decision tiles on an editorial grid. The concerns and the
+                conversation live in the decision view, one tap in. */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(262px, 1fr))", gap: isMobile ? 14 : 18 }}>
+              {displayList.map((decision) => (
+                <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80, display: "grid" }}>
+                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} />
+                </div>
+              ))}
             </div>
-            ))}
           </>
         )}
       </div>
@@ -1996,7 +1877,7 @@ const Feed = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50"
+              className="fixed inset-0 z-[80]"
               style={{ background: "rgba(0,0,0,0.6)" }}
               onClick={dismissWeighIn}
             />
@@ -2007,7 +1888,7 @@ const Feed = () => {
               exit={{ y: 360 }}
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed bottom-0 left-0 right-0 rounded-t-3xl px-6 pt-6 pb-10"
-              style={{ background: "#F5EFEA", zIndex: 60 }}
+              style={{ background: "#F5EFEA", zIndex: 81 }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Drag handle */}
@@ -2261,7 +2142,7 @@ const Feed = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[90] flex items-center justify-center p-4"
             style={{ background: "rgba(0,0,0,0.92)" }}
             onClick={() => setLightboxUrl(null)}
           >
@@ -2313,25 +2194,86 @@ const Feed = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Responses drawer (right-side, keeps feed context) ─────────────────── */}
-      <ResponsesDrawer
-        open={!!responsesOpenId}
-        onClose={() => { setResponsesOpenId(null); setFocusResponseId(null); }}
-        decision={[...decisions, ...myDecisions].find((d) => d.id === responsesOpenId) ?? null}
-        user={user}
-        voteCounts={voteCounts}
-        userVotes={userVotes}
-        onHelpful={(rid) => handleHelpfulVote(rid, "helpful")}
-        onAddThoughts={(id) => startWeighIn(id)}
-        onSignIn={() => navigate("/signin")}
-        onSubmitReply={submitReply}
-        onDeleteReply={deleteReply}
-        onEditReply={editReply}
-        onSubmitComment={submitComment}
-        onDeleteComment={deleteComment}
-        onEditComment={editComment}
-        focusResponseId={focusResponseId}
-      />
+      {/* ── The decision view, over the feed ──────────────────────────────────── */}
+      <AnimatePresence>
+        {(() => {
+          const pool = [...decisions, ...myDecisions].filter((x, i, arr) => arr.findIndex((y) => y.id === x.id) === i);
+          const open = openDecisionId ? pool.find((x) => x.id === openDecisionId) : null;
+          if (!open) return null;
+          const isLF = open.post_type === "looking_for";
+          // Same category first, same brand ahead of the rest, newest after that.
+          const similar = isLF ? [] : pool
+            .filter((x) => x.id !== open.id && x.post_type !== "looking_for" && !!x.product_image_url && !!open.product_category && x.product_category === open.product_category)
+            .sort((a, b) =>
+              Number((b.brand_name ?? "").toLowerCase() === (open.brand_name ?? "").toLowerCase()) - Number((a.brand_name ?? "").toLowerCase() === (open.brand_name ?? "").toLowerCase())
+              || new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 3);
+          return (
+            <DecisionView
+              key={open.id}
+              d={open}
+              viewer={user ? { id: user.id } : null}
+              isMobile={isMobile}
+              onClose={closeDecision}
+              onOpenDecision={(id) => openDecision(id)}
+              similar={similar}
+              initialTab={openTab}
+              focusResponseId={focusResponseId}
+              isSaved={savedDecisionIds.has(open.id)}
+              onSave={() => toggleSave(open.id)}
+              onHide={() => hideDecision(open.id)}
+              isFollowing={followingIds.has(open.user_id)}
+              onToggleFollow={setFollowing}
+              onViewProfile={() => navigate(user?.id === open.user_id ? "/profile" : `/profile/${open.user_id}`)}
+              onSignIn={() => navigate("/signin")}
+              onLightbox={(url) => setLightboxUrl(url)}
+              onWeighIn={() => startWeighIn(open.id)}
+              outcomeLogged={loggedOutcomeIds.has(open.id)}
+              canDelete={user?.id === open.user_id}
+              onLogOutcome={(initial, chosen) => { setOutcomeInitial(initial); setOutcomeChosen(chosen ?? null); setTrackingId(open.id); }}
+              onStillDeciding={() => quickStillDeciding(open.id)}
+              onDelete={() => handleDelete(open.id)}
+              onSaveEdit={(patch) => saveDecisionEdit(open.id, patch)}
+              updateOutcome={(patch) => updateOutcome(open.id, patch)}
+              submitReceived={(data) => submitReceived(open.id, data)}
+              submitReturned={(data) => submitReturned(open.id, data)}
+              voteCounts={voteCounts}
+              userVotes={userVotes}
+              onHelpful={(rid) => handleHelpfulVote(rid, "helpful")}
+              onSubmitReply={submitReply}
+              onEditReply={editReply}
+              onDeleteReply={deleteReply}
+              onSubmitComment={(body) => submitComment(open.id, body)}
+              onEditComment={editComment}
+              onDeleteComment={deleteComment}
+              customBody={isLF ? (
+                <LookingForCard
+                  isFollowing={followingIds.has(open.user_id)}
+                  onToggleFollow={setFollowing}
+                  decision={open as any}
+                  user={user}
+                  isMobile={isMobile}
+                  activeTab={activeTab}
+                  isSaved={savedDecisionIds.has(open.id)}
+                  onSave={() => toggleSave(open.id)}
+                  onHide={() => { hideDecision(open.id); closeDecision(); }}
+                  navigate={navigate}
+                  handleDelete={(id: string) => { handleDelete(id); closeDecision(); }}
+                  onOpenRecommendations={() => setRecsOpenId(open.id)}
+                  onAddRecommendation={() => (user ? setRecModalFor(open.id) : navigate("/signin"))}
+                  onSignIn={() => navigate("/signin")}
+                  onFound={saveLookingForOutcome}
+                  onProductPulled={patchLookingForProduct}
+                  onStillLooking={quickStillLooking}
+                  updateOutcome={updateOutcome}
+                  submitReceived={submitReceived}
+                  submitReturned={submitReturned}
+                />
+              ) : undefined}
+            />
+          );
+        })()}
+      </AnimatePresence>
 
       {/* ── Looking For: recommendations drawer + recommend modal ──────────────── */}
       <RecommendationsDrawer

@@ -32,6 +32,20 @@ export const recommendationLabel = (rec: string): string => {
   return "Depends";
 };
 
+// What she said about her own experience when she weighed in, shortened. The
+// database holds her exact words (the CONTEXT_OPTIONS in Feed.tsx), and this maps
+// them one to one. "No experience with this brand" shows nothing: that isn't
+// relevance, and saying it next to her name would read as a demerit. Never infer
+// anything she didn't say, like "similar body" or "similar height".
+export const experienceLabel = (stored: string | null | undefined): string | null => {
+  switch ((stored ?? "").trim()) {
+    case "I own this exact item": return "Owns this item";
+    case "I've bought from this brand before": return "Owns items from brand";
+    case "I haven't bought, but I'm familiar with the brand": return "Knows brand well";
+    default: return null;
+  }
+};
+
 // Budget shows as "$XX" when it's a bare number; descriptive budgets
 // ("Under $150", "$100–200") are left untouched.
 export const formatBudget = (s: string | null | undefined): string => {

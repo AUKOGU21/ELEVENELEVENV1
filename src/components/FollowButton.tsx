@@ -16,9 +16,11 @@ interface Props {
   onChange: (targetUserId: string, following: boolean) => void;
   onSignIn?: () => void;
   size?: "sm" | "md";
+  /** "text" is the underlined link the decision view uses; "pill" is the original. */
+  variant?: "pill" | "text";
 }
 
-export default function FollowButton({ targetUserId, user, following, onChange, onSignIn, size = "sm" }: Props) {
+export default function FollowButton({ targetUserId, user, following, onChange, onSignIn, size = "sm", variant = "pill" }: Props) {
   const [busy, setBusy] = useState(false);
 
   // Never offer to follow yourself.
@@ -58,6 +60,24 @@ export default function FollowButton({ targetUserId, user, following, onChange, 
     }
     setBusy(false);
   };
+
+  if (variant === "text") {
+    return (
+      <button
+        onClick={toggle}
+        disabled={busy}
+        aria-pressed={following}
+        style={{
+          background: "none", border: "none", padding: 0, cursor: busy ? "default" : "pointer",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12.5, fontWeight: 600,
+          color: following ? MUTED : "#761919", textDecoration: "underline", textUnderlineOffset: 4,
+          whiteSpace: "nowrap", flexShrink: 0,
+        }}
+      >
+        {following ? "Following" : "Follow"}
+      </button>
+    );
+  }
 
   return (
     <button

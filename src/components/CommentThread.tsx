@@ -1,15 +1,16 @@
 // ── CommentThread ─────────────────────────────────────────────────────────────
-// Comments on the decision itself, separate from weigh-ins. A weigh-in is a
-// structured buy / don't-buy call; a comment is just a question or a reaction —
-// "what went wrong?", "what size did you try?". It's the only way to reach the
-// poster on a decided post, where weighing in no longer makes sense.
-import { useState, useEffect, useRef } from "react";
-import { ringStyle } from "@/lib/tiers";
+// Questions on a decision, as opposed to weigh-ins. In the decision view this
+// renders twice: under Responses, for what was asked while she was deciding, and
+// as the whole Follow-ups tab, for what gets asked after she decided. A woman who
+// finds this decision months from now can still ask how it held up.
+//
+// Type and rules, no bubbles. The original poster is named as such whenever she
+// answers, so a reader can tell her voice from everyone else's.
+import { useEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { getInitials, timeAgo } from "@/lib/format";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
+import { C, RADIUS, SANS, body, meta, strong } from "@/lib/design";
+import { formatName, timeAgo } from "@/lib/format";
+import { Avatar } from "./DecisionTile";
 
 export interface CommentData {
   id: string;
@@ -29,19 +30,50 @@ interface Props {
   onDelete: (commentId: string) => Promise<void>;
   onEdit: (commentId: string, body: string) => Promise<void>;
   onSignIn: () => void;
+  /** Section label above the list. Null hides it. */
+  heading?: string | null;
+  placeholder?: string;
+  emptyHint?: string | null;
+  submitLabel?: string;
+  /** Show the list only, with no way to add to it. */
+  hideComposer?: boolean;
 }
 
-export default function CommentThread({ comments, user, posterId, isClosed, onSubmit, onDelete, onEdit, onSignIn }: Props) {
+const textBtn = (color: string): React.CSSProperties => ({
+  ...meta(10.5, color),
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+});
+
+const field: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: RADIUS,
+  border: `1px solid ${C.rule}`,
+  background: "#FFFFFF",
+  padding: "12px 14px",
+  fontFamily: SANS,
+  fontSize: 14,
+  lineHeight: 1.5,
+  color: C.ink,
+  resize: "vertical",
+  outline: "none",
+};
+
+export default function CommentThread({
+  comments, user, posterId, isClosed, onSubmit, onDelete, onEdit, onSignIn,
+  heading, placeholder, emptyHint, submitLabel = "Post", hideComposer = false,
+}: Props) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  // Editing her own comment, the same way she can already edit a reply.
   const [menuId, setMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // Click anywhere else and the little menu closes.
   useEffect(() => {
     if (!menuId) return;
     const onDown = (e: MouseEvent) => {
@@ -51,171 +83,117 @@ export default function CommentThread({ comments, user, posterId, isClosed, onSu
     return () => document.removeEventListener("mousedown", onDown);
   }, [menuId]);
 
-  const saveEdit = async (commentId: string) => {
-    const body = editDraft.trim();
-    if (!body || savingEdit) return;
-    setSavingEdit(true);
-    try {
-      await onEdit(commentId, body);
-      setEditingId(null);
-      setEditDraft("");
-    } catch { /* the handler logs; leave her text on screen so nothing is lost */ }
-    setSavingEdit(false);
-  };
-
-  const ordered = [...comments].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  const ordered = [...comments].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   const send = async () => {
-    const body = draft.trim();
-    if (!body || busy) return;
+    const b = draft.trim();
+    if (!b || busy) return;
     setBusy(true);
-    try {
-      await onSubmit(body);
-      setDraft("");
-    } catch { /* the handler logs; keep her text so nothing is lost */ }
+    try { await onSubmit(b); setDraft(""); }
+    catch { /* the handler logs; keep her text so nothing is lost */ }
     setBusy(false);
   };
 
-  return (
-    <div style={{ marginTop: 24 }}>
-      <div style={{ height: 1, background: "rgba(0,0,0,0.08)", marginBottom: 16 }} />
-      <p style={{ fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: MUTED, margin: "0 0 12px" }}>
-        {ordered.length > 0 ? `Comments (${ordered.length})` : "Comments"}
-      </p>
+  const saveEdit = async (commentId: string) => {
+    const b = editDraft.trim();
+    if (!b || savingEdit) return;
+    setSavingEdit(true);
+    try { await onEdit(commentId, b); setEditingId(null); setEditDraft(""); }
+    catch { /* the handler logs; leave her text on screen */ }
+    setSavingEdit(false);
+  };
 
-      {ordered.length === 0 && (
-        <p style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, margin: "0 0 14px" }}>
-          {isClosed
-            ? "Ask her how it turned out, or why she passed."
-            : "Ask her anything you need to know before you can weigh in."}
-        </p>
+  const hint = emptyHint !== undefined
+    ? emptyHint
+    : isClosed ? "Ask her how it turned out, or why she passed." : "Ask her anything you need to know before you can weigh in.";
+
+  return (
+    <div>
+      {heading && <p style={{ ...meta(11, C.ink), marginBottom: 4 }}>{heading}</p>}
+
+      {ordered.length === 0 && hint && (
+        <p style={{ ...body(13.5, C.muted), padding: "14px 0 18px" }}>{hint}</p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {ordered.map((c) => {
-          const name = c.profiles?.display_name ?? null;
-          const isPoster = c.user_id === posterId;
-          const isMine = !!user && c.user_id === user.id;
-          const editing = editingId === c.id;
-          // A second of slack, so the row a save writes doesn't read as "edited".
-          const edited = !!c.updated_at
-            && new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 1000;
-          return (
-            <div key={c.id} style={{ display: "flex", gap: 9 }}>
-              <div style={{ ...ringStyle(c.profiles?.badge_tier, 1.5), width: 26, height: 26, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff" }}>
-                {c.profiles?.avatar_url
-                  ? <img src={c.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : getInitials(name)}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{name ?? "Someone"}</span>
-                  {isPoster && (
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#A07848", background: "rgba(160,120,72,0.12)", borderRadius: 100, padding: "2px 7px" }}>
-                      Her
-                    </span>
-                  )}
-                  <span style={{ fontSize: 11, color: MUTED }}>{timeAgo(c.created_at)}</span>
-                  {edited && <span style={{ fontSize: 10.5, color: MUTED }}>edited</span>}
-                  {isMine && !editing && (
-                    <div style={{ marginLeft: "auto", position: "relative", flexShrink: 0 }} ref={menuId === c.id ? menuRef : undefined}>
-                      <button
-                        onClick={() => setMenuId(menuId === c.id ? null : c.id)}
-                        aria-label="Comment options"
-                        style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 2, lineHeight: 0 }}
-                      >
-                        <MoreHorizontal style={{ width: 15, height: 15 }} />
-                      </button>
-                      {menuId === c.id && (
-                        <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: "#FDFAF6", borderRadius: 10, border: "1px solid rgba(0,0,0,0.10)", boxShadow: "0 8px 22px rgba(0,0,0,0.14)", minWidth: 110, zIndex: 5, overflow: "hidden" }}>
-                          <button
-                            onClick={() => { setEditingId(c.id); setEditDraft(c.body); setMenuId(null); }}
-                            style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 11, color: INK, cursor: "pointer" }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => { setMenuId(null); if (confirm("Delete this comment?")) onDelete(c.id); }}
-                            style={{ width: "100%", textAlign: "left", padding: "9px 13px", background: "none", border: "none", fontSize: 11, color: "#c0392b", cursor: "pointer", borderTop: "1px solid rgba(0,0,0,0.06)" }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {editing ? (
-                  <div style={{ marginTop: 5 }}>
-                    <textarea
-                      autoFocus
-                      value={editDraft}
-                      maxLength={2000}
-                      onChange={(e) => setEditDraft(e.target.value)}
-                      rows={2}
-                      style={{ width: "100%", boxSizing: "border-box", resize: "vertical", padding: "9px 11px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", fontSize: 13, lineHeight: 1.45, color: INK, fontFamily: "inherit", outline: "none" }}
-                    />
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
-                      <button
-                        onClick={() => { setEditingId(null); setEditDraft(""); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: MUTED, padding: "6px 8px" }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => saveEdit(c.id)}
-                        disabled={!editDraft.trim() || savingEdit}
-                        style={{ background: editDraft.trim() && !savingEdit ? INK : "rgba(0,0,0,0.25)", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "7px 16px", fontSize: 11, fontWeight: 600, cursor: editDraft.trim() && !savingEdit ? "pointer" : "default" }}
-                      >
-                        {savingEdit ? "Saving..." : "Save"}
-                      </button>
-                    </div>
+      {ordered.map((c) => {
+        const isPoster = c.user_id === posterId;
+        const isMine = !!user && c.user_id === user.id;
+        const editing = editingId === c.id;
+        // A second of slack, so the row a save writes doesn't read as "edited".
+        const edited = !!c.updated_at && new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 1000;
+        return (
+          <div key={c.id} style={{ display: "flex", gap: 14, padding: "20px 0", borderBottom: `1px solid ${C.rule}` }}>
+            <Avatar url={c.profiles?.avatar_url ?? null} name={c.profiles?.display_name ?? null} tier={c.profiles?.badge_tier} size={34} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 12, rowGap: 4 }}>
+                <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {formatName(c.profiles?.display_name)}
+                </span>
+                {isPoster && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>Original poster</span>}
+                <span style={body(12, C.muted)}>{timeAgo(c.created_at)}{edited ? "  ·  edited" : ""}</span>
+                {isMine && !editing && (
+                  <div style={{ marginLeft: "auto", position: "relative" }} ref={menuId === c.id ? menuRef : undefined}>
+                    <button onClick={() => setMenuId(menuId === c.id ? null : c.id)} aria-label="Comment options" style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, padding: 2, lineHeight: 0 }}>
+                      <MoreHorizontal style={{ width: 15, height: 15 }} />
+                    </button>
+                    {menuId === c.id && (
+                      <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: "#FFFFFF", border: `1px solid ${C.rule}`, borderRadius: RADIUS, minWidth: 120, zIndex: 5 }}>
+                        <button onClick={() => { setEditingId(c.id); setEditDraft(c.body); setMenuId(null); }} style={{ ...textBtn(C.ink), display: "block", width: "100%", textAlign: "left", padding: "10px 14px" }}>Edit</button>
+                        <button onClick={() => { setMenuId(null); if (confirm("Delete this comment?")) onDelete(c.id); }} style={{ ...textBtn(C.burgundy), display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderTop: `1px solid ${C.rule}` }}>Delete</button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p style={{ fontSize: 13, lineHeight: 1.5, color: "#3A3530", margin: "3px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                    {c.body}
-                  </p>
                 )}
               </div>
+              {editing ? (
+                <div style={{ marginTop: 8 }}>
+                  <textarea autoFocus rows={2} maxLength={2000} value={editDraft} onChange={(e) => setEditDraft(e.target.value)} style={field} />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 18, marginTop: 8 }}>
+                    <button onClick={() => { setEditingId(null); setEditDraft(""); }} style={textBtn(C.muted)}>Cancel</button>
+                    <button onClick={() => saveEdit(c.id)} disabled={!editDraft.trim() || savingEdit} style={textBtn(C.burgundy)}>{savingEdit ? "Saving..." : "Save"}</button>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ ...body(14.5, C.ink), marginTop: 6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{c.body}</p>
+              )}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
 
-      {/* Composer */}
-      {user ? (
-        <div style={{ marginTop: ordered.length > 0 ? 16 : 0 }}>
+      {!hideComposer && (user ? (
+        <div style={{ marginTop: 18 }}>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={2}
             maxLength={2000}
-            placeholder={isClosed ? "Ask her what happened..." : "Ask a question..."}
-            style={{ width: "100%", resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", fontSize: 13, lineHeight: 1.45, color: INK, fontFamily: "inherit", outline: "none" }}
+            placeholder={placeholder ?? (isClosed ? "Ask her what happened..." : "Ask a question...")}
+            style={field}
           />
-          <button
-            onClick={send}
-            disabled={!draft.trim() || busy}
-            style={{
-              marginTop: 8, width: "100%", padding: "10px 0", borderRadius: 100, border: "none",
-              background: draft.trim() && !busy ? INK : "rgba(0,0,0,0.10)",
-              color: draft.trim() && !busy ? "#FDFAF6" : MUTED,
-              fontSize: 12.5, fontWeight: 600, cursor: draft.trim() && !busy ? "pointer" : "default",
-            }}
-          >
-            {busy ? "Posting..." : "Post comment"}
-          </button>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+            <button
+              onClick={send}
+              disabled={!draft.trim() || busy}
+              style={{
+                ...meta(11, draft.trim() && !busy ? "#FFFFFF" : C.muted),
+                fontWeight: 700,
+                background: draft.trim() && !busy ? C.ink : "transparent",
+                border: `1px solid ${draft.trim() && !busy ? C.ink : C.rule}`,
+                borderRadius: RADIUS,
+                padding: "11px 20px",
+                cursor: draft.trim() && !busy ? "pointer" : "default",
+              }}
+            >
+              {busy ? "Posting..." : submitLabel}
+            </button>
+          </div>
         </div>
       ) : (
-        <button
-          onClick={onSignIn}
-          style={{ marginTop: 14, width: "100%", padding: "11px 0", borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", color: INK, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
-        >
+        <button onClick={onSignIn} style={{ ...textBtn(C.burgundy), fontWeight: 700, marginTop: 18 }}>
           Sign in to comment
         </button>
-      )}
+      ))}
     </div>
   );
 }

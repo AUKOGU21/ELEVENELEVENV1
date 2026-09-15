@@ -1,12 +1,10 @@
 // ── FeedBanner ────────────────────────────────────────────────────────────────
-// The primary posting surface at the top of the feed. Replaces the old floating
-// "+ Post" as the main entry point. Decision dominates; Looking For is secondary.
-import { ShoppingBag, Search, ArrowRight, Users } from "lucide-react";
-import { SANS_APP } from "@/lib/type";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
-const GOLD = "#C49E64";
+// The top of the feed: what you can do here, set as a page rather than a widget.
+// An oversized question on the left, the two ways in on a grid beside it,
+// separated by rules instead of boxes. No icons and no background photograph:
+// the decisions underneath supply the imagery.
+import { ArrowRight } from "lucide-react";
+import { C, body, display, meta } from "@/lib/design";
 
 interface Props {
   onDecision: () => void;
@@ -15,88 +13,91 @@ interface Props {
   isMobile: boolean;
 }
 
-export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobile }: Props) {
+const cta: React.CSSProperties = {
+  ...meta(12.5, C.burgundy),
+  fontWeight: 700,
+  letterSpacing: "0.12em",
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  alignSelf: "flex-start",
+};
+
+function Way({ n, eyebrow, title, blurb, action, onClick, isMobile }: {
+  n: string;
+  eyebrow: string;
+  title: string;
+  blurb: string;
+  action: string;
+  onClick: () => void;
+  isMobile: boolean;
+}) {
   return (
-    <div style={{
-      position: "relative", zIndex: 1,
-      background: "#F5EFEA", borderRadius: 20, padding: isMobile ? "20px 16px" : "26px 28px",
-      boxShadow: "0 6px 24px rgba(0,0,0,0.06)", marginTop: isMobile ? 18 : 34, marginBottom: 20, border: "1px solid rgba(0,0,0,0.04)",
-    }}>
-      <div style={{ textAlign: "center", marginBottom: isMobile ? 18 : 22 }}>
-        <p style={{ fontFamily: SANS_APP, fontSize: isMobile ? 18.5 : 23, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15, letterSpacing: "-0.015em" }}>
-          What are you deciding on today?
-        </p>
-        <p style={{ fontSize: isMobile ? 11.5 : 13, color: MUTED, margin: "7px 0 0" }}>
-          Share a decision or ask the community for help.
-        </p>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 10 : 14, height: "100%" }}>
+      <p style={meta(11, C.ink)}>{n} / {eyebrow}</p>
+      <h2 style={display(isMobile ? 30 : "clamp(28px, 2.9vw, 40px)")}>{title}</h2>
+      <p style={{ ...body(isMobile ? 13.5 : 14.5), maxWidth: "34ch" }}>{blurb}</p>
+      <button onClick={onClick} style={{ ...cta, marginTop: isMobile ? 4 : "auto", paddingTop: isMobile ? 0 : 6 }}>
+        {action} <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
 
-      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 12 : 16 }}>
-        {/* PRIMARY — Decision */}
-        <button
-          onClick={onDecision}
-          style={{
-            flex: 1, textAlign: "left", cursor: "pointer",
-            background: "rgba(255,255,255,0.72)", borderRadius: 16,
-            border: `1.5px solid ${GOLD}`,
-            boxShadow: "0 0 14px rgba(196,158,100,0.20)",
-            padding: isMobile ? "16px" : "18px 20px",
-            display: "flex", flexDirection: "column", gap: 12,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 12, background: "rgba(196,158,100,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <ShoppingBag style={{ width: 22, height: 22, color: "#A07848" }} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, margin: "0 0 2px" }}>Decision</p>
-              <p style={{ fontSize: isMobile ? 14.5 : 16, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15 }}>Should I buy this?</p>
-            </div>
-          </div>
-          <p style={{ fontSize: 11.5, color: "#5A4A42", margin: 0, lineHeight: 1.45 }}>
-            Get real opinions from women like you before you buy.
-          </p>
-          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", borderRadius: 100, padding: "11px 0", fontSize: 12.5, fontWeight: 600, marginTop: 2 }}>
-            Post a decision <ArrowRight style={{ width: 16, height: 16 }} />
-          </span>
-        </button>
+export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobile }: Props) {
+  const decision = (
+    <Way
+      n="01" eyebrow="Decision" title="Should I buy this?"
+      blurb="Get real opinions from women like you before you buy."
+      action="Post a decision" onClick={onDecision} isMobile={isMobile}
+    />
+  );
+  const lookingFor = (
+    <Way
+      n="02" eyebrow="Looking for" title="Need recommendations?"
+      blurb="Tell us what you want and get matched product picks."
+      action="Ask the community" onClick={onLookingFor} isMobile={isMobile}
+    />
+  );
 
-        {/* SECONDARY — Looking For */}
-        <button
-          onClick={onLookingFor}
-          style={{
-            flex: 1, textAlign: "left", cursor: "pointer",
-            background: "rgba(255,255,255,0.5)", borderRadius: 16,
-            border: "1px solid rgba(0,0,0,0.10)",
-            padding: isMobile ? "16px" : "18px 20px",
-            display: "flex", flexDirection: "column", gap: 12,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 12, background: "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Search style={{ width: 21, height: 21, color: "#6F665A" }} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, margin: "0 0 2px" }}>Looking For</p>
-              <p style={{ fontSize: isMobile ? 14.5 : 16, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.15 }}>Need recommendations?</p>
-            </div>
-          </div>
-          <p style={{ fontSize: 11.5, color: "#5A4A42", margin: 0, lineHeight: 1.45 }}>
-            Tell us what you want and get matched product picks.
-          </p>
-          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: INK, border: "1px solid rgba(0,0,0,0.22)", borderRadius: 100, padding: "10px 0", fontSize: 12.5, fontWeight: 600, marginTop: 2 }}>
-            Ask the community <ArrowRight style={{ width: 16, height: 16 }} />
-          </span>
-        </button>
-      </div>
-
-      {onInvite && (
-        <div style={{ textAlign: "center", marginTop: isMobile ? 14 : 18 }}>
-          <button onClick={onInvite} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: MUTED, display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <Users style={{ width: 14, height: 14 }} /> Invite your shopping circle
-          </button>
+  return (
+    <section style={{ position: "relative", zIndex: 1, marginTop: isMobile ? 22 : 44 }}>
+      {isMobile ? (
+        <div>
+          <h1 style={display("clamp(50px, 15vw, 64px)")}>
+            What are you<br />deciding on<br />today?
+          </h1>
+          <div style={{ borderTop: `1px solid ${C.rule}`, marginTop: 26, paddingTop: 22 }}>{decision}</div>
+          <div style={{ borderTop: `1px solid ${C.rule}`, marginTop: 24, paddingTop: 22 }}>{lookingFor}</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)", alignItems: "stretch" }}>
+          <h1 style={{ ...display("clamp(64px, 7.4vw, 108px)"), paddingRight: 40 }}>
+            What are you<br />deciding on<br />today?
+          </h1>
+          <div style={{ borderLeft: `1px solid ${C.rule}`, padding: "10px 36px 6px" }}>{decision}</div>
+          <div style={{ borderLeft: `1px solid ${C.rule}`, padding: "10px 0 6px 36px" }}>{lookingFor}</div>
         </div>
       )}
-    </div>
+
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+        marginTop: isMobile ? 26 : 30, paddingBottom: isMobile ? 16 : 18,
+        borderBottom: "1px solid rgba(20,18,16,0.32)",
+      }}>
+        <p style={{ ...meta(isMobile ? 10 : 11, C.ink), letterSpacing: "0.3em", fontWeight: 500 }}>
+          Real women. Real decisions.
+        </p>
+        {onInvite && (
+          <button onClick={onInvite} style={{ ...cta, ...meta(isMobile ? 10 : 11, C.ink), letterSpacing: "0.22em", display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", whiteSpace: "nowrap" }}>
+            Invite your circle <ArrowRight style={{ width: 14, height: 14 }} strokeWidth={2} />
+          </button>
+        )}
+      </div>
+    </section>
   );
 }

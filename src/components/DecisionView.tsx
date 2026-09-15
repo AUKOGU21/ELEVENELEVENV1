@@ -769,7 +769,7 @@ export default function DecisionView(props: Props) {
           <label style={{ display: "inline-flex", alignItems: "center", gap: 8, paddingBottom: 12 }}>
             <span style={meta(10.5, C.muted)}>Sort</span>
             <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}
-              style={{ ...meta(10.5, C.ink), fontWeight: 700, background: "transparent", border: "none", cursor: "pointer", outline: "none" }}>
+              style={{ ...meta(10.5, C.ink), fontWeight: 700, background: "transparent", border: "none", borderRadius: 0, WebkitAppearance: "none", appearance: "none", cursor: "pointer", outline: "none" }}>
               <option value="match">Highest match</option>
               <option value="helpful">Most helpful</option>
               <option value="newest">Newest</option>

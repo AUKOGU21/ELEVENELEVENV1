@@ -1764,7 +1764,9 @@ const Feed = () => {
               aria-label="Sort"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              style={{ ...e11Meta(11, E11.ink), fontWeight: 700, letterSpacing: "0.2em", background: "transparent", border: "none", cursor: "pointer", outline: "none", flexShrink: 0, paddingBottom: 8 }}
+              // Safari draws its own white rounded box over a select unless the
+              // native appearance is turned off.
+              style={{ ...e11Meta(11, E11.ink), fontWeight: 700, letterSpacing: "0.2em", background: "transparent", border: "none", borderRadius: 0, WebkitAppearance: "none", appearance: "none", cursor: "pointer", outline: "none", flexShrink: 0, paddingBottom: 8 }}
             >
               <option value="newest">Newest</option>
               <option value="relevant">Most relevant</option>

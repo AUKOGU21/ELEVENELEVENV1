@@ -3,22 +3,28 @@
 // Shows only when push is available but not yet enabled. On iPhones still in
 // Safari (not installed), it guides the user to add to Home Screen instead.
 //
-// One line, set on rules rather than in a tinted box. iPhone can't be sent to
-// the Home Screen by script, so tapping it opens the steps instead of failing
-// silently.
+// Set like a notification: icon, one bold line, one line under it. The whole
+// card is the tap target, because iPhone can't be sent to the Home Screen by
+// script and the steps are the only thing to give.
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { pushState, enablePush, canInstall, promptInstall, isStandalone } from "@/lib/push";
-import { C, RADIUS, SANS, body, display, meta } from "@/lib/design";
+import { C, RADIUS, SANS, body, meta } from "@/lib/design";
 
 // A dismissal quiets the nudge for three weeks rather than killing it forever.
 const RESHOW_DAYS = 21;
 
-const STEPS: { label: string; title: string; note?: string; items: React.ReactNode[] }[] = [
+const HIGHLIGHT = "#F4E06B";
+
+function Mark({ children }: { children: React.ReactNode }) {
+  return <mark style={{ background: HIGHLIGHT, color: C.ink, padding: "1px 5px" }}>{children}</mark>;
+}
+
+const STEPS: { label: string; title: React.ReactNode; note?: string; items: React.ReactNode[] }[] = [
   {
     label: "Step one",
-    title: "Add ElevenEleven to your home screen",
+    title: <>Add <Mark>ElevenEleven</Mark> to your home screen</>,
     items: [
       <>Tap <b>Share</b>, the square with the arrow. On Android, tap the <b>⋮</b> menu, top right.</>,
       <>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</>,
@@ -26,10 +32,10 @@ const STEPS: { label: string; title: string; note?: string; items: React.ReactNo
   },
   {
     label: "Step two",
-    title: "Turn notifications on",
+    title: <>Turn notifications on</>,
     note: "Do this from the icon you just added, not from your browser.",
     items: [
-      <>Open <b>ElevenEleven</b> from your home screen.</>,
+      <>Open <Mark>ElevenEleven</Mark> from your <b>home screen</b>.</>,
       <>Tap the <b>bell</b> in the top right.</>,
       <>Tap <b>Turn on push notifications</b>.</>,
       <>Tap <b>Allow</b> when your phone asks.</>,
@@ -57,9 +63,11 @@ export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () =>
         className="no-scrollbar"
         style={{
           position: "relative", width: isMobile ? "100%" : "min(520px, 100%)", height: isMobile ? "100%" : "auto",
-          maxHeight: isMobile ? "100%" : "88vh", overflowY: "auto", boxSizing: "border-box", borderRadius: isMobile ? 0 : RADIUS,
-          background: "linear-gradient(rgba(247,244,239,0.94), rgba(247,244,239,0.94)), #EDECEA url(/email/legs-faded.jpg) center 45% / cover no-repeat",
-          fontFamily: SANS, padding: isMobile ? "26px 22px 40px" : "34px 38px 40px",
+          maxHeight: isMobile ? "100%" : "90vh", overflowY: "auto", boxSizing: "border-box", borderRadius: isMobile ? 0 : RADIUS,
+          // The photograph stays legible, the way the emails set it: a light veil
+          // rather than a wash that hides it.
+          background: "linear-gradient(rgba(252,251,249,0.30), rgba(252,251,249,0.62)), #EDECEA url(/email/legs-faded.jpg) center 28% / cover no-repeat",
+          fontFamily: SANS, padding: isMobile ? "26px 22px 40px" : "32px 38px 38px",
           boxShadow: isMobile ? "none" : "0 30px 70px rgba(20,18,16,0.35)",
         }}
       >
@@ -68,21 +76,28 @@ export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () =>
           <X style={{ width: 22, height: 22 }} strokeWidth={1.5} />
         </button>
 
-        <p style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>Never miss a weigh-in</p>
-        <h2 style={{ ...display(isMobile ? 38 : 44), marginTop: 12, maxWidth: "14ch" }}>
-          Put us on your home screen.
+        <p style={{ textAlign: "center", marginTop: 6 }}>
+          <span style={{ fontFamily: SANS, textTransform: "uppercase", letterSpacing: "0.3em", fontSize: 11.5, color: C.ink, background: HIGHLIGHT, padding: "3px 8px" }}>
+            <b style={{ fontWeight: 700 }}>ELEVEN</b><span style={{ fontWeight: 300 }}>ELEVEN</span>
+          </span>
+        </p>
+        <h2 style={{ ...body(isMobile ? 26 : 30, C.ink), fontWeight: 700, lineHeight: 1.16, letterSpacing: "-0.01em", textAlign: "center", margin: "22px auto 0", maxWidth: "26ch" }}>
+          Never miss a weigh-in.
         </h2>
+        <p style={{ ...body(14.5, C.inkSoft), textAlign: "center", marginTop: 10 }}>
+          Two minutes, and we can reach you.
+        </p>
 
         {STEPS.map((s) => (
-          <section key={s.label} style={{ marginTop: 30, borderTop: `1px solid ${C.rule}`, paddingTop: 18 }}>
-            <p style={meta(10.5, C.muted)}>{s.label}</p>
-            <p style={{ ...display(isMobile ? 24 : 28), marginTop: 8 }}>{s.title}</p>
-            {s.note && <p style={{ ...body(13.5, C.inkSoft), marginTop: 10 }}>{s.note}</p>}
+          <section key={s.label} style={{ marginTop: 30 }}>
+            <p style={{ ...meta(11, C.muted), fontWeight: 700 }}>{s.label}</p>
+            <p style={{ ...body(isMobile ? 16 : 17, C.ink), fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.01em", marginTop: 8 }}>{s.title}</p>
+            {s.note && <p style={{ ...body(14, C.inkSoft), marginTop: 12 }}>{s.note}</p>}
             <ol style={{ margin: "14px 0 0", padding: 0, listStyle: "none" }}>
               {s.items.map((item, i) => (
-                <li key={i} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "9px 0", borderBottom: `1px solid ${C.rule}` }}>
-                  <span style={meta(11, C.burgundy)}>{i + 1}</span>
-                  <span style={body(14, C.ink)}>{item}</span>
+                <li key={i} style={{ display: "grid", gridTemplateColumns: "24px 1fr", gap: 8, padding: "8px 0" }}>
+                  <span style={{ ...body(14, C.muted), fontWeight: 700 }}>{i + 1}</span>
+                  <span style={body(14.5, C.ink)}>{item}</span>
                 </li>
               ))}
             </ol>
@@ -92,7 +107,7 @@ export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () =>
         <button onClick={onClose} style={{
           ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em",
           width: "100%", background: C.burgundy, border: "none", borderRadius: RADIUS,
-          padding: "16px 0", marginTop: 28, cursor: "pointer",
+          padding: "16px 0", marginTop: 30, cursor: "pointer",
         }}>
           Got it
         </button>
@@ -168,36 +183,39 @@ export default function NotificationBanner({ userId, isMobile }: { userId: strin
     setBusy(false);
   };
 
-  const line = install
-    ? "Add us to your home screen and never miss a weigh-in."
-    : "Turn notifications on and never miss a weigh-in.";
-  const actionLabel = busy ? "..." : androidInstall ? "Install" : iosInstall ? "Show me how" : "Turn on";
-  const onAction = androidInstall ? addToHome : iosInstall ? () => setHowTo(true) : turnOn;
+  const title = install ? "Add us to your home screen" : "Turn on notifications";
+  const open = androidInstall ? addToHome : iosInstall ? () => setHowTo(true) : turnOn;
 
   return (
     <>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: isMobile ? 12 : 18,
-        borderTop: `1px solid ${C.rule}`, borderBottom: `1px solid ${C.rule}`,
-        padding: isMobile ? "12px 0" : "14px 0", marginTop: isMobile ? 14 : 30,
-      }}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => !busy && open()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!busy) open(); } }}
+        style={{
+          display: "flex", alignItems: "center", gap: isMobile ? 13 : 16, cursor: "pointer",
+          background: "#FFFFFF", border: `1px solid ${C.ruleStrong}`, borderRadius: RADIUS,
+          padding: isMobile ? "13px 14px" : "15px 18px", marginTop: isMobile ? 14 : 30,
+          boxShadow: "0 6px 18px rgba(20,18,16,0.06)", opacity: busy ? 0.6 : 1,
+        }}
+      >
+        <span style={{ width: 40, height: 40, flexShrink: 0, background: C.ink, borderRadius: RADIUS, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Bell style={{ width: 19, height: 19, color: C.paper }} strokeWidth={1.8} />
+        </span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: "block", ...body(isMobile ? 14.5 : 15.5, C.ink), fontWeight: 700, lineHeight: 1.25 }}>{title}</span>
+          <span style={{ display: "block", ...body(isMobile ? 13.5 : 14, C.inkSoft), marginTop: 2 }}>
+            {busy ? "One moment..." : "Never miss a weigh-in."}
+          </span>
+        </span>
         <button
-          onClick={onAction}
-          disabled={busy}
-          style={{ ...body(isMobile ? 13.5 : 14.5, C.ink), textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", minWidth: 0 }}
+          onClick={(e) => { e.stopPropagation(); dismiss(); }}
+          aria-label="Dismiss"
+          style={{ background: "none", border: "none", padding: 4, cursor: "pointer", color: C.muted, lineHeight: 0, flexShrink: 0 }}
         >
-          {line}
+          <X style={{ width: 16, height: 16 }} strokeWidth={1.6} />
         </button>
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 16, flexShrink: 0 }}>
-          <button onClick={onAction} disabled={busy}
-            style={{ ...meta(11, C.burgundy), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
-            {actionLabel}
-          </button>
-          <button onClick={dismiss} aria-label="Dismiss"
-            style={{ background: "none", border: "none", padding: 4, cursor: "pointer", color: C.muted, lineHeight: 0 }}>
-            <X style={{ width: 16, height: 16 }} strokeWidth={1.6} />
-          </button>
-        </div>
       </div>
       {howTo && <HowTo isMobile={isMobile} onClose={() => setHowTo(false)} />}
     </>

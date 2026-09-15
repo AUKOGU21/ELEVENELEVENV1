@@ -134,6 +134,13 @@ interface Props {
 
 // ── Small parts ───────────────────────────────────────────────────────────────
 
+/** Her concern as a heading. Labels that are questions read as questions
+ *  ("WORTH THE PRICE?"); topics stay topics ("QUALITY CONCERNS", "BETWEEN SIZES"). */
+const questionize = (label: string) =>
+  /\?$/.test(label) || !/^(will|is|does|do|can|should|would|worth|how|what|which|am|are)\b/i.test(label.trim())
+    ? label
+    : `${label}?`;
+
 const money = (p: string | null | undefined) => (p ? (p.trim().startsWith("$") ? p.trim() : `$${p.trim()}`) : null);
 
 const squareBtn = (filled: boolean, colour: string = C.ink): React.CSSProperties => ({
@@ -494,7 +501,7 @@ export default function DecisionView(props: Props) {
           <span style={{ ...strong(14, C.ink), letterSpacing: "0.02em" }}>{String(i + 1).padStart(2, "0")}</span>
           <div>
             <p style={{ ...strong(isMobile ? 15 : 16.5), textTransform: "uppercase", letterSpacing: "0.03em" }}>
-              {/\?$/.test(c.label) ? c.label : `${c.label}?`}
+              {questionize(c.label)}
             </p>
             {c.sizes.length > 0 && (
               <p style={{ ...body(14, C.inkSoft), marginTop: 6 }}>Deciding between {c.sizes.join(" / ")}</p>
@@ -935,7 +942,7 @@ export default function DecisionView(props: Props) {
           {identity}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, alignSelf: "flex-start" }}>
             {viewer && menu}
-            <button ref={closeRef} onClick={onClose} aria-label="Close"
+            <button ref={closeRef} onClick={onClose} aria-label="Close" className="e11-close"
               style={{ background: "none", border: "none", padding: 6, cursor: "pointer", color: C.ink, lineHeight: 0 }}>
               <X style={{ width: 26, height: 26 }} strokeWidth={1.5} />
             </button>

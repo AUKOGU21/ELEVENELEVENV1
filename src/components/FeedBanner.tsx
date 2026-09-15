@@ -39,7 +39,7 @@ function Way({ n, eyebrow, title, blurb, action, onClick, isMobile }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 10 : 14, height: "100%" }}>
       <p style={meta(11, C.ink)}>{n} / {eyebrow}</p>
-      <h2 style={display(isMobile ? 30 : "clamp(28px, 2.9vw, 40px)")}>{title}</h2>
+      <h2 style={display(isMobile ? 30 : "clamp(22px, 2.1vw, 32px)")}>{title}</h2>
       <p style={{ ...body(isMobile ? 13.5 : 14.5), maxWidth: "34ch" }}>{blurb}</p>
       <button onClick={onClick} style={{ ...cta, marginTop: isMobile ? 4 : "auto", paddingTop: isMobile ? 0 : 6 }}>
         {action} <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
@@ -75,12 +75,12 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
           <div style={{ borderTop: `1px solid ${C.rule}`, marginTop: 24, paddingTop: 22 }}>{lookingFor}</div>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr)", alignItems: "stretch" }}>
-          <h1 style={{ ...display("clamp(64px, 7.4vw, 108px)"), paddingRight: 40 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 1fr)", alignItems: "stretch" }}>
+          <h1 style={{ ...display("clamp(54px, 5.7vw, 88px)"), paddingRight: 40 }}>
             What are you<br />deciding on<br />today?
           </h1>
-          <div style={{ borderLeft: `1px solid ${C.rule}`, padding: "10px 36px 6px" }}>{decision}</div>
-          <div style={{ borderLeft: `1px solid ${C.rule}`, padding: "10px 0 6px 36px" }}>{lookingFor}</div>
+          <div style={{ borderLeft: `1px solid ${C.rule}`, padding: "10px 32px 6px" }}>{decision}</div>
+          <div style={{ borderLeft: `1px solid ${C.rule}`, padding: "10px 0 6px 32px" }}>{lookingFor}</div>
         </div>
       )}
 

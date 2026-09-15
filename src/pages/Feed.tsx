@@ -1068,7 +1068,7 @@ const Feed = () => {
       }
     } catch (e) {
       console.error("looking-for outcome save failed:", e);
-      toast.error("Couldn't save that — try again in a second.");
+      toast.error("Couldn't save that. Try again in a second.");
       fetchDecisions();
     }
   };
@@ -2737,7 +2737,7 @@ const DecisionCard = ({
             {editConsiderations.map((u) => (
               <div key={u} style={{ marginBottom: 14 }}>
                 <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>{u}</p>
-                <textarea value={editDetails[u] ?? ""} onChange={(e) => setEditDetails((p) => ({ ...p, [u]: e.target.value }))} rows={2} placeholder="Add context — how you'll wear it, your specific worry..." style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 12, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
+                <textarea value={editDetails[u] ?? ""} onChange={(e) => setEditDetails((p) => ({ ...p, [u]: e.target.value }))} rows={2} placeholder="Add context: how you'll wear it, your specific worry..." style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "10px 12px", fontSize: 12, color: "#1A1A1A", resize: "none", fontFamily: "inherit" }} />
               </div>
             ))}
             {(decision.uncertainty_text ?? "").toLowerCase().includes("between sizes") && (
@@ -3128,7 +3128,7 @@ const DecisionCard = ({
                       {heading("What went wrong? (optional)")}
                       <textarea value={fuReturnNote} onChange={(e) => setFuReturnNote(e.target.value)} rows={2} placeholder="e.g. ran huge, fabric felt cheap, changed my mind" style={ta} />
                       <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
-                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo (optional)"}</button>
+                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added. Change" : "+ Add a photo (optional)"}</button>
                       <p style={{ fontSize: 10, color: "#8C7A70", margin: "8px 0 0" }}>Even if it didn't work out, a photo shows the next woman why.</p>
                       <button style={{ ...dark, width: "100%", marginTop: 10, padding: "12px 0" }} onClick={() => { submitReturned(decision.id, { note: fuReturnNote, photoFile: fuPhoto }); setFuThanks(true); }}>Done</button>
                     </div>
@@ -3171,10 +3171,10 @@ const DecisionCard = ({
                   return wrap(
                     <div>
                       {heading("Anything you'd tell a woman like you?")}
-                      <p style={{ fontSize: 10.5, color: "#8C7A70", margin: "0 0 10px" }}>Optional — how it really fits, wears, or holds up (e.g. runs big, super wrinkly by end of day, the denim gives after a few wears).</p>
+                      <p style={{ fontSize: 10.5, color: "#8C7A70", margin: "0 0 10px" }}>Optional. How it really fits, wears, or holds up (e.g. runs big, super wrinkly by end of day, the denim gives after a few wears).</p>
                       <textarea value={fuTake} onChange={(e) => setFuTake(e.target.value)} rows={3} placeholder="Share what the photos can't show..." style={ta} />
                       <input ref={fuPhotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => setFuPhoto(e.target.files?.[0] ?? null)} />
-                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added — change" : "+ Add a photo (optional)"}</button>
+                      <button onClick={() => fuPhotoRef.current?.click()} style={{ ...outline, width: "100%", flex: "unset", marginTop: 10 }}>{fuPhoto ? "✓ Photo added. Change" : "+ Add a photo (optional)"}</button>
                       <button onClick={() => { submitReceived(decision.id, { primary, detailAnswer: fuDetail, kept: fuKept, recommend: fuRec, confidence: fuConf, photoFile: fuPhoto, take: fuTake }); setFuThanks(true); }} style={{ ...dark, width: "100%", marginTop: 8, padding: "12px 0" }}>Done</button>
                     </div>
                   );
@@ -3299,7 +3299,7 @@ const DecisionCard = ({
                     {decision.status === "open" && !loggedOutcomeIds.has(decision.id) && (
                       snoozedOutcome ? (
                         <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ fontSize: 13, fontWeight: 600, color: "#6E7A44", margin: "4px 0", lineHeight: 1.4 }}>
-                          Sounds good — we'll circle back. ✦
+                          Sounds good. We'll circle back. ✦
                         </motion.p>
                       ) : (
                         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>

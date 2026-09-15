@@ -552,7 +552,7 @@ export default function DecisionView(props: Props) {
           Weigh in <ArrowRight style={{ width: 16, height: 16 }} />
         </button>
       ) : outcomeLogged ? null : snoozed ? (
-        <p style={{ ...body(14, C.ink) }}>Sounds good — we'll circle back. ✦</p>
+        <p style={{ ...body(14, C.ink) }}>Sounds good. We'll circle back. ✦</p>
       ) : (
         <div>
           <p style={{ ...body(14.5, C.ink), marginBottom: 12 }}>

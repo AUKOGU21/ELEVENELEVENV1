@@ -10,11 +10,12 @@
 // a decision from months ago stays useful.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, ExternalLink, MoreHorizontal, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, ExternalLink, MoreHorizontal, X } from "lucide-react";
 import { C, RADIUS, SANS, STATE_WORD, body, display, meta, stateColor, strong } from "@/lib/design";
 import { formatName, prettyHost, timeAgo } from "@/lib/format";
 import { track } from "@/lib/track";
 import FollowButton from "./FollowButton";
+import MatchSeal from "./MatchSeal";
 import { Avatar, decisionState, isResolved, type TileDecision } from "./DecisionTile";
 import ResponseItem, { type ResponseItemData } from "./ResponseItem";
 import CommentThread, { type CommentData } from "./CommentThread";
@@ -235,6 +236,7 @@ export default function DecisionView(props: Props) {
   const concerns = useMemo(() => parseConcerns(d), [d.uncertainty_text, d.context_note, d.sizes_note]);
   const confidence = d.confidence_score ?? 0;
   const closeRef = useRef<HTMLButtonElement>(null);
+  const convoRef = useRef<HTMLElement>(null);
 
   // Escape closes; focus lands on the close control so the keyboard has a way out.
   useEffect(() => {
@@ -350,9 +352,9 @@ export default function DecisionView(props: Props) {
         <p style={{ ...strong(isMobile ? 13 : 14), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(p?.display_name)}</p>
         <p style={{ ...body(12.5, C.muted), marginTop: 2 }}>{[city, timeAgo(d.created_at)].filter(Boolean).join("  ·  ")}</p>
       </div>
-      {match != null && <span style={{ ...meta(11, C.ink), marginLeft: isMobile ? 0 : 10 }}>{match}% match</span>}
-      {!isOwn && viewer && (
-        <FollowButton targetUserId={d.user_id} user={viewer} following={isFollowing} onChange={onToggleFollow} onSignIn={onSignIn} variant="text" />
+      {match != null && <span style={{ marginLeft: isMobile ? 0 : 6 }}><MatchSeal score={match} size={isMobile ? 40 : 48} withLabel /></span>}
+      {!isOwn && (
+        <FollowButton targetUserId={d.user_id} user={viewer} following={isFollowing} onChange={onToggleFollow} onSignIn={onSignIn} size="md" variant="editorial" />
       )}
       <button onClick={() => setProfileOpen((v) => !v)} style={{ ...textLink(C.muted), fontWeight: 600 }}>
         {isOwn ? "Your profile" : "See her profile"}
@@ -427,6 +429,23 @@ export default function DecisionView(props: Props) {
         ) : (
           <p style={meta(10.5, C.faint)}>No image</p>
         )}
+        {shownUrl && (
+          <a
+            href={shownUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`View on ${prettyHost(shownUrl)}`}
+            onClick={(e) => { e.stopPropagation(); track("product_click", { decisionId: d.id, userId: viewer?.id ?? null }); }}
+            style={{
+              position: "absolute", top: 14, right: 14, zIndex: 2,
+              display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none",
+              background: C.paper, border: `1px solid ${C.rule}`, borderRadius: RADIUS, padding: "8px 11px",
+              ...meta(10, C.ink), fontWeight: 700,
+            }}
+          >
+            View <ArrowUpRight style={{ width: 13, height: 13 }} strokeWidth={2} />
+          </a>
+        )}
         {slides.length > 1 && !isMobile && (
           <>
             <button aria-label="Previous image" onClick={() => setSlide((i) => Math.max(0, i - 1))} disabled={slide === 0}
@@ -448,17 +467,6 @@ export default function DecisionView(props: Props) {
         {shownBrand && <p style={{ ...strong(isMobile ? 15 : 17), textTransform: "uppercase", letterSpacing: "0.04em" }}>{shownBrand}</p>}
         {shownName && <p style={{ ...body(isMobile ? 13.5 : 14.5, C.inkSoft), textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 3 }}>{shownName}</p>}
         {shownPrice && <p style={{ ...body(14, C.ink), marginTop: 6 }}>{shownPrice}</p>}
-        {shownUrl && (
-          <a
-            href={shownUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => track("product_click", { decisionId: d.id, userId: viewer?.id ?? null })}
-            style={{ ...textLink(C.ink), marginTop: 12 }}
-          >
-            <ExternalLink style={{ width: 12, height: 12 }} /> View on {prettyHost(shownUrl)}
-          </a>
-        )}
       </div>
     </div>
   );
@@ -528,7 +536,6 @@ export default function DecisionView(props: Props) {
         <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           <span style={display(isMobile ? 40 : 52)}>{confidence}/10</span>
           <Ticks value={confidence} />
-          <span style={body(12.5, C.muted)}>{resolved ? "When she posted" : "When she posted"}</span>
         </div>
       )}
     </div>
@@ -754,7 +761,7 @@ export default function DecisionView(props: Props) {
   );
 
   const conversation = (
-    <section style={{ marginTop: isMobile ? 34 : 48 }}>
+    <section ref={convoRef} style={{ marginTop: isMobile ? 34 : 48, scrollMarginTop: 96 }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, borderBottom: `1px solid ${C.rule}` }}>
         <div style={{ display: "flex", gap: isMobile ? 22 : 34 }}>
           {tabBtn("responses", `Responses (${d.responses.length + before.length})`)}
@@ -900,12 +907,44 @@ export default function DecisionView(props: Props) {
     </aside>
   );
 
+  // A resolved decision is where the later questions come from: how it held up,
+  // whether she'd buy it again. Say so plainly, with a way in, instead of leaving
+  // a second tab to be discovered under a lot of white space.
+  const firstName = (p?.display_name ?? "").trim().split(" ")[0] || "her";
+  const askFollowUp = () => {
+    setTab("followups");
+    setTimeout(() => {
+      convoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      convoRef.current?.querySelector("textarea")?.focus({ preventScroll: true });
+    }, 90);
+  };
+  const followUpPrompt = resolved && (
+    <div style={{ padding: "24px 0", borderBottom: `1px solid ${C.rule}` }}>
+      <p style={{ ...meta(10.5, C.burgundy), marginBottom: 10 }}>Follow up</p>
+      <p style={{ ...strong(isMobile ? 17 : 19), lineHeight: 1.25 }}>
+        {isOwn ? "How is it holding up?" : `Have a question for ${firstName}?`}
+      </p>
+      <p style={{ ...body(14, C.inkSoft), marginTop: 8, maxWidth: "46ch" }}>
+        {isOwn
+          ? "Post an update. It's the part the next woman deciding will actually read."
+          : "How did it hold up? Would she buy it again? What did she get instead? Ask her, even months from now."}
+      </p>
+      <button onClick={() => (viewer ? askFollowUp() : onSignIn())} style={{ ...squareBtn(true, C.burgundy), marginTop: 16 }}>
+        {isOwn ? "Post an update" : "Ask a follow-up"} <ArrowRight style={{ width: 16, height: 16 }} />
+      </button>
+      {after.length > 0 && (
+        <p style={{ ...body(12.5, C.muted), marginTop: 10 }}>{after.length} {after.length === 1 ? "follow-up" : "follow-ups"} so far</p>
+      )}
+    </div>
+  );
+
   const infoColumn = (
     <div style={{ minWidth: 0 }}>
       {concernsBlock}
       {!editing && confidenceBlock}
       {openActions}
       {myDecision}
+      {followUpPrompt}
       {receivedFlow}
       {isOwn && fuThanks && (
         <p style={{ ...body(14, C.ink), padding: "18px 0", borderBottom: `1px solid ${C.rule}` }}>

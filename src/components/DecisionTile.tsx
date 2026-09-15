@@ -2,11 +2,14 @@
 // A person's decision, as a tile in the feed grid. Visual and spare: who, the
 // thing, and one word for where it stands. The concerns, her confidence and the
 // conversation live in the decision view, one tap in. Nothing here is a box
-// inside a box, a pill or a badge.
-import { ArrowRight } from "lucide-react";
+// inside a box, a pill or a badge. The one exception is the gold match seal.
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { C, RADIUS, STATE_WORD, body, display, meta, stateColor, strong, type DecisionState } from "@/lib/design";
 import { ringStyle } from "@/lib/tiers";
 import { formatBudget, formatName, getInitials, timeAgo } from "@/lib/format";
+import FollowButton from "./FollowButton";
+import MatchSeal from "./MatchSeal";
 
 export interface TileDecision {
   id: string;
@@ -89,19 +92,95 @@ const productImg: React.CSSProperties = {
   mixBlendMode: "multiply",
 };
 
+const ADVANCE_MS = 2200;
+
+/**
+ * Two photos, each at full size, sliding on their own. Hovering pauses it; on a
+ * phone it swipes. A swipe must not also count as a tap on the tile, or every
+ * swipe would open the decision.
+ */
+function TileCarousel({ images, alt }: { images: string[]; alt: string }) {
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchX = useRef<number | null>(null);
+  const swiped = useRef(false);
+  const n = images.length;
+
+  useEffect(() => {
+    if (paused || n < 2) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const t = setInterval(() => setI((x) => (x + 1) % n), ADVANCE_MS);
+    return () => clearInterval(t);
+  }, [paused, n]);
+
+  const step = (e: React.MouseEvent, dir: number) => {
+    e.stopPropagation();
+    setI((x) => (x + dir + n) % n);
+  };
+
+  const arrow = (side: "left" | "right"): React.CSSProperties => ({
+    position: "absolute", top: "50%", [side]: 0, transform: "translateY(-50%)",
+    background: "none", border: "none", padding: 8, cursor: "pointer", color: C.ink, lineHeight: 0, zIndex: 2,
+  });
+
+  return (
+    <div
+      className="e11-carousel"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={(e) => { touchX.current = e.touches[0].clientX; swiped.current = false; setPaused(true); }}
+      onTouchEnd={(e) => {
+        if (touchX.current == null) return;
+        const dx = e.changedTouches[0].clientX - touchX.current;
+        if (Math.abs(dx) > 35) {
+          swiped.current = true;
+          setI((x) => (x + (dx < 0 ? 1 : -1) + n) % n);
+        }
+        touchX.current = null;
+        setPaused(false);
+      }}
+      onClickCapture={(e) => { if (swiped.current) { e.stopPropagation(); e.preventDefault(); swiped.current = false; } }}
+      style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}
+    >
+      <div style={{ display: "flex", height: "100%", transform: `translateX(-${i * 100}%)`, transition: "transform .6s cubic-bezier(.2,.7,.2,1)" }}>
+        {images.map((src) => (
+          <div key={src} style={{ flex: "0 0 100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <img src={src} alt={alt} loading="lazy" style={productImg} />
+          </div>
+        ))}
+      </div>
+      <button aria-label="Previous photo" className="e11-carousel-arrow" onClick={(e) => step(e, -1)} style={arrow("left")}>
+        <ArrowLeft style={{ width: 18, height: 18 }} strokeWidth={1.5} />
+      </button>
+      <button aria-label="Next photo" className="e11-carousel-arrow" onClick={(e) => step(e, 1)} style={arrow("right")}>
+        <ArrowRight style={{ width: 18, height: 18 }} strokeWidth={1.5} />
+      </button>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 4, display: "flex", justifyContent: "center", gap: 6 }} aria-hidden>
+        {images.map((src, k) => (
+          <span key={src} style={{ width: 16, height: 2, background: k === i ? C.ink : "rgba(20,18,16,0.2)", transition: "background .3s" }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   d: TileDecision;
   viewerId: string | null;
   onOpen: (id: string) => void;
   isMobile: boolean;
+  following?: boolean;
+  onToggleFollow?: (targetUserId: string, following: boolean) => void;
+  onSignIn?: () => void;
 }
 
-export default function DecisionTile({ d, viewerId, onOpen, isMobile }: Props) {
+export default function DecisionTile({ d, viewerId, onOpen, isMobile, following = false, onToggleFollow, onSignIn }: Props) {
   const state = decisionState(d, viewerId);
   const isLF = d.post_type === "looking_for";
   const city = d.profiles?.city?.split(",")[0] ?? "";
   const match = d.matchScore != null ? Math.round(d.matchScore) : null;
   const colour = stateColor(state);
+  const alt = isLF ? (d.lf_title ?? "") : [d.brand_name, d.product_name].filter(Boolean).join(" ");
 
   const images = isLF
     ? [d.outcomes?.[0]?.alt_product_image_url].filter(Boolean) as string[]
@@ -112,9 +191,13 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile }: Props) {
       className="e11-tile"
       role="button"
       tabIndex={0}
-      aria-label={`${formatName(d.profiles?.display_name)}: ${isLF ? d.lf_title ?? "Looking for" : [d.brand_name, d.product_name].filter(Boolean).join(" ")}. ${STATE_WORD[state]}`}
+      aria-label={`${formatName(d.profiles?.display_name)}: ${isLF ? d.lf_title ?? "Looking for" : alt}. ${STATE_WORD[state]}`}
       onClick={() => onOpen(d.id)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(d.id); } }}
+      onKeyDown={(e) => {
+        // Only the tile itself: Enter on its Follow button must not open it.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(d.id); }
+      }}
       style={{
         background: "#FBFAF7",
         border: `1px solid ${C.rule}`,
@@ -131,34 +214,39 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile }: Props) {
       <header style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <Avatar url={d.profiles?.avatar_url ?? null} name={d.profiles?.display_name ?? null} tier={d.profiles?.badge_tier} size={isMobile ? 36 : 40} />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{ ...strong(12), textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {formatName(d.profiles?.display_name)}
-          </p>
-          {city && <p style={{ ...body(12, C.muted), lineHeight: 1.35, marginTop: 1 }}>{city}</p>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <p style={{ ...strong(12), textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+              {formatName(d.profiles?.display_name)}
+            </p>
+            {onToggleFollow && d.user_id !== viewerId && (
+              <FollowButton
+                targetUserId={d.user_id}
+                user={viewerId ? { id: viewerId } : null}
+                following={following}
+                onChange={onToggleFollow}
+                onSignIn={onSignIn}
+                size="sm"
+                variant="editorial"
+              />
+            )}
+          </div>
+          {city && <p style={{ ...body(12, C.muted), lineHeight: 1.35, marginTop: 2 }}>{city}</p>}
         </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
           <p style={{ ...body(11.5, C.muted), lineHeight: 1.35 }}>{timeAgo(d.created_at)}</p>
-          {match != null && (
-            <p style={{ ...meta(10, C.ink), letterSpacing: "0.08em", marginTop: 2 }}>{match}% match</p>
-          )}
+          {match != null && <MatchSeal score={match} size={isMobile ? 32 : 34} withLabel labelSize={9} />}
         </div>
       </header>
 
       {/* The thing */}
       <div style={{
-        aspectRatio: "4 / 5", margin: isMobile ? "12px 0 12px" : "14px 0 14px",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 8, overflow: "hidden",
+        position: "relative", aspectRatio: "4 / 5", margin: isMobile ? "12px 0 12px" : "14px 0 14px",
+        display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
       }}>
-        {images.length === 2 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", height: "100%", alignItems: "center" }}>
-            {images.map((src) => (
-              <div key={src} style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                <img src={src} alt="" loading="lazy" style={productImg} />
-              </div>
-            ))}
-          </div>
+        {images.length >= 2 ? (
+          <TileCarousel images={images} alt={alt} />
         ) : images.length === 1 ? (
-          <img src={images[0]} alt="" loading="lazy" style={productImg} />
+          <img src={images[0]} alt={alt} loading="lazy" style={productImg} />
         ) : isLF ? (
           // No photograph yet: the ask itself is the image.
           <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 14 }}>
@@ -166,11 +254,7 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile }: Props) {
             <p style={{ ...display(isMobile ? 34 : "clamp(28px, 2.6vw, 38px)"), lineHeight: 0.95, overflowWrap: "anywhere" }}>
               {d.lf_title || "Recommendations"}
             </p>
-            {(d.lf_budget || d.lf_occasion) && (
-              <p style={meta(10.5, C.inkSoft)}>
-                {[d.lf_budget && `${formatBudget(d.lf_budget)} budget`, d.lf_occasion].filter(Boolean).join("  /  ")}
-              </p>
-            )}
+            {d.lf_budget && <p style={meta(10.5, C.inkSoft)}>{formatBudget(d.lf_budget)} budget</p>}
           </div>
         ) : (
           <p style={meta(10.5, C.faint)}>No image</p>

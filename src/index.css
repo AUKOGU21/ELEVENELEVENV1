@@ -146,3 +146,6 @@
 .e11-tile:focus-visible { outline: 2px solid #761919; outline-offset: 3px; }
 .e11-close:focus { outline: none; }
 .e11-close:focus-visible { outline: 1px solid #141210; outline-offset: 2px; }
+.e11-carousel-arrow { opacity: 0; transition: opacity .2s ease; }
+.e11-tile:hover .e11-carousel-arrow, .e11-carousel-arrow:focus-visible { opacity: 1; }
+@media (hover: none) { .e11-carousel-arrow { display: none; } }

@@ -11,6 +11,7 @@ import { Check, ExternalLink, MoreHorizontal, ThumbsUp } from "lucide-react";
 import { C, RADIUS, SANS, body, meta, strong } from "@/lib/design";
 import { experienceLabel, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { Avatar } from "./DecisionTile";
+import MatchSeal from "./MatchSeal";
 import type { ReplyData } from "./ResponseCard";
 
 export interface ResponseItemData {
@@ -125,16 +126,16 @@ export default function ResponseItem({
     setSavingEdit(false);
   };
 
-  const facts = [
-    resp.match_score != null ? `${Math.round(resp.match_score)}% match` : null,
-    experienceLabel(resp.personal_experience),
-  ].filter(Boolean) as string[];
+  const facts = [experienceLabel(resp.personal_experience)].filter(Boolean) as string[];
 
   return (
     <div
       ref={wrapRef}
       style={{
-        padding: isMobile ? "20px 0" : "24px 0",
+        // Top and bottom only: the highlight animates paddingLeft, and React
+        // warns when a shorthand and one of its longhands change together.
+        paddingTop: isMobile ? 20 : 24,
+        paddingBottom: isMobile ? 20 : 24,
         borderBottom: `1px solid ${C.rule}`,
         boxShadow: flash ? `inset 3px 0 0 ${C.burgundy}` : "inset 0 0 0 transparent",
         paddingLeft: flash ? 14 : 0,
@@ -145,10 +146,11 @@ export default function ResponseItem({
         <Avatar url={resp.profiles?.avatar_url ?? null} name={resp.profiles?.display_name ?? null} tier={resp.profiles?.badge_tier} size={isMobile ? 36 : 42} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 12, rowGap: 4, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
               <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 {formatName(resp.profiles?.display_name)}
               </span>
+              {resp.match_score != null && <MatchSeal score={resp.match_score} size={isMobile ? 28 : 30} />}
               {facts.map((f) => <span key={f} style={meta(10, C.muted)}>{f}</span>)}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(resp.recommendation)}</span>
             </div>

@@ -16,8 +16,8 @@ interface Props {
   onChange: (targetUserId: string, following: boolean) => void;
   onSignIn?: () => void;
   size?: "sm" | "md";
-  /** "text" is the underlined link the decision view uses; "pill" is the original. */
-  variant?: "pill" | "text";
+  /** "editorial" is the redesign's square button; "pill" is the original. */
+  variant?: "pill" | "editorial";
 }
 
 export default function FollowButton({ targetUserId, user, following, onChange, onSignIn, size = "sm", variant = "pill" }: Props) {
@@ -61,20 +61,27 @@ export default function FollowButton({ targetUserId, user, following, onChange, 
     setBusy(false);
   };
 
-  if (variant === "text") {
+  if (variant === "editorial") {
+    // The redesign's version: a small square button with a plus, filled so it
+    // can't be missed. Following turns it quiet.
     return (
       <button
         onClick={toggle}
         disabled={busy}
         aria-pressed={following}
         style={{
-          background: "none", border: "none", padding: 0, cursor: busy ? "default" : "pointer",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12.5, fontWeight: 600,
-          color: following ? MUTED : "#761919", textDecoration: "underline", textUnderlineOffset: 4,
-          whiteSpace: "nowrap", flexShrink: 0,
+          display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap",
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontSize: small ? 9 : 10.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase",
+          padding: small ? "4px 7px" : "8px 13px", borderRadius: 2, cursor: busy ? "default" : "pointer", lineHeight: 1.2,
+          ...(following
+            ? { background: "transparent", border: "1px solid rgba(20,18,16,0.22)", color: "#8A8178" }
+            : { background: "#141210", border: "1px solid #141210", color: "#F7F4EF" }),
         }}
       >
-        {following ? "Following" : "Follow"}
+        {following
+          ? <><Check style={{ width: small ? 9 : 11, height: small ? 9 : 11 }} strokeWidth={2.5} /> Following</>
+          : <><Plus style={{ width: small ? 9 : 11, height: small ? 9 : 11 }} strokeWidth={2.5} /> Follow</>}
       </button>
     );
   }

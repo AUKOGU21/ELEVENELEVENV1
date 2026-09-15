@@ -1860,7 +1860,7 @@ const Feed = () => {
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(262px, 1fr))", gap: isMobile ? 14 : 18 }}>
               {displayList.map((decision) => (
                 <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80, display: "grid" }}>
-                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} />
+                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} following={followingIds.has(decision.user_id)} onToggleFollow={setFollowing} onSignIn={() => navigate("/signin")} />
                 </div>
               ))}
             </div>

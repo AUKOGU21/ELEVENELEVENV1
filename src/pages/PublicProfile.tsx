@@ -1,34 +1,30 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
 import FollowButton from "@/components/FollowButton";
-import { tierFor, ringStyle } from "@/lib/tiers";
+import MatchSeal from "@/components/MatchSeal";
+import { Avatar } from "@/components/DecisionTile";
+import { tierFor } from "@/lib/tiers";
 import { track } from "@/lib/track";
-import { SILHOUETTE_OPTIONS, STYLE_OPTIONS } from "@/components/onboarding/OnboardingData";
-import heroEditorial from "@/assets/hero-editorial.png";
-
-const MUTED    = "#8C7A70";
-const SECONDARY= "#5A4A42";
-const PRIMARY  = "#1A1A1A";
-const CARD_BG  = "#F5EFEA";
-const DIVIDER  = "rgba(0,0,0,0.07)";
-const PILL_BG  = "rgba(0,0,0,0.05)";
-const PILL_BDR = "rgba(0,0,0,0.09)";
-
-function getBadge(v: number) {
-  return tierFor(v)?.label ?? "";
-}
+import { C, body, meta } from "@/lib/design";
+// The layout and read-only sections are shared with her own profile page.
+import {
+  BigName, DecisionsBlock, EmptyNote, FitSummary, Hero, HeroEyebrow, IrlPhotos, Lightbox, Portrait,
+  ProfileFooter, ProfileHeader, Section, StatsRow, StyleRow, TILE_FIELDS, fitPhotosFor, helpfulStats,
+  nameParts, silhouetteFor, squareBtn, textLink, useViewport, withTileExtras, wrap, type ProfileTile,
+} from "./Profile";
 
 const PublicProfile = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate   = useNavigate();
+  const location   = useLocation();
   const { user }   = useAuth();
+  const { isMobile, isWide } = useViewport();
   const [following, setFollowing] = useState(false);
-  const location = useLocation();
 
   // Opening this page from a push notification launches straight onto it, so
   // there is no history entry to go back to and navigate(-1) does nothing.
@@ -50,276 +46,170 @@ const PublicProfile = () => {
     return () => { cancelled = true; };
   }, [user, userId]);
 
-  const [profile, setProfile]   = useState<any>(null);
-  const [stats, setStats]       = useState({ decisions: 0, responses: 0, helpfulVotes: 0 });
-  const [fitPhotos, setFitPhotos] = useState<string[]>([]);
+  const [profile, setProfile]       = useState<any>(null);
+  const [viewer, setViewer]         = useState<any>(null);
+  const [stats, setStats]           = useState({ takes: 0, helpfulVotes: 0 });
+  const [decisions, setDecisions]   = useState<ProfileTile[] | null>(null);
   const [matchScore, setMatchScore] = useState<number | null>(null);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading]       = useState(true);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!userId) return;
-    fetchData();
+    let cancelled = false;
+    (async () => {
+      const [profRes, decRes, helpful, mine] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+        // Her public decisions only.
+        supabase.from("decisions").select(TILE_FIELDS)
+          .eq("user_id", userId).eq("is_public", true).is("deleted_at", null)
+          .order("created_at", { ascending: false }),
+        // Counted from response_votes, the same way as her own profile, so the
+        // tier and "Marked helpful" agree on both pages.
+        helpfulStats(userId),
+        user
+          ? supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then((r) => r.data as any)
+          : Promise.resolve(null),
+      ]);
+      if (cancelled) return;
+      const prof = (profRes as any).data ?? null;
+      setProfile(prof);
+      setViewer(mine ?? null);
+      setStats({ takes: helpful.responses, helpfulVotes: helpful.helpfulVotes });
+      // Match only for a signed-in viewer looking at someone else.
+      setMatchScore(prof && mine && user && user.id !== userId ? Math.round(computeMatchScore(mine, prof).total) : null);
+      setLoading(false);
+      const tiles = await withTileExtras((decRes as any).data ?? []);
+      if (!cancelled) setDecisions(tiles);
+    })();
+    return () => { cancelled = true; };
   }, [userId, user]);
 
-  const fetchData = async () => {
-    // Fetch the viewed profile
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+  const headerRight = user ? (
+    <button onClick={() => navigate("/profile")} aria-label="Your profile" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}>
+      <Avatar url={viewer?.avatar_url ?? null} name={viewer?.display_name ?? null} tier={viewer?.badge_tier} size={isMobile ? 30 : 36} />
+    </button>
+  ) : (
+    <button onClick={() => navigate("/signin")} style={{ ...textLink(C.ink), fontSize: isMobile ? 10 : 11, whiteSpace: "nowrap" }}>Sign in</button>
+  );
 
-    if (!prof) { setLoading(false); return; }
-    setProfile(prof);
-
-    const storedPhotos = prof.fit_details?._fit_photos ?? prof.fit_photo_urls ?? [];
-    setFitPhotos(Array.isArray(storedPhotos) ? storedPhotos : []);
-
-    // Stats
-    const [{ count: dCount }, { count: rCount }, { data: votes }] = await Promise.all([
-      supabase.from("decisions").select("*", { count: "exact", head: true }).eq("user_id", userId!).is("deleted_at", null),
-      supabase.from("responses").select("*", { count: "exact", head: true }).eq("user_id", userId!),
-      supabase.from("responses").select("helpfulness_votes").eq("user_id", userId!),
-    ]);
-    const totalVotes = (votes ?? []).reduce((s: number, r: any) => s + (r.helpfulness_votes ?? 0), 0);
-    setStats({ decisions: dCount ?? 0, responses: rCount ?? 0, helpfulVotes: totalVotes });
-
-    // Compute match score if viewer is logged in
-    if (user && user.id !== userId) {
-      const { data: myProf } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      if (myProf && prof) {
-        const result = computeMatchScore(myProf, prof);
-        setMatchScore(Math.round(result.total));
-      }
-    }
-
-    setLoading(false);
-  };
+  const back = (
+    <button onClick={goBack} style={{ ...textLink(C.muted), marginTop: isMobile ? 16 : 28 }}>
+      <ArrowLeft style={{ width: 14, height: 14 }} strokeWidth={2} /> Back
+    </button>
+  );
 
   if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#ECE7DF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <p style={{ color: "rgba(28,23,18,0.4)", fontSize: 11 }}>Loading...</p>
+    <div style={{ minHeight: "100vh", background: C.paper, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <p style={meta(11)}>Loading...</p>
     </div>
   );
 
   if (!profile) return (
-    <div style={{ minHeight: "100vh", background: "#ECE7DF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <p style={{ color: "rgba(28,23,18,0.4)", fontSize: 11 }}>Profile not found.</p>
+    <div style={{ minHeight: "100vh", background: C.paper }}>
+      <ProfileHeader isMobile={isMobile} right={headerRight} />
+      <main style={wrap(isMobile)}>
+        {back}
+        <p style={{ ...body(15), marginTop: 24 }}>Profile not found.</p>
+      </main>
     </div>
   );
 
-  const name     = profile.display_name?.trim() || "Anonymous";
-  const initial  = name[0].toUpperCase();
-  const badge    = getBadge(stats.helpfulVotes);
-  const rawSil   = profile.silhouette_preference;
-  const silLabel = Array.isArray(rawSil) ? rawSil[0] : (typeof rawSil === "string" ? rawSil : null);
-  const sil      = SILHOUETTE_OPTIONS.find(s => s.label === silLabel);
-  const avgHelp  = stats.responses > 0 ? Math.min(5, stats.helpfulVotes / stats.responses).toFixed(1) : null;
+  const name      = profile.display_name?.trim() || "Anonymous";
+  const first     = nameParts(name)[0] ?? name;
+  const tier      = tierFor(stats.helpfulVotes)?.label ?? null;
+  const sil       = silhouetteFor(profile);
+  const fitPhotos = fitPhotosFor(profile);
+  const styles: string[] = profile.style_aesthetics ?? [];
+  const isOwner   = !!user && user.id === userId;
 
-  const AVERAGE_TERMS = ["average", "about average", "typical", "standard", "normal", "medium", "moderate"];
-  const isAverage = (v: string) => AVERAGE_TERMS.some(t => v.toLowerCase().includes(t));
-  const fitDetails = profile.fit_details as Record<string, string> | null;
-  const notableFit = fitDetails
-    ? Object.entries(fitDetails).filter(([k, v]) => v && k !== "Overall fit" && !k.startsWith("_") && !isAverage(v)).map(([, v]) => v)
-    : [];
-  const allTags = [
-    profile.fit_preference && !isAverage(profile.fit_preference) ? profile.fit_preference : null,
-    ...notableFit,
-  ].filter(Boolean) as string[];
+  const identity = (
+    <div>
+      <HeroEyebrow tier={tier} since={profile.created_at} />
+      <div style={{ marginTop: 16 }}><BigName name={name} isMobile={isMobile} /></div>
+      {(profile.age || profile.city) && (
+        <p style={{ ...meta(12, C.inkSoft), marginTop: 16 }}>
+          {[profile.age, profile.city?.split(",")[0]].filter(Boolean).join(" · ")}
+        </p>
+      )}
+      {profile.bio && (
+        <p style={{ ...body(isMobile ? 14.5 : 15.5), marginTop: 14, maxWidth: "42ch", whiteSpace: "pre-line" }}>{profile.bio}</p>
+      )}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 16, marginTop: 24 }}>
+        {isOwner ? (
+          <button onClick={() => navigate("/profile")} style={squareBtn(false)}>Edit profile</button>
+        ) : userId ? (
+          <FollowButton
+            targetUserId={userId}
+            user={user}
+            following={following}
+            onChange={(_, on) => setFollowing(on)}
+            onSignIn={() => navigate("/signin")}
+            size="md"
+            variant="editorial"
+          />
+        ) : null}
+        {matchScore !== null && <MatchSeal score={matchScore} size={isMobile ? 48 : 56} withLabel labelSize={10.5} />}
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{ minHeight: "100vh", position: "relative", background: "#ECE7DF" }}>
+    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink }}>
 
-      {/* Background */}
-      <div style={{ position: "fixed", inset: 0, overflow: "hidden", zIndex: 0 }}>
-        <img src={heroEditorial} aria-hidden alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "60% center", filter: "brightness(1.08) saturate(0.85)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(240,236,230,0.18) 0%, rgba(240,236,230,0.62) 22%, rgba(240,236,230,0.72) 38%, rgba(240,236,230,0.72) 62%, rgba(240,236,230,0.62) 78%, rgba(240,236,230,0.18) 100%)" }} />
-      </div>
+      <AnimatePresence>
+        {lightboxIdx !== null && fitPhotos[lightboxIdx] && (
+          <Lightbox key="lightbox" photos={fitPhotos} index={lightboxIdx} onIndex={setLightboxIdx} onClose={() => setLightboxIdx(null)} />
+        )}
+      </AnimatePresence>
 
-      {/* Lightbox */}
-      {lightboxIdx !== null && (
-        <div onClick={() => setLightboxIdx(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <img src={fitPhotos[lightboxIdx]} alt="" onClick={e => e.stopPropagation()}
-            style={{ maxHeight: "88vh", maxWidth: "88vw", objectFit: "contain", borderRadius: 16, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }} />
+      <ProfileHeader isMobile={isMobile} right={headerRight} />
+
+      <main style={wrap(isMobile)}>
+        {back}
+
+        {/* ── Hero ─────────────────────────────────────────────────────────── */}
+        <div style={{ marginTop: isMobile ? 16 : 28 }}>
+          <Hero
+            isMobile={isMobile}
+            isWide={isWide}
+            portrait={<Portrait url={profile.avatar_url ?? null} name={name} />}
+            identity={identity}
+            irl={fitPhotos.length > 0 ? <IrlPhotos label={`${first}, IRL`} photos={fitPhotos} onOpen={setLightboxIdx} /> : null}
+          />
         </div>
-      )}
 
-      {/* Scrollable content */}
-      <div style={{ position: "relative", zIndex: 1 }}>
-
-        {/* Nav */}
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 32px" }}>
-          <button onClick={goBack}
-            style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(28,23,18,0.55)", background: "none", border: "none", cursor: "pointer" }}>
-            <ArrowLeft style={{ width: 14, height: 14 }} />
-            <span style={{ fontSize: 11 }}>Back</span>
-          </button>
-          <span style={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(28,23,18,0.38)" }}>Profile</span>
-          <div style={{ width: 60 }} />
-        </header>
-
-        <div style={{ maxWidth: 680, margin: "0 auto", padding: "8px 28px 80px" }}>
-
-          {/* ── Card 1: Identity ── */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            style={{ background: CARD_BG, borderRadius: 20, overflow: "hidden", marginBottom: 12 }}>
-
-            <div style={{ padding: "32px 36px 28px", display: "flex", gap: 24, alignItems: "flex-start" }}>
-              {/* Avatar */}
-              <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#3A3530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 29, fontWeight: 700, color: "white", overflow: "hidden", flexShrink: 0, ...ringStyle(badge || null, 3) }}>
-                {profile.avatar_url
-                  ? <img src={profile.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : initial}
-              </div>
-
-              {/* Identity */}
-              <div style={{ paddingTop: 8 }}>
-                {badge && (
-                  <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8E3A3A", borderBottom: "1px solid #8E3A3A", paddingBottom: 1, display: "inline-block", marginBottom: 8 }}>
-                    {badge}
-                  </p>
-                )}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
-                  <h1 style={{ fontSize: 25.5, fontWeight: 700, color: PRIMARY, lineHeight: 1.05, margin: 0 }}>{name}</h1>
-                  {userId && (
-                    <FollowButton
-                      targetUserId={userId}
-                      user={user}
-                      following={following}
-                      onChange={(_, on) => setFollowing(on)}
-                      onSignIn={() => navigate("/signin")}
-                      size="md"
-                    />
-                  )}
-                </div>
-                {(profile.age || profile.city) && (
-                  <p style={{ fontSize: 12, color: MUTED }}>
-                    {[profile.age, profile.city?.split(",")[0]].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-
-                {/* Match score badge */}
-                {matchScore !== null && (
-                  <div style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 5,
-                    background: "linear-gradient(135deg, #C4A47A 0%, #B8956A 50%, #A07848 100%)",
-                    border: "1px solid rgba(220,185,130,0.60)",
-                    borderRadius: 100, padding: "6px 16px",
-                    boxShadow: "0 0 12px rgba(184,149,106,0.55), 0 0 28px rgba(184,149,106,0.25), inset 0 1px 0 rgba(255,255,255,0.25)",
-                  }}>
-                    <span style={{ fontSize: 11, color: "#FDFAF6", fontWeight: 700, letterSpacing: "0.04em" }}>✦ {matchScore}% match</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Fit photos */}
-            {fitPhotos.length > 0 && (
-              <div style={{ padding: "0 36px 28px", borderTop: `1px solid ${DIVIDER}`, paddingTop: 20 }}>
-                <p style={{ fontSize: 10, fontWeight: 600, color: SECONDARY, marginBottom: 12 }}>you, IRL</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {fitPhotos.map((url, i) => (
-                    <button key={i} onClick={() => setLightboxIdx(i)}
-                      style={{ width: 130, height: 172, borderRadius: 14, overflow: "hidden", border: "none", cursor: "zoom-in", padding: 0, flexShrink: 0 }}>
-                      <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-
-          {/* ── Card 2: Stats ── */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
-            style={{ background: CARD_BG, borderRadius: 20, marginBottom: 12, overflow: "hidden" }}>
-            <div style={{ display: "flex", borderBottom: `1px solid ${DIVIDER}` }}>
-              {[
-                { value: stats.decisions, label: "Decisions\nposted" },
-                { value: stats.responses, label: "Takes\ngiven" },
-                { value: stats.helpfulVotes, label: "Marked\nhelpful" },
-              ].map(({ value, label }, i) => (
-                <div key={label} style={{ flex: 1, textAlign: "center", padding: "24px 16px", borderRight: i < 2 ? `1px solid ${DIVIDER}` : "none" }}>
-                  <p style={{ fontSize: 27, fontWeight: 700, color: PRIMARY, lineHeight: 1, marginBottom: 6 }}>{value}</p>
-                  <p style={{ fontSize: 9.5, color: MUTED, letterSpacing: "0.08em", textTransform: "uppercase", lineHeight: 1.5, whiteSpace: "pre-line" }}>{label}</p>
-                </div>
-              ))}
-            </div>
-            {avgHelp && (
-              <div style={{ padding: "16px 24px" }}>
-                <p style={{ fontSize: 11, color: SECONDARY }}>
-                  <span style={{ fontSize: 17, fontWeight: 700, color: PRIMARY }}>{avgHelp}</span>
-                  <span style={{ color: MUTED }}> / 5 avg helpfulness · {stats.responses} response{stats.responses !== 1 ? "s" : ""}</span>
-                </p>
-              </div>
-            )}
-          </motion.div>
-
-          {/* ── Card 3: Fit profile ── */}
-          {sil && (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
-              style={{ background: CARD_BG, borderRadius: 20, marginBottom: 12, padding: "28px 28px 24px" }}>
-              <p style={{ fontSize: 9, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED, marginBottom: 20 }}>Fit profile</p>
-              <div style={{ display: "flex", gap: 20, alignItems: "flex-start", marginBottom: 16 }}>
-                <img src={sil.image} alt={sil.label}
-                  style={{ width: 76, height: 100, objectFit: "cover", objectPosition: "top", borderRadius: 12, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 18.5, fontWeight: 700, color: PRIMARY, lineHeight: 1.1, marginBottom: 4 }}>{sil.label}</p>
-                  <p style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>{sil.desc}</p>
-                </div>
-              </div>
-
-              {(profile.height_range || profile.top_size || profile.bottom_size) && (
-                <div style={{ display: "flex", borderTop: `1px solid ${DIVIDER}`, borderBottom: `1px solid ${DIVIDER}`, marginBottom: 14 }}>
-                  {[
-                    profile.height_range && { label: "Height", value: profile.height_range },
-                    profile.top_size     && { label: "Top size", value: profile.top_size },
-                    profile.bottom_size  && { label: "Bottom size", value: profile.bottom_size },
-                  ].filter(Boolean).map((item: any, i, arr) => (
-                    <div key={item.label} style={{ flex: 1, padding: "12px 14px", borderRight: i < arr.length - 1 ? `1px solid ${DIVIDER}` : "none" }}>
-                      <p style={{ fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: MUTED, marginBottom: 4 }}>{item.label}</p>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: PRIMARY }}>{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {allTags.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {allTags.map((tag, i) => (
-                    <span key={i} style={{ fontSize: 10, color: SECONDARY, background: PILL_BG, border: `1px solid ${PILL_BDR}`, borderRadius: 100, padding: "5px 13px" }}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* ── Card 4: Aesthetic ── */}
-          {(profile.style_aesthetics?.length ?? 0) > 0 && (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.13 }}
-              style={{ background: CARD_BG, borderRadius: 20, padding: "28px 28px 24px" }}>
-              <p style={{ fontSize: 9, letterSpacing: "0.3em", textTransform: "uppercase", color: MUTED, marginBottom: 20 }}>Aesthetic</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                {profile.style_aesthetics.map((label: string) => {
-                  const opt = STYLE_OPTIONS.find((s: any) => s.label === label);
-                  return opt ? (
-                    <div key={label} style={{ borderRadius: 14, overflow: "hidden", position: "relative" }}>
-                      <img src={opt.image} alt={label} style={{ width: "100%", height: 200, objectFit: "cover", objectPosition: "top", display: "block" }} />
-                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 10px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.58), transparent)" }}>
-                        <p style={{ fontSize: 10, color: "white", fontWeight: 700, textAlign: "center", letterSpacing: "0.05em" }}>{label}</p>
-                      </div>
-                    </div>
-                  ) : null;
-                })}
-              </div>
-            </motion.div>
-          )}
-
+        {/* ── Stats and standing ───────────────────────────────────────────── */}
+        <div style={{ marginTop: isMobile ? 36 : 56 }}>
+          <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} />
         </div>
-      </div>
+
+        {/* ── Fit profile ──────────────────────────────────────────────────── */}
+        {sil && (
+          <Section title="Fit profile" rail={isWide} isMobile={isMobile}>
+            <FitSummary profile={profile} isMobile={isMobile} />
+          </Section>
+        )}
+
+        {/* ── Style ────────────────────────────────────────────────────────── */}
+        {styles.length > 0 && (
+          <Section title="Style" rail={isWide} isMobile={isMobile}>
+            <StyleRow labels={styles} isMobile={isMobile} />
+          </Section>
+        )}
+
+        {/* ── Decisions ────────────────────────────────────────────────────── */}
+        <DecisionsBlock
+          heading={`${first}'s decisions`}
+          decisions={decisions}
+          viewerId={user?.id ?? null}
+          isMobile={isMobile}
+          onOpen={(id) => navigate("/feed", { state: { openDecisionId: id } })}
+          empty={<EmptyNote text={`${first} hasn't shared a public decision yet.`} />}
+        />
+
+        <ProfileFooter isMobile={isMobile} />
+      </main>
     </div>
   );
 };

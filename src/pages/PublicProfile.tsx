@@ -90,7 +90,7 @@ const PublicProfile = () => {
       <Avatar url={viewer?.avatar_url ?? null} name={viewer?.display_name ?? null} tier={viewer?.badge_tier} size={isMobile ? 30 : 36} />
     </button>
   ) : (
-    <button onClick={() => navigate("/signin")} style={{ ...textLink(C.ink), fontSize: isMobile ? 10 : 11, whiteSpace: "nowrap" }}>Sign in</button>
+    <button onClick={() => navigate("/signin")} style={{ ...textLink(C.ink), fontSize: isMobile ? 10.5 : 12, whiteSpace: "nowrap" }}>Sign in</button>
   );
 
   const back = (

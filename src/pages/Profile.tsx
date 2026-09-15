@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Bookmark, Camera, Check, ChevronDown, LogOut, MoreHorizontal, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bookmark, Camera, Check, ChevronDown, MoreHorizontal, Plus, X } from "lucide-react";
 import Cropper from "react-easy-crop";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -214,8 +214,19 @@ function Wordmark({ size, spacing = "0.32em" }: { size: number; spacing?: string
 /** The feed's header: wordmark, FEED / MINE, and whatever the page needs on the right. */
 export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: React.ReactNode }) {
   const navigate = useNavigate();
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerH, setHeaderH] = useState(isMobile ? 46 : 70);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const measure = () => setHeaderH(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const tab: React.CSSProperties = {
-    ...meta(isMobile ? 10.5 : 12, C.muted),
+    ...meta(isMobile ? 10.5 : 12, C.ink),
     fontWeight: 700,
     background: "none",
     border: "none",
@@ -225,7 +236,8 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
     whiteSpace: "nowrap",
   };
   return (
-    <header style={{ position: "sticky", top: 0, zIndex: 40, background: C.paper, borderBottom: `1px solid ${C.rule}`, transform: "translateZ(0)", WebkitTransform: "translateZ(0)" }}>
+    <>
+      <header ref={headerRef} style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 40, background: C.paper, borderBottom: `1px solid ${C.rule}` }}>
       <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "12px 16px" : "20px 40px" }}>
         <button
           onClick={() => navigate("/", { state: { home: true } })}
@@ -240,7 +252,10 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
         </nav>
         <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: isMobile ? 10 : 18 }}>{right}</div>
       </div>
-    </header>
+      </header>
+      {/* The fixed header's own height, so the page starts under it. */}
+      <div aria-hidden style={{ height: headerH }} />
+    </>
   );
 }
 
@@ -1560,8 +1575,7 @@ const Profile = () => {
       <ProfileHeader
         isMobile={isMobile}
         right={
-          <button onClick={handleSignOut} style={{ ...textLink(C.ink), fontSize: isMobile ? 10 : 11, whiteSpace: "nowrap" }}>
-            <LogOut style={{ width: 13, height: 13 }} strokeWidth={1.75} />
+          <button onClick={handleSignOut} style={{ ...textLink(C.ink), fontSize: isMobile ? 10.5 : 12, whiteSpace: "nowrap" }}>
             Sign out
           </button>
         }

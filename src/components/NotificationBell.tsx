@@ -1,16 +1,16 @@
 // ── NotificationBell ──────────────────────────────────────────────────────────
 // In-app notification center. Replaces the top-right "+ Post" (posting now lives
 // in the feed banner). Reads the user's own rows from the existing `notifications`
-// table, shows an unread dot, and marks everything read when the panel opens.
+// table, shows an unread count, and marks everything read when the panel opens.
 // Email notifications still fire separately — this is the in-app mirror.
+// Drawn like the rest of the header: a bare line icon, a square count, a flat
+// panel with hairlines. No circles, no glow.
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { timeAgo } from "@/lib/format";
 import { pushState, enablePush, type PushState } from "@/lib/push";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
+import { C, RADIUS, SANS, body, display, meta } from "@/lib/design";
 
 interface NotificationRow {
   id: string;
@@ -122,19 +122,24 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
     }
   };
 
-  const dim = isMobile ? 30 : 32;
+  const icon = isMobile ? 20 : 22;
+  const row: React.CSSProperties = { padding: "14px 18px", borderBottom: `1px solid ${C.rule}` };
 
   return (
     <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
         onClick={toggle}
-        aria-label="Notifications"
-        className="rounded-full flex items-center justify-center transition-all"
-        style={{ width: dim, height: dim, background: open ? "#1C1712" : "rgba(28,23,18,0.08)", position: "relative" }}
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-expanded={open}
+        style={{ position: "relative", background: "none", border: "none", padding: 4, cursor: "pointer", lineHeight: 0, color: open ? C.burgundy : C.ink }}
       >
-        <Bell style={{ width: 15, height: 15, color: open ? "#FDFAF6" : "rgba(28,23,18,0.55)" }} />
+        <Bell style={{ width: icon, height: icon }} strokeWidth={1.5} />
         {unread > 0 && (
-          <span style={{ position: "absolute", top: -2, right: -2, minWidth: 15, height: 15, padding: "0 4px", borderRadius: 100, background: "#C0392B", color: "#fff", fontSize: 9.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #EBE6DE" }}>
+          <span style={{
+            position: "absolute", top: -1, right: -4, minWidth: 16, height: 16, padding: "0 4px", boxSizing: "border-box",
+            borderRadius: RADIUS, background: C.burgundy, color: C.paper,
+            fontFamily: SANS, fontSize: 9.5, fontWeight: 700, lineHeight: "16px", textAlign: "center",
+          }}>
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -142,42 +147,42 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
 
       {open && (
         <div className="no-scrollbar" style={{
-          position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 60,
-          width: isMobile ? "min(300px, 88vw)" : 340, maxHeight: 420, overflowY: "auto",
-          background: "#FDFAF6", borderRadius: 16, border: "1px solid rgba(0,0,0,0.08)",
-          boxShadow: "0 16px 44px rgba(28,23,18,0.20)",
+          position: "absolute", top: "calc(100% + 14px)", right: 0, zIndex: 60,
+          width: isMobile ? "min(320px, 88vw)" : 360, maxHeight: 440, overflowY: "auto",
+          background: C.paper, borderRadius: RADIUS, border: `1px solid ${C.ruleStrong}`,
+          boxShadow: "0 18px 40px rgba(20,18,16,0.14)",
         }}>
-          <div style={{ padding: "13px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)", position: "sticky", top: 0, background: "#FDFAF6" }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: INK, margin: 0 }}>Notifications</p>
+          <div style={{ ...row, position: "sticky", top: 0, zIndex: 1, background: C.paper }}>
+            <p style={{ ...meta(11, C.ink), fontWeight: 700 }}>Notifications</p>
           </div>
 
           {push === "default" && (
             <button
               onClick={turnOnPush}
               disabled={pushBusy}
-              style={{ width: "100%", textAlign: "left", padding: "12px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(196,158,100,0.10)", cursor: "pointer" }}
+              style={{ ...row, display: "block", width: "100%", textAlign: "left", border: "none", borderBottom: `1px solid ${C.rule}`, background: C.well, cursor: "pointer" }}
             >
-              <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: INK }}>
-                {pushBusy ? "Turning on…" : "Turn on push notifications ✦"}
+              <span style={{ display: "block", ...meta(10.5, C.burgundy), fontWeight: 700 }}>
+                {pushBusy ? "Turning on..." : "Turn on push notifications"}
               </span>
-              <span style={{ display: "block", fontSize: 11.5, color: MUTED, marginTop: 2 }}>
+              <span style={{ display: "block", ...body(12.5, C.inkSoft), marginTop: 5 }}>
                 Get a ping when someone weighs in on your decision.
               </span>
             </button>
           )}
           {push === "needs-install" && (
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(196,158,100,0.10)" }}>
-              <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: INK }}>Add ElevenEleven to your Home Screen</span>
-              <span style={{ display: "block", fontSize: 11.5, color: MUTED, marginTop: 2 }}>
+            <div style={{ ...row, background: C.well }}>
+              <span style={{ display: "block", ...meta(10.5, C.ink), fontWeight: 700 }}>Add ElevenEleven to your Home Screen</span>
+              <span style={{ display: "block", ...body(12.5, C.inkSoft), marginTop: 5 }}>
                 On iPhone, push alerts turn on once the app is on your home screen.
               </span>
             </div>
           )}
 
           {items.length === 0 ? (
-            <div style={{ padding: "30px 20px", textAlign: "center" }}>
-              <p style={{ fontSize: 14, color: MUTED, margin: 0 }}>You're all caught up ✦</p>
-              <p style={{ fontSize: 12.5, color: MUTED, margin: "6px 0 0", opacity: 0.8 }}>Weigh-ins, saves, and outcomes on your decisions show up here.</p>
+            <div style={{ padding: "28px 18px 30px" }}>
+              <p style={display(26)}>All caught up.</p>
+              <p style={{ ...body(13, C.muted), marginTop: 8 }}>Weigh-ins, saves, and outcomes on your decisions show up here.</p>
             </div>
           ) : (
             items.map((n) => (
@@ -185,17 +190,16 @@ export default function NotificationBell({ user, isMobile, onOpenDecision }: Pro
                 key={n.id}
                 onClick={() => { if (n.decision_id && onOpenDecision) onOpenDecision(n.decision_id, n.response_id); setOpen(false); }}
                 style={{
-                  width: "100%", textAlign: "left", cursor: n.decision_id ? "pointer" : "default",
-                  display: "flex", gap: 10, alignItems: "flex-start",
-                  padding: "12px 16px", background: n.read_at ? "transparent" : "rgba(196,158,100,0.08)",
-                  border: "none", borderBottom: "1px solid rgba(0,0,0,0.05)",
+                  ...row, width: "100%", textAlign: "left", cursor: n.decision_id ? "pointer" : "default",
+                  display: "flex", gap: 12, alignItems: "flex-start",
+                  background: "transparent", border: "none", borderBottom: `1px solid ${C.rule}`,
                 }}
               >
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: n.read_at ? "transparent" : "#C49E64", marginTop: 6, flexShrink: 0 }} />
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 13.5, color: "#3A3530", margin: 0, lineHeight: 1.4 }}>{messageFor(n)}</p>
-                  <p style={{ fontSize: 12, color: MUTED, margin: "3px 0 0" }}>{timeAgo(n.created_at)}</p>
-                </div>
+                <span aria-hidden style={{ width: 6, height: 6, background: n.read_at ? "transparent" : C.burgundy, marginTop: 7, flexShrink: 0 }} />
+                <span style={{ display: "block", minWidth: 0 }}>
+                  <span style={{ display: "block", ...body(13.5, n.read_at ? C.inkSoft : C.ink), lineHeight: 1.4 }}>{messageFor(n)}</span>
+                  <span style={{ display: "block", ...meta(9.5, C.muted), marginTop: 6 }}>{timeAgo(n.created_at)}</span>
+                </span>
               </button>
             ))
           )}

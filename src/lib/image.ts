@@ -1,28 +1,47 @@
-// Convert any browser-decodable image to a compressed JPEG Blob and downscale it.
+// Convert an image to a compressed JPEG Blob and downscale it.
 //
-// Why: iPhones produce HEIC photos, which browsers (Chrome/Firefox/etc.) cannot
-// render — uploading them raw results in broken images. Re-encoding through a
-// canvas yields a universally-displayable JPEG. On WebKit (iOS Safari/Chrome) HEIC
-// decodes natively so this works for the common mobile-upload case. If a browser
-// genuinely can't decode the source (e.g. HEIC on desktop Chrome), we throw so the
-// caller can fall back to uploading the original file unchanged.
-export async function imageToJpeg(file: File, maxDim = 1600, quality = 0.9): Promise<Blob> {
-  const dataUrl: string = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("read failed"));
-    reader.readAsDataURL(file);
-  });
+// Why: iPhones produce HEIC photos, which only Safari can display. Uploading one
+// raw means a broken image for everyone on Chrome, Firefox or Edge. The browser
+// decodes JPEG/PNG/WebP itself (and Safari decodes HEIC), so the canvas path
+// covers those. When it can't, which is HEIC anywhere but Safari, we decode with
+// libheif (heic-to), loaded only on that path so it stays out of the main bundle,
+// and re-encode the same way. We throw only if both decoders fail.
 
-  const img: HTMLImageElement = await new Promise((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = () => reject(new Error("decode failed"));
-    i.src = dataUrl;
-  });
+type Picture = { source: CanvasImageSource; width: number; height: number; done?: () => void };
 
-  let w = img.naturalWidth || img.width;
-  let h = img.naturalHeight || img.height;
+async function decodeNative(file: Blob): Promise<Picture> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("decode failed"));
+      i.src = url;
+    });
+    return { source: img, width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function decodeHeic(file: Blob): Promise<Picture> {
+  const { heicTo } = await import("heic-to");
+  const bmp = await heicTo({ blob: file, type: "bitmap" });
+  return { source: bmp, width: bmp.width, height: bmp.height, done: () => bmp.close() };
+}
+
+export async function imageToJpeg(file: Blob, maxDim = 1600, quality = 0.9): Promise<Blob> {
+  let pic: Picture;
+  try {
+    pic = await decodeNative(file);
+  } catch (nativeErr) {
+    // Chrome often reports HEIC with an empty type, so try libheif on anything
+    // the browser couldn't read rather than trusting the label.
+    try { pic = await decodeHeic(file); } catch { throw nativeErr; }
+  }
+
+  let w = pic.width;
+  let h = pic.height;
   if (Math.max(w, h) > maxDim) {
     const scale = maxDim / Math.max(w, h);
     w = Math.round(w * scale);
@@ -34,7 +53,8 @@ export async function imageToJpeg(file: File, maxDim = 1600, quality = 0.9): Pro
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("no canvas context");
-  ctx.drawImage(img, 0, 0, w, h);
+  ctx.drawImage(pic.source, 0, 0, w, h);
+  pic.done?.();
 
   return await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(

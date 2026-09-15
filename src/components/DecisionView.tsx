@@ -8,7 +8,7 @@
 // the next chapter. Nor does it close the conversation. Responses hold what was
 // said while she was deciding; Follow-ups hold what's asked after, which is how
 // a decision from months ago stays useful.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ExternalLink, MoreHorizontal, X } from "lucide-react";
 import { C, RADIUS, SANS, STATE_WORD, body, display, meta, stateColor, strong } from "@/lib/design";
@@ -231,6 +231,7 @@ export default function DecisionView(props: Props) {
 
   const isOwn = !!viewer && viewer.id === d.user_id;
   const resolved = isResolved(d);
+  const isLFPost = d.post_type === "looking_for";
   const state = decisionState(d, viewer?.id ?? null);
   const outcome = d.outcomes?.[0] ?? null;
   const concerns = useMemo(() => parseConcerns(d), [d.uncertainty_text, d.context_note, d.sizes_note]);
@@ -761,7 +762,7 @@ export default function DecisionView(props: Props) {
     <section ref={convoRef} style={{ marginTop: isMobile ? 34 : 48, scrollMarginTop: 96 }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, borderBottom: `1px solid ${C.rule}` }}>
         <div style={{ display: "flex", gap: isMobile ? 22 : 34 }}>
-          {tabBtn("responses", `Responses (${d.responses.length + before.length})`)}
+          {tabBtn("responses", isLFPost ? `Questions (${before.length})` : `Responses (${d.responses.length + before.length})`)}
           {resolved && tabBtn("followups", `Follow-ups (${after.length})`)}
         </div>
         {tab === "responses" && d.responses.length > 1 && (
@@ -795,7 +796,7 @@ export default function DecisionView(props: Props) {
             </div>
           )}
 
-          {d.responses.length === 0 && (
+          {!isLFPost && d.responses.length === 0 && (
             <p style={{ ...body(14, C.muted), padding: "22px 0" }}>
               {resolved ? "No one weighed in on this one." : isOwn ? "No responses yet. Your mirrors will start weighing in." : "No responses yet. Be the first to weigh in."}
             </p>
@@ -821,7 +822,7 @@ export default function DecisionView(props: Props) {
             />
           ))}
 
-          {!isOwn && !resolved && viewer && (
+          {!isLFPost && !isOwn && !resolved && viewer && (
             <button onClick={onWeighIn} style={{ ...textLink(C.burgundy), marginTop: 20, fontSize: 12 }}>
               + Add your thoughts <ArrowRight style={{ width: 14, height: 14 }} />
             </button>
@@ -829,15 +830,18 @@ export default function DecisionView(props: Props) {
 
           {/* Questions asked while she was deciding. Once she's decided these stay
               here, read-only, and new questions go to Follow-ups. */}
+          {isLFPost && resolved && before.length === 0 && (
+            <p style={{ ...body(14, C.muted), padding: "22px 0" }}>No questions were asked while she was looking.</p>
+          )}
           {(!resolved || before.length > 0) && (
-            <div style={{ marginTop: 36 }}>
+            <div style={{ marginTop: isLFPost ? 8 : 36 }}>
               <CommentThread
                 comments={before}
                 user={viewer}
                 posterId={d.user_id}
                 isClosed={false}
-                heading={before.length > 0 ? `Questions (${before.length})` : "Questions"}
-                emptyHint={isOwn ? null : "Ask her anything you need to know before you weigh in."}
+                heading={isLFPost ? null : before.length > 0 ? `Questions (${before.length})` : "Questions"}
+                emptyHint={isOwn ? null : isLFPost ? "Ask her anything you need to know before you recommend something." : "Ask her anything you need to know before you weigh in."}
                 placeholder="Ask a question..."
                 submitLabel="Ask"
                 hideComposer={resolved}
@@ -859,7 +863,7 @@ export default function DecisionView(props: Props) {
             heading={null}
             emptyHint={isOwn
               ? "No follow-ups yet. When someone asks how it held up, it'll show here."
-              : "How did it hold up? Would she still recommend it? What did she buy instead? Ask her."}
+              : isLFPost ? "How is it holding up? Would she buy it again? Ask her." : "How did it hold up? Would she still recommend it? What did she buy instead? Ask her."}
             placeholder={isOwn ? "Add an update..." : "Add a follow-up..."}
             submitLabel={isOwn ? "Post update" : "Add a follow-up"}
             onSubmit={onSubmitComment}
@@ -988,7 +992,14 @@ export default function DecisionView(props: Props) {
         </div>
 
         {customBody ? (
-          <div style={{ padding: isMobile ? "18px 18px 60px" : "34px 44px 80px" }}>{customBody}</div>
+          <div style={{ padding: isMobile ? "18px 18px 60px" : "34px 44px 80px" }}>
+            {/* The body places the follow-up prompt itself, since where it sits
+                depends on the layout it draws. */}
+            {isValidElement<{ followUp?: React.ReactNode }>(customBody)
+              ? cloneElement(customBody, { followUp: followUpPrompt || null })
+              : customBody}
+            {conversation}
+          </div>
         ) : (
         <div style={{ padding: isMobile ? "0 18px 60px" : "0 44px 80px" }}>
           {profileLine}

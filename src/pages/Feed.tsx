@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import DecisionTile from "@/components/DecisionTile";
+import DecisionTile, { isResolved } from "@/components/DecisionTile";
 import DecisionView from "@/components/DecisionView";
 import LookingForView from "@/components/LookingForView";
 import { C as E11, SANS as E11_SANS, meta as e11Meta, display as e11Display, body as e11Body, strong as e11Strong } from "@/lib/design";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, ThumbsUp, Check, ExternalLink, SlidersHorizontal, Search, X, User, Info, ChevronDown, ChevronUp, Camera, ArrowRight, Bookmark, MoreHorizontal, MessageCircle } from "lucide-react";
+import { Plus, ThumbsUp, Check, ExternalLink, SlidersHorizontal, X, User, Info, ChevronDown, ChevronUp, Camera, ArrowRight, Bookmark, MoreHorizontal, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
@@ -1582,6 +1582,11 @@ const Feed = () => {
       });
     }
 
+    // Open posts first, always: the ones still waiting on a weigh-in or a rec.
+    // Each group keeps the chosen sort inside it.
+    const isOpen = (d: { status?: string | null }) => !isResolved({ status: d.status ?? "" });
+    filtered = [...filtered.filter(isOpen), ...filtered.filter((d) => !isOpen(d))];
+
     return filtered;
   };
 
@@ -1690,14 +1695,7 @@ const Feed = () => {
             ))}
           </nav>
 
-          <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: isMobile ? 8 : 18 }}>
-            <button
-              onClick={() => setFilterOpen((v) => !v)}
-              aria-label="Search and filter"
-              style={{ background: "none", border: "none", padding: 4, cursor: "pointer", lineHeight: 0, color: filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest" ? E11.burgundy : E11.ink }}
-            >
-              <Search style={{ width: isMobile ? 18 : 20, height: isMobile ? 18 : 20 }} strokeWidth={1.75} />
-            </button>
+          <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: isMobile ? 12 : 22 }}>
             {user && (
               <NotificationBell
                 user={user}
@@ -1722,61 +1720,6 @@ const Feed = () => {
           </div>
         </div>
       </header>
-
-      {/* ── Search and filter: a flat panel under the header ─────────────────── */}
-      <AnimatePresence>
-        {filterOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.16 }}
-            className="fixed left-0 right-0 z-40"
-            style={{ top: headerH, background: E11.paper, borderBottom: `1px solid ${E11.rule}` }}
-          >
-            <div style={{ maxWidth: 1320, margin: "0 auto", padding: isMobile ? "16px 16px 20px" : "24px 40px 28px" }}>
-              <input
-                autoFocus
-                type="text"
-                value={filterBrand}
-                onChange={(e) => setFilterBrand(e.target.value)}
-                placeholder="Search brand or item name"
-                style={{ width: "100%", border: "none", borderBottom: `1px solid ${E11.ink}`, borderRadius: 0, background: "transparent", padding: "6px 0 10px", fontFamily: E11_SANS, fontSize: isMobile ? 18 : 24, color: E11.ink, outline: "none" }}
-              />
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "auto auto 1fr", gap: isMobile ? 18 : 56, marginTop: 22, alignItems: "start" }}>
-                {([
-                  ["Category", CATEGORY_OPTIONS.map((c) => ({ value: c, label: c })), filterCategory, (v: string) => setFilterCategory(v)],
-                  ["Status", [{ value: "all", label: "All" }, { value: "open", label: "Open only" }, { value: "closed", label: "Closed" }], filterStatus, (v: string) => setFilterStatus(v as "all" | "open" | "closed")],
-                  ["Sort by", [{ value: "newest", label: "Newest" }, { value: "relevant", label: "Most relevant" }, { value: "discussed", label: "Most discussed" }, { value: "needs_input", label: "Needs input" }], sortBy, (v: string) => setSortBy(v as typeof sortBy)],
-                ] as [string, { value: string; label: string }[], string, (v: string) => void][]).map(([label, items, current, pick]) => (
-                  <div key={label}>
-                    <p style={{ ...e11Meta(10, E11.muted), marginBottom: 10 }}>{label}</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", columnGap: 18, rowGap: 10 }}>
-                      {items.map((it) => (
-                        <button
-                          key={it.value}
-                          onClick={() => pick(it.value)}
-                          style={{ ...e11Meta(11, current === it.value ? E11.ink : E11.muted), fontWeight: current === it.value ? 700 : 600, background: "none", border: "none", padding: "0 0 4px", cursor: "pointer", borderBottom: `1px solid ${current === it.value ? E11.burgundy : "transparent"}` }}
-                        >
-                          {it.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {(filterBrand || filterCategory !== "All" || filterStatus !== "all" || sortBy !== "newest") && (
-                <button
-                  onClick={() => { setFilterBrand(""); setFilterCategory("All"); setFilterStatus("all"); setSortBy("newest"); }}
-                  style={{ ...e11Meta(10.5, E11.burgundy), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 20, display: "inline-flex", alignItems: "center", gap: 6 }}
-                >
-                  <X className="w-3 h-3" /> Clear all
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── Feed scroll container ─────────────────────────────────────────────── */}
       <div

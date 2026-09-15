@@ -2,9 +2,10 @@
 // The top of the feed: what you can do here, set as a page rather than a widget.
 // An oversized question on the left, the two ways in on a grid beside it,
 // separated by rules instead of boxes. No icons and no background photograph:
-// the decisions underneath supply the imagery.
+// the decisions underneath supply the imagery. Below it, the invite gets its
+// own band and its own Anton line, so it reads as an ask rather than a footnote.
 import { ArrowRight } from "lucide-react";
-import { C, body, display, meta } from "@/lib/design";
+import { C, RADIUS, body, display, meta } from "@/lib/design";
 
 interface Props {
   onDecision: () => void;
@@ -64,6 +65,12 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
     />
   );
 
+  const tagline = (
+    <p style={{ ...meta(isMobile ? 10 : 11, onInvite ? C.muted : C.ink), letterSpacing: "0.3em", fontWeight: 500 }}>
+      Real women. Real decisions.
+    </p>
+  );
+
   return (
     <section style={{ position: "relative", zIndex: 1, marginTop: isMobile ? 22 : 44 }}>
       {isMobile ? (
@@ -84,20 +91,33 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
         </div>
       )}
 
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
-        marginTop: isMobile ? 26 : 30, paddingBottom: isMobile ? 16 : 18,
-        borderBottom: "1px solid rgba(20,18,16,0.32)",
-      }}>
-        <p style={{ ...meta(isMobile ? 10 : 11, C.ink), letterSpacing: "0.3em", fontWeight: 500 }}>
-          Real women. Real decisions.
-        </p>
-        {onInvite && (
-          <button onClick={onInvite} style={{ ...cta, ...meta(isMobile ? 10 : 11, C.ink), letterSpacing: "0.22em", display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", whiteSpace: "nowrap" }}>
-            Invite your circle <ArrowRight style={{ width: 14, height: 14 }} strokeWidth={2} />
+      {onInvite ? (
+        <div style={{
+          display: "flex", flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "flex-end", justifyContent: "space-between", gap: isMobile ? 18 : 32,
+          marginTop: isMobile ? 28 : 40, padding: isMobile ? "22px 0" : "26px 0",
+          borderTop: `1px solid ${C.rule}`, borderBottom: "1px solid rgba(20,18,16,0.32)",
+        }}>
+          <div style={{ minWidth: 0 }}>
+            {tagline}
+            <p style={{ ...display(isMobile ? 36 : "clamp(36px, 3.6vw, 54px)"), marginTop: isMobile ? 10 : 12 }}>
+              Know someone with good taste?
+            </p>
+          </div>
+          <button onClick={onInvite} style={{
+            ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
+            background: C.burgundy, border: "none", borderRadius: RADIUS,
+            padding: isMobile ? "16px 0" : "17px 28px", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+          }}>
+            Send an invite <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div style={{ marginTop: isMobile ? 26 : 30, paddingBottom: isMobile ? 16 : 18, borderBottom: "1px solid rgba(20,18,16,0.32)" }}>
+          {tagline}
+        </div>
+      )}
     </section>
   );
 }

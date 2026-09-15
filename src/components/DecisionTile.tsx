@@ -24,6 +24,7 @@ export interface TileDecision {
   lf_title?: string | null;
   lf_budget?: string | null;
   lf_occasion?: string | null;
+  lf_priorities?: string[] | null;
   matchScore?: number | null;
   responses?: unknown[] | null;
   recommendations?: unknown[] | null;
@@ -68,7 +69,7 @@ function footnote(d: TileDecision, state: DecisionState): string {
   if (state === "bought" || state === "returned" || state === "didnt_buy" || state === "found") return "See why";
   if (d.post_type === "looking_for") {
     const n = d.recommendations?.length ?? 0;
-    return n === 0 ? (state === "recommend" ? "Be the first" : "No picks yet") : `${n} ${n === 1 ? "pick" : "picks"}`;
+    return n === 0 ? (state === "recommend" ? "Be the first" : "No recs yet") : `${n} ${n === 1 ? "rec" : "recs"}`;
   }
   const n = d.responses?.length ?? 0;
   return n === 0 ? (state === "weigh_in" ? "Be the first" : "No responses yet") : `${n} ${n === 1 ? "response" : "responses"}`;
@@ -181,6 +182,8 @@ interface Props {
 export default function DecisionTile({ d, viewerId, onOpen, isMobile, following = false, onToggleFollow, onSignIn }: Props) {
   const state = decisionState(d, viewerId);
   const isLF = d.post_type === "looking_for";
+  // Her first priority says what kind of jeans: "Jeans / Tall friendly".
+  const lfTop = isLF ? d.lf_priorities?.[0] ?? null : null;
   const city = d.profiles?.city?.split(",")[0] ?? "";
   const match = d.matchScore != null ? Math.round(d.matchScore) : null;
   const colour = stateColor(state);
@@ -258,7 +261,11 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
             <p style={{ ...display(isMobile ? 34 : "clamp(28px, 2.6vw, 38px)"), lineHeight: 0.95, overflowWrap: "anywhere" }}>
               {d.lf_title || "Recommendations"}
             </p>
-            {d.lf_budget && <p style={meta(10.5, C.inkSoft)}>{formatBudget(d.lf_budget)} budget</p>}
+            {(lfTop || d.lf_budget) && (
+              <p style={meta(10.5, C.inkSoft)}>
+                {[lfTop, d.lf_budget ? `${formatBudget(d.lf_budget)} budget` : null].filter(Boolean).join("  /  ")}
+              </p>
+            )}
           </div>
         ) : (
           <p style={meta(10.5, C.faint)}>No image</p>
@@ -269,10 +276,10 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
       {!isLF || images.length > 0 ? (
         <div style={{ minHeight: 34 }}>
           <p style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {isLF ? (d.lf_title || "Looking for") : (d.brand_name || "")}
+            {isLF ? "Looking for" : (d.brand_name || "")}
           </p>
           <p style={{ ...body(12, C.inkSoft), textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
-            {isLF ? "Found it" : (d.product_name || "")}
+            {isLF ? [d.lf_title, lfTop].filter(Boolean).join(" / ") : (d.product_name || "")}
           </p>
         </div>
       ) : null}

@@ -11,7 +11,7 @@ import { ArrowRight, Check, ExternalLink, ThumbsUp } from "lucide-react";
 import { C, RADIUS, SANS, STATE_WORD, body, display, meta, strong } from "@/lib/design";
 import { formatBudget, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { pullProduct, type PulledProduct } from "@/lib/productPull";
-import { Avatar } from "./DecisionTile";
+import { Avatar, isResolved } from "./DecisionTile";
 import MatchSeal from "./MatchSeal";
 import type { RecommendationData } from "./RecommendationCard";
 import type { LookingForDecision, LookingForFoundPayload } from "./LookingForCard";
@@ -34,6 +34,8 @@ interface Props {
   updateOutcome: (id: string, patch: Record<string, any>) => void;
   submitReceived: (id: string, data: { primary: string; detailAnswer: string | null; kept: boolean | null; recommend: boolean | null; confidence: number | null; photoFile: File | null; take: string | null }) => void;
   submitReturned: (id: string, data: { note: string | null; photoFile: File | null }) => void;
+  /** The decision view's follow-up prompt. Once she's closed it, it takes the recommend button's place. */
+  followUp?: React.ReactNode;
 }
 
 // ── Small parts ───────────────────────────────────────────────────────────────
@@ -126,7 +128,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
               <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(rec.profiles?.display_name)}</span>
               {rec.match_score != null && <MatchSeal score={rec.match_score} size={isMobile ? 28 : 30} />}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
-              {isWinner && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>Her pick</span>}
+              {isWinner && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>She bought this</span>}
             </div>
             <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(rec.created_at)}</span>
           </div>
@@ -182,9 +184,10 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
 export default function LookingForView({
   decision, user, isMobile, voteCounts, userVotes, onRecHelpful,
   onAddRecommendation, onSignIn, onFound, onProductPulled, onStillLooking,
-  updateOutcome, submitReceived, submitReturned,
+  updateOutcome, submitReceived, submitReturned, followUp,
 }: Props) {
   const isOwn = !!user && user.id === decision.user_id;
+  const isClosed = isResolved({ status: decision.status ?? "" });
   const confidence = decision.confidence_score ?? 0;
   const recs = decision.recommendations ?? [];
   const priorities = decision.lf_priorities ?? [];
@@ -553,10 +556,10 @@ export default function LookingForView({
             ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain", mixBlendMode: "multiply" }} />
             : <span style={meta(9.5, C.faint)}>No image</span>}
           {isWinner && (
-            <span style={{ position: "absolute", top: 10, left: 10, ...meta(9.5, "#FFFFFF"), fontWeight: 700, background: C.burgundy, padding: "5px 8px" }}>Her pick</span>
+            <span style={{ position: "absolute", top: 10, left: 10, ...meta(9.5, "#FFFFFF"), fontWeight: 700, background: C.burgundy, padding: "5px 8px" }}>She bought this</span>
           )}
         </div>
-        <p style={{ ...strong(12), textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.brand_name || "Her pick"}</p>
+        <p style={{ ...strong(12), textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.brand_name || "Recommended"}</p>
         {rec.product_name && <p style={{ ...body(12, C.inkSoft), textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.product_name}</p>}
         {price && <p style={{ ...body(12.5, C.ink), marginTop: 4 }}>{price}</p>}
         <p style={{ ...meta(9.5, C.muted), marginTop: 6 }}>Rec. by {formatName(rec.profiles?.display_name)}</p>
@@ -564,10 +567,10 @@ export default function LookingForView({
     );
   };
 
-  const recommendCta = !isOwn && (
+  const recommendCta = !isOwn && !isClosed && (
     <div style={{ paddingTop: 22 }}>
       <button onClick={() => (user ? onAddRecommendation() : onSignIn())} style={{ ...squareBtn(true, C.burgundy), width: "100%" }}>
-        {user ? "Recommend a pick" : "Sign in to recommend"} <ArrowRight style={{ width: 16, height: 16 }} />
+        {user ? "Recommend a product" : "Sign in to recommend"} <ArrowRight style={{ width: 16, height: 16 }} />
       </button>
     </div>
   );
@@ -608,7 +611,7 @@ export default function LookingForView({
           </div>
 
           {foundChapter}
-          {recommendCta}
+          {isClosed ? followUp : recommendCta}
           {findFlow}
           {receivedFlow}
         </section>
@@ -616,14 +619,14 @@ export default function LookingForView({
         {/* The picks */}
         <section style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingBottom: 12, borderBottom: `1px solid ${C.rule}`, marginBottom: 18 }}>
-            <p style={meta(11, C.ink)}>Community picks{recs.length > 0 ? ` (${recs.length})` : ""}</p>
+            <p style={meta(11, C.ink)}>Recommended{recs.length > 0 ? ` (${recs.length})` : ""}</p>
             {step === "pick" && <p style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>Tap the one you bought</p>}
           </div>
           {recs.length === 0 ? (
             <div style={{ padding: "8px 0 4px" }}>
-              <p style={display(isMobile ? 28 : 34, C.faint)}>No picks yet.</p>
+              <p style={display(isMobile ? 28 : 34, C.faint)}>No recommendations yet.</p>
               <p style={{ ...body(14, C.muted), marginTop: 10 }}>
-                {isOwn ? "Your mirrors will start filling this in." : user ? "Be the first to recommend something." : "Sign in to recommend something."}
+                {isClosed ? "She closed this before anyone recommended something." : isOwn ? "Your mirrors will start filling this in." : user ? "Be the first to recommend something." : "Sign in to recommend something."}
               </p>
             </div>
           ) : (
@@ -670,7 +673,7 @@ export default function LookingForView({
               innerRef={(el) => { recRefs.current[rec.id] = el; }}
             />
           ))}
-          {!isOwn && user && (
+          {!isOwn && !isClosed && user && (
             <button onClick={onAddRecommendation} style={{ ...textLink(C.burgundy), marginTop: 20, fontSize: 12 }}>
               + Add a recommendation <ArrowRight style={{ width: 14, height: 14 }} />
             </button>

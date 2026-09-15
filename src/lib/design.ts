@@ -82,16 +82,17 @@ export const hairline = (color: string = C.rule): React.CSSProperties => ({
 // The one piece of large type on a tile. Open decisions invite you in, in
 // burgundy. Resolved ones state what happened, in black. No badges, no "open",
 // no "in progress".
-export type DecisionState = "weigh_in" | "deciding" | "bought" | "didnt_buy" | "recommend" | "found";
+export type DecisionState = "weigh_in" | "deciding" | "bought" | "returned" | "didnt_buy" | "recommend" | "found";
 
 export const STATE_WORD: Record<DecisionState, string> = {
   weigh_in: "WEIGH IN.",
   deciding: "DECIDING.",   // her own open post: you can't weigh in on yourself
   bought: "BOUGHT.",
+  returned: "RETURNED.",   // bought it, then sent it back
   didnt_buy: "DIDN'T BUY.",
   recommend: "RECOMMEND.", // someone else's open Looking For
   found: "FOUND IT.",
 };
 
 export const stateColor = (s: DecisionState): string =>
-  s === "bought" || s === "didnt_buy" || s === "found" ? C.ink : C.burgundy;
+  s === "bought" || s === "returned" || s === "didnt_buy" || s === "found" ? C.ink : C.burgundy;

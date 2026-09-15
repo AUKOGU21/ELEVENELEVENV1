@@ -31,6 +31,8 @@ export interface TileDecision {
     did_purchase: boolean | null;
     outcome_type: string | null;
     alt_product_image_url?: string | null;
+    kept?: boolean | null;
+    arrival_status?: string | null;
   }[] | null;
   profiles: {
     display_name: string | null;
@@ -57,11 +59,13 @@ export function decisionState(d: TileDecision, viewerId: string | null): Decisio
   if (!resolved) return mine ? "deciding" : "weigh_in";
   const o = d.outcomes?.[0];
   const bought = d.status === "purchased" || o?.did_purchase === true || o?.outcome_type === "bought_it";
-  return bought ? "bought" : "didnt_buy";
+  if (!bought) return "didnt_buy";
+  // Bought and then sent back is its own ending, and the one women most need to see.
+  return o?.kept === false || o?.arrival_status === "returned" ? "returned" : "bought";
 }
 
 function footnote(d: TileDecision, state: DecisionState): string {
-  if (state === "bought" || state === "didnt_buy" || state === "found") return "See why";
+  if (state === "bought" || state === "returned" || state === "didnt_buy" || state === "found") return "See why";
   if (d.post_type === "looking_for") {
     const n = d.recommendations?.length ?? 0;
     return n === 0 ? (state === "recommend" ? "Be the first" : "No picks yet") : `${n} ${n === 1 ? "pick" : "picks"}`;

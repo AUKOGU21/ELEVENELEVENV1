@@ -149,3 +149,11 @@
 .e11-carousel-arrow { opacity: 0; transition: opacity .2s ease; }
 .e11-tile:hover .e11-carousel-arrow, .e11-carousel-arrow:focus-visible { opacity: 1; }
 @media (hover: none) { .e11-carousel-arrow { display: none; } }
+.e11-tip { position: relative; }
+.e11-tip::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: #141210; color: #F7F4EF; font: 700 10px/1 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  letter-spacing: .14em; text-transform: uppercase; padding: 6px 8px; border-radius: 2px; white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity .15s ease; z-index: 10;
+}
+.e11-tip:hover::after, .e11-tip:focus-visible::after { opacity: 1; }

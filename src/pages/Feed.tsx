@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import DecisionTile from "@/components/DecisionTile";
 import DecisionView from "@/components/DecisionView";
-import { C as E11, SANS as E11_SANS, meta as e11Meta } from "@/lib/design";
+import LookingForView from "@/components/LookingForView";
+import { C as E11, SANS as E11_SANS, meta as e11Meta, display as e11Display, body as e11Body, strong as e11Strong } from "@/lib/design";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, ThumbsUp, Check, ExternalLink, SlidersHorizontal, Search, X, User, Info, ChevronDown, ChevronUp, Camera, ArrowRight, Bookmark, MoreHorizontal, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -456,6 +457,36 @@ const Feed = () => {
     setOpenDecisionId(id);
   };
   const closeDecision = () => { setOpenDecisionId(null); setFocusResponseId(null); };
+  // Handed a decision by another page (a tile on a profile): open it here. If it's
+  // older than the newest 50 the feed loads, fetch it on its own first.
+  const openFromStateRef = useRef<string | null>(null);
+  useEffect(() => {
+    const want = (location.state as any)?.openDecisionId as string | undefined;
+    if (!want || loading || openFromStateRef.current === want) return;
+    openFromStateRef.current = want;
+    window.history.replaceState({}, "");
+    if ([...decisions, ...myDecisions].some((x) => x.id === want)) { openDecision(want); return; }
+    (async () => {
+      const { data: row } = await supabase
+        .from("decisions")
+        .select(`
+          id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_name_2, brand_name_2, price_note_2, product_category,
+          price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, resolved_at, user_id, created_at,
+          post_type, lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
+          profiles ( display_name, avatar_url, badge_tier, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
+          responses ( id, recommendation, reasoning, photo_url, product_url, match_score, personal_experience, helpfulness_votes, user_id, created_at, profiles ( display_name, avatar_url, badge_tier ) ),
+          decision_comments ( id, user_id, body, created_at, updated_at, profiles ( display_name, avatar_url, badge_tier ) )
+        `)
+        .eq("id", want)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!row) return;
+      const { data: outs } = await supabase.from("outcomes").select("*").eq("decision_id", want).order("created_at", { ascending: false }).limit(1);
+      const full = { ...(row as any), outcomes: outs ?? [], recommendations: (row as any).recommendations ?? [] } as DecisionRow;
+      setDecisions((prev) => (prev.some((x) => x.id === want) ? prev : [...prev, full]));
+      openDecision(want);
+    })();
+  }, [location.state, loading]);
   // Looking For: which post's recommendations drawer is open, and the recommend modal.
   const [recsOpenId, setRecsOpenId] = useState<string | null>(null);
   const [recModalFor, setRecModalFor] = useState<string | null>(null);
@@ -1409,7 +1440,7 @@ const Feed = () => {
         .catch((e) => console.warn("recommendation notify failed:", e));
       await fetchDecisions();
       setRecModalFor(null);
-      setRecsOpenId(lookingForId); // show the drawer so they see their pick land
+      // The picks show inline in the decision view now; no drawer on top of it.
     } catch (e) {
       console.error("recommendation insert failed:", e);
     }
@@ -1860,7 +1891,7 @@ const Feed = () => {
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(262px, 1fr))", gap: isMobile ? 14 : 18 }}>
               {displayList.map((decision) => (
                 <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80, display: "grid" }}>
-                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} following={followingIds.has(decision.user_id)} onToggleFollow={setFollowing} onSignIn={() => navigate("/signin")} />
+                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} />
                 </div>
               ))}
             </div>
@@ -1868,219 +1899,192 @@ const Feed = () => {
         )}
       </div>
 
-      {/* ── Weigh-in bottom sheet ─────────────────────────────────────────────── */}
+      {/* ── Weigh-in sheet ────────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {weighingIn && (
-          <>
-            {/* Scrim */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[80]"
-              style={{ background: "rgba(0,0,0,0.6)" }}
-              onClick={dismissWeighIn}
-            />
-            {/* Sheet */}
-            <motion.div
-              initial={{ y: 360 }}
-              animate={{ y: 0 }}
-              exit={{ y: 360 }}
-              transition={{ type: "spring", damping: 28, stiffness: 260 }}
-              className="fixed bottom-0 left-0 right-0 rounded-t-3xl px-6 pt-6 pb-10"
-              style={{ background: "#F5EFEA", zIndex: 81 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Drag handle */}
-              <div className="w-12 h-1 rounded-full mx-auto mb-6" style={{ background: "rgba(0,0,0,0.15)" }} />
-
-              {/* Cancel */}
-              <button
-                onClick={cancelWeighIn}
-                className="absolute top-6 right-6 text-[15.5px] tracking-widest uppercase"
-                style={{ color: "#8C7A70" }}
+        {weighingIn && (() => {
+          const stepN = weighInStep === "context" ? 1 : weighInStep === "vote" ? 2 : 3;
+          const heading = (t: string) => <h3 style={e11Display(isMobile ? 30 : 38)}>{t}</h3>;
+          const sub = (t: string) => <p style={{ ...e11Body(15, E11.inkSoft), marginTop: 8, marginBottom: 20 }}>{t}</p>;
+          const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 2, border: `1px solid ${E11.rule}`, background: "#FFFFFF", fontFamily: E11_SANS, color: E11.ink, outline: "none" };
+          return (
+            <>
+              {/* Tapping outside hides the sheet and keeps the draft. */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[80]"
+                style={{ background: E11.scrim }}
+                onClick={dismissWeighIn}
+              />
+              <motion.div
+                initial={{ y: 360 }}
+                animate={{ y: 0 }}
+                exit={{ y: 360 }}
+                transition={{ type: "spring", damping: 28, stiffness: 260 }}
+                className="fixed bottom-0 left-0 right-0"
+                style={{
+                  zIndex: 81, margin: "0 auto", width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto", boxSizing: "border-box",
+                  background: E11.paper, borderRadius: "2px 2px 0 0", borderTop: `1px solid ${E11.rule}`,
+                  padding: isMobile ? "20px 18px 32px" : "28px 36px 40px",
+                }}
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-
-              {/* What the poster is asking — pinned so you can answer it while you write */}
-              {(weighInStep === "vote" || weighInStep === "take") && (() => {
-                const wd = [...decisions, ...myDecisions].find((d) => d.id === weighingIn);
-                if (!wd) return null;
-                const asks = (wd.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-                if (!asks.length && !wd.brand_name && !wd.product_name) return null;
-                return (
-                  <div style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 14, padding: "12px 14px", marginBottom: 18 }}>
-                    <p style={{ fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8C7A70", margin: "0 0 7px" }}>They're deciding about</p>
-                    {(wd.brand_name || wd.product_name) && (
-                      <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px" }}>
-                        {[wd.brand_name, wd.product_name].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
-                    {asks.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {asks.map((u, i) => (
-                          <span key={i} style={{ fontSize: 11, color: "#3A3530", background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 100, padding: "4px 11px" }}>{u}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Step: context */}
-              {weighInStep === "context" && (
-                <div>
-                  <p className="font-sans text-[20.5px] mb-1" style={{ color: "#1A1A1A" }}>Your context</p>
-                  <p className="text-[15.5px] mb-5" style={{ color: "#8C7A70" }}>What's your relationship with this item or brand?</p>
-                  <div className="space-y-2">
-                    {CONTEXT_OPTIONS.map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => { setContext(opt); setWeighInStep("vote"); }}
-                        className="w-full text-left px-4 py-3.5 rounded-xl text-[15.5px] transition-all"
-                        style={{
-                          background: "rgba(0,0,0,0.04)",
-                          border: "1px solid rgba(0,0,0,0.08)",
-                          color: "#1A1A1A",
-                        }}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <p style={{ ...e11Meta(11, E11.burgundy), fontWeight: 700 }}>Weigh in</p>
+                  {weighInStep !== "done" && (
+                    <button onClick={cancelWeighIn} style={{ ...e11Meta(11, E11.muted), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                      Cancel
+                    </button>
+                  )}
                 </div>
-              )}
-
-              {/* Step: vote */}
-              {weighInStep === "vote" && (
-                <div>
-                  <p className="font-sans text-[20.5px] mb-1" style={{ color: "#1A1A1A" }}>Your verdict</p>
-                  <p className="text-[15.5px] mb-5" style={{ color: "#8C7A70" }}>Would you buy this?</p>
-                  <div className="flex gap-2">
-                    {(["buy", "do_not_buy", "need_more_info"] as const).map((v) => (
-                      <button
-                        key={v}
-                        onClick={() => { setVote(v); setWeighInStep("take"); }}
-                        className="flex-1 py-3.5 rounded-full text-[15.5px] font-medium transition-all"
-                        style={{
-                          background: vote === v ? "#3A3530" : "rgba(0,0,0,0.04)",
-                          border: `1px solid ${vote === v ? "#3A3530" : "rgba(0,0,0,0.08)"}`,
-                          color: vote === v ? "#F5EFEA" : "#5A4A42",
-                        }}
-                      >
-                        {v === "buy" ? "Yes" : v === "do_not_buy" ? "No" : "Depends"}
-                      </button>
-                    ))}
+                {weighInStep !== "done" && (
+                  <div style={{ display: "flex", gap: 4, marginBottom: 24 }} aria-hidden>
+                    {[1, 2, 3].map((i) => <span key={i} style={{ flex: 1, height: 2, background: i <= stepN ? E11.burgundy : E11.rule }} />)}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Step: take */}
-              {weighInStep === "take" && (
-                <div>
-                  <p className="font-sans text-[20.5px] mb-1" style={{ color: "#1A1A1A" }}>your take</p>
-                  <p className="text-[15.5px] mb-4" style={{ color: "#8C7A70" }}>
-                    be the friend who tells her the truth.
-                  </p>
-                  <textarea
-                    value={take}
-                    onChange={(e) => setTake(e.target.value)}
-                    placeholder="no bs…"
-                    rows={4}
-                    className="w-full rounded-xl px-4 py-3 text-[15.5px] resize-none focus:outline-none mb-3"
-                    style={{
-                      background: "rgba(0,0,0,0.04)",
-                      border: "1px solid rgba(0,0,0,0.08)",
-                      color: "#1A1A1A",
-                    }}
-                  />
+                {/* What she's asking, pinned so you can answer it while you write */}
+                {(weighInStep === "vote" || weighInStep === "take") && (() => {
+                  const wd = [...decisions, ...myDecisions].find((d) => d.id === weighingIn);
+                  if (!wd) return null;
+                  const asks = (wd.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+                  if (!asks.length && !wd.brand_name && !wd.product_name) return null;
+                  return (
+                    <div style={{ paddingBottom: 18, marginBottom: 22, borderBottom: `1px solid ${E11.rule}` }}>
+                      <p style={{ ...e11Meta(10, E11.muted), marginBottom: 8 }}>They're deciding about</p>
+                      {(wd.brand_name || wd.product_name) && (
+                        <p style={{ ...e11Strong(13), textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          {[wd.brand_name, wd.product_name].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                      {asks.length > 0 && <p style={{ ...e11Meta(10.5, E11.ink), marginTop: 8, lineHeight: 1.7 }}>{asks.join("  /  ")}</p>}
+                    </div>
+                  );
+                })()}
 
-                  {/* Optional product link */}
-                  <div style={{ position: "relative", marginBottom: 12 }}>
-                    <ExternalLink style={{ width: 15, height: 15, color: "#8C7A70", position: "absolute", left: 14, top: 15, pointerEvents: "none" }} />
-                    <input
-                      value={takeLink}
-                      onChange={(e) => setTakeLink(e.target.value)}
-                      placeholder="Link a product (optional)"
-                      type="url"
-                      inputMode="url"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      className="w-full rounded-full text-[13.5px] focus:outline-none"
-                      style={{
-                        background: "rgba(0,0,0,0.04)",
-                        border: "1px solid rgba(0,0,0,0.08)",
-                        color: "#1A1A1A",
-                        padding: "11px 16px 11px 40px",
-                      }}
-                    />
-                    {takeLink.trim().length > 0 && !normalizeProductUrl(takeLink) && (
-                      <p style={{ fontSize: 11, color: "#c0392b", margin: "6px 4px 0" }}>
-                        That doesn't look like a valid link.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Photo attachment */}
-                  <div style={{ marginBottom: 16 }}>
-                    <input ref={takePhotoInputRef} type="file" accept="image/*" style={{ display: "none" }}
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setTakePhoto(file);
-                        const reader = new FileReader();
-                        reader.onload = () => setTakePhotoPreview(reader.result as string);
-                        reader.readAsDataURL(file);
-                        e.target.value = "";
-                      }} />
-
-                    {takePhotoPreview ? (
-                      <div style={{ position: "relative", display: "inline-block" }}>
-                        <img src={takePhotoPreview} alt="attachment" style={{ height: 90, width: 72, objectFit: "cover", borderRadius: 10, display: "block" }} />
-                        <button onClick={() => { setTakePhoto(null); setTakePhotoPreview(null); }}
-                          style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "#1A1A1A", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <X style={{ width: 10, height: 10, color: "white" }} />
+                {weighInStep === "context" && (
+                  <div>
+                    {heading("Your context")}
+                    {sub("What's your relationship with this item or brand?")}
+                    <div style={{ borderTop: `1px solid ${E11.rule}` }}>
+                      {CONTEXT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => { setContext(opt); setWeighInStep("vote"); }}
+                          style={{ ...e11Body(15.5, E11.ink), width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${E11.rule}`, padding: "17px 2px", cursor: "pointer" }}
+                        >
+                          {opt}
+                          <ArrowRight style={{ width: 16, height: 16, flexShrink: 0, color: E11.muted }} strokeWidth={1.5} />
                         </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => takePhotoInputRef.current?.click()}
-                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 100, border: "1px solid rgba(0,0,0,0.12)", background: "transparent", cursor: "pointer", color: "#5A4A42", fontSize: 15.5 }}>
-                        <Camera style={{ width: 14, height: 14 }} />
-                        Add a photo
-                      </button>
-                    )}
+                      ))}
+                    </div>
                   </div>
+                )}
 
-                  <button
-                    onClick={submitWeighIn}
-                    disabled={take.trim().length === 0 || submitting}
-                    className="w-full py-3.5 text-[15.5px] tracking-[0.2em] uppercase font-medium transition-all disabled:opacity-30"
-                    style={{ borderRadius: 6, background: "#1C1712", color: "#FDFAF6", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", cursor: "pointer" }}
-                  >
-                    {submitting ? "Submitting..." : "Submit"}
-                  </button>
-                </div>
-              )}
+                {weighInStep === "vote" && (
+                  <div>
+                    {heading("Your verdict")}
+                    {sub("Would you buy this?")}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      {(["buy", "do_not_buy", "need_more_info"] as const).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => { setVote(v); setWeighInStep("take"); }}
+                          style={{ ...e11Meta(12, vote === v ? "#FFFFFF" : E11.ink), fontWeight: 700, letterSpacing: "0.16em", padding: "18px 0", borderRadius: 2, cursor: "pointer", background: vote === v ? E11.ink : "transparent", border: `1px solid ${E11.ink}` }}
+                        >
+                          {v === "buy" ? "Yes" : v === "do_not_buy" ? "No" : "Depends"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-              {/* Step: done */}
-              {weighInStep === "done" && (
-                <div className="text-center py-6 space-y-3">
-                  <p className="font-sans text-[20.5px]" style={{ color: "#1A1A1A" }}>You've weighed in</p>
-                  <p className="text-[15.5px]" style={{ color: "#5A4A42" }}>Your take has been added to the conversation.</p>
-                  <button
-                    onClick={closeWeighIn}
-                    className="mt-4 px-8 py-3 rounded-full text-[15.5px] tracking-widest uppercase"
-                    style={{ background: "rgba(0,0,0,0.06)", color: "#5A4A42" }}
-                  >
-                    Done
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </>
-        )}
+                {weighInStep === "take" && (
+                  <div>
+                    {heading("Your take")}
+                    {sub("be the friend who tells her the truth.")}
+                    <textarea
+                      value={take}
+                      onChange={(e) => setTake(e.target.value)}
+                      placeholder="no bs…"
+                      rows={4}
+                      style={{ ...field, padding: "13px 14px", fontSize: 15, lineHeight: 1.5, resize: "none" }}
+                    />
+                    <div style={{ position: "relative", marginTop: 10 }}>
+                      <ExternalLink style={{ width: 14, height: 14, color: E11.muted, position: "absolute", left: 13, top: 14, pointerEvents: "none" }} />
+                      <input
+                        value={takeLink}
+                        onChange={(e) => setTakeLink(e.target.value)}
+                        placeholder="Link a product (optional)"
+                        type="url"
+                        inputMode="url"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={{ ...field, padding: "11px 14px 11px 36px", fontSize: 14 }}
+                      />
+                      {takeLink.trim().length > 0 && !normalizeProductUrl(takeLink) && (
+                        <p style={{ ...e11Body(12.5, E11.burgundy), marginTop: 6 }}>That doesn't look like a valid link.</p>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: 14, marginBottom: 20 }}>
+                      <input ref={takePhotoInputRef} type="file" accept="image/*" style={{ display: "none" }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setTakePhoto(file);
+                          const reader = new FileReader();
+                          reader.onload = () => setTakePhotoPreview(reader.result as string);
+                          reader.readAsDataURL(file);
+                          e.target.value = "";
+                        }} />
+                      {takePhotoPreview ? (
+                        <div style={{ position: "relative", display: "inline-block" }}>
+                          <img src={takePhotoPreview} alt="attachment" style={{ height: 96, width: 76, objectFit: "cover", borderRadius: 2, display: "block" }} />
+                          <button
+                            onClick={() => { setTakePhoto(null); setTakePhotoPreview(null); }}
+                            aria-label="Remove photo"
+                            style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 2, background: E11.ink, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            <X style={{ width: 11, height: 11, color: "#FFFFFF" }} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => takePhotoInputRef.current?.click()}
+                          style={{ ...e11Meta(11, E11.ink), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <Camera style={{ width: 14, height: 14 }} strokeWidth={1.75} /> Add a photo
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={submitWeighIn}
+                      disabled={take.trim().length === 0 || submitting}
+                      style={{ width: "100%", ...e11Meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", padding: "17px 0", borderRadius: 2, border: `1px solid ${E11.burgundy}`, background: E11.burgundy, cursor: take.trim() && !submitting ? "pointer" : "default", opacity: take.trim() && !submitting ? 1 : 0.4 }}
+                    >
+                      {submitting ? "Submitting..." : "Submit"}
+                    </button>
+                  </div>
+                )}
+
+                {weighInStep === "done" && (
+                  <div style={{ padding: "6px 0 2px" }}>
+                    <h3 style={e11Display(isMobile ? 40 : 52)}>You've weighed in.</h3>
+                    <p style={{ ...e11Body(15, E11.inkSoft), marginTop: 12 }}>Your take has been added to the conversation.</p>
+                    <button
+                      onClick={closeWeighIn}
+                      style={{ marginTop: 22, width: "100%", ...e11Meta(12, E11.ink), fontWeight: 700, letterSpacing: "0.16em", padding: "16px 0", borderRadius: 2, border: `1px solid ${E11.ink}`, background: "transparent", cursor: "pointer" }}
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </>
+          );
+        })()}
       </AnimatePresence>
 
       <OutcomeModal
@@ -2247,19 +2251,13 @@ const Feed = () => {
               onEditComment={editComment}
               onDeleteComment={deleteComment}
               customBody={isLF ? (
-                <LookingForCard
-                  isFollowing={followingIds.has(open.user_id)}
-                  onToggleFollow={setFollowing}
+                <LookingForView
                   decision={open as any}
-                  user={user}
+                  user={user ? { id: user.id } : null}
                   isMobile={isMobile}
-                  activeTab={activeTab}
-                  isSaved={savedDecisionIds.has(open.id)}
-                  onSave={() => toggleSave(open.id)}
-                  onHide={() => { hideDecision(open.id); closeDecision(); }}
-                  navigate={navigate}
-                  handleDelete={(id: string) => { handleDelete(id); closeDecision(); }}
-                  onOpenRecommendations={() => setRecsOpenId(open.id)}
+                  voteCounts={voteCounts}
+                  userVotes={userVotes}
+                  onRecHelpful={(rid) => handleRecHelpfulVote(rid)}
                   onAddRecommendation={() => (user ? setRecModalFor(open.id) : navigate("/signin"))}
                   onSignIn={() => navigate("/signin")}
                   onFound={saveLookingForOutcome}

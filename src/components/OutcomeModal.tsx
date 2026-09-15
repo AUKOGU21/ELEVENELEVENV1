@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeUrl, pullProduct, type PulledProduct } from "@/lib/productPull";
-import { SANS_APP } from "@/lib/type";
+import { C, SANS, RADIUS, display, meta, strong, body } from "@/lib/design";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface OutcomeModalProps {
   open: boolean;
@@ -352,71 +353,130 @@ function completeMessage(outcome: OutcomeType, boughtAlternative?: boolean | nul
     if (boughtAlternative) return "Good to know what you went with instead. That's the useful part.";
     return "Makes sense. We're using this to get you more relevant input.";
   }
-  return "Sounds good — we'll circle back.";
+  return "Sounds good. We'll circle back.";
 }
 
 
-const OPTION_BASE: React.CSSProperties = {
-  width: "100%",
-  textAlign: "left",
-  padding: "14px 18px",
-  borderRadius: 12,
-  background: "rgba(28,23,18,0.05)",
-  border: "1.5px solid rgba(28,23,18,0.12)",
-  fontSize: 13.5,
-  color: "#1C1712",
-  cursor: "pointer",
-  marginBottom: 8,
-  fontFamily: "inherit",
-};
+// ── Editorial styles ─────────────────────────────────────────────────────────
+// Options are full-width rows between thin rules, not boxes. The question is
+// the heading, in Anton. Burgundy is the only accent.
 
-const OPTION_SELECTED: React.CSSProperties = {
-  ...OPTION_BASE,
-  background: "rgba(196,158,100,0.12)",
-  borderColor: "#C49E64",
-};
-
-const CONTINUE_BTN: React.CSSProperties = {
-  width: "100%",
-  background: "#1C1712",
-  color: "#FDFAF6",
-  borderRadius: 100,
-  padding: "14px",
-  fontSize: 13.5,
-  fontWeight: 600,
-  border: "none",
-  cursor: "pointer",
-  marginTop: 12,
-  fontFamily: "inherit",
-};
-
-const TEXTAREA_STYLE: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "1px solid rgba(196,158,100,0.4)",
-  background: "white",
-  fontSize: 13.5,
-  fontFamily: "inherit",
-  color: "#1C1712",
-  resize: "none",
-  boxSizing: "border-box",
-  marginTop: 8,
-  marginBottom: 4,
-};
-
-const QUESTION_STYLE: React.CSSProperties = {
-  fontSize: 18.5,
+// Square, filled burgundy. Matches DecisionView's squareBtn.
+const continueBtn = (saving: boolean): React.CSSProperties => ({
+  ...meta(12, "#FFFFFF"),
   fontWeight: 700,
-  color: "#1C1712",
-  fontFamily: SANS_APP,
-  letterSpacing: "-0.015em",
-  marginBottom: 20,
-  lineHeight: 1.3,
+  letterSpacing: "0.16em",
+  width: "100%",
+  background: C.burgundy,
+  border: `1px solid ${C.burgundy}`,
+  borderRadius: RADIUS,
+  padding: "15px 18px",
+  marginTop: 20,
+  cursor: saving ? "default" : "pointer",
+  opacity: saving ? 0.6 : 1,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+});
+
+// Matches DecisionView's fieldStyle.
+const TEXTAREA_STYLE: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: RADIUS,
+  border: `1px solid ${C.rule}`,
+  background: "#FFFFFF",
+  padding: "11px 13px",
+  fontFamily: SANS,
+  fontSize: 14,
+  lineHeight: 1.5,
+  color: C.ink,
+  outline: "none",
+  resize: "none",
+  marginTop: 10,
 };
+
+const questionStyle = (isMobile: boolean): React.CSSProperties => ({
+  ...display(isMobile ? 26 : 30),
+  lineHeight: 1,
+  marginBottom: isMobile ? 20 : 24,
+});
+
+const BACK_LINK: React.CSSProperties = {
+  ...meta(11, C.muted),
+  fontWeight: 700,
+  background: "none",
+  border: "none",
+  padding: 0,
+  marginBottom: 20,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+};
+
+// Closes the bottom of an option list; each row carries its own top rule.
+const OPTION_LIST: React.CSSProperties = { borderBottom: `1px solid ${C.rule}` };
+
+// Space under an inline field that opens inside the option list.
+const INLINE_FIELD_WRAP: React.CSSProperties = { paddingBottom: 16 };
+
+function ThinArrow() {
+  return (
+    <svg width="18" height="10" viewBox="0 0 18 10" aria-hidden style={{ flexShrink: 0, display: "block" }}>
+      <path d="M0 5h16.5M12.5 1l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  );
+}
+
+// One option: a full-width row between rules. Burgundy on hover, press, or
+// when it's the current answer.
+function OptionRow({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  const [hot, setHot] = useState(false);
+  const on = selected || hot;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHot(true)}
+      onMouseLeave={() => setHot(false)}
+      onPointerDown={() => setHot(true)}
+      onPointerCancel={() => setHot(false)}
+      onBlur={() => setHot(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        width: "100%",
+        textAlign: "left",
+        background: "none",
+        border: "none",
+        borderTop: `1px solid ${C.rule}`,
+        borderRadius: 0,
+        padding: "17px 0",
+        cursor: "pointer",
+        fontFamily: SANS,
+        fontSize: 15,
+        fontWeight: 400,
+        lineHeight: 1.4,
+        color: on ? C.burgundy : C.ink,
+        transition: "color 0.15s",
+      }}
+    >
+      <span>{label}</span>
+      <span style={{ display: "flex", transform: on ? "translateX(3px)" : "none", transition: "transform 0.15s" }}>
+        <ThinArrow />
+      </span>
+    </button>
+  );
+}
 
 const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, initialChosenOption }: OutcomeModalProps) => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const [state, setState] = useState<StepState>({
     outcome: null,
@@ -612,7 +672,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
       setSaving(false);
       const detail = outcomeErr?.message || statusErr?.message
         || "the change didn't save (you may not have permission on this post)";
-      toast.error(`Couldn't close this decision — ${detail}`);
+      toast.error(`Couldn't close this decision: ${detail}`);
       return; // do NOT advance to the success step or call onComplete
     }
 
@@ -711,10 +771,12 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)" }}
+          style={{ position: "absolute", inset: 0, background: C.scrim }}
           onClick={onClose}
         />
 
+        {/* The sheet: full width on phones; on wide screens ~680px, centred,
+            still anchored to the bottom. */}
         <motion.div
           initial={{ y: "100%" }}
           animate={{ y: 0 }}
@@ -725,34 +787,30 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
             bottom: 0,
             left: 0,
             right: 0,
-            background: "#F5EFEA",
-            borderRadius: "20px 20px 0 0",
-            padding: "0 24px 40px",
+            width: "100%",
+            maxWidth: 680,
+            margin: "0 auto",
+            boxSizing: "border-box",
+            background: C.paper,
+            color: C.ink,
+            fontFamily: SANS,
+            borderRadius: `${RADIUS}px ${RADIUS}px 0 0`,
+            padding: isMobile ? "22px 20px 0" : "30px 40px 0",
+            paddingBottom: `calc(${isMobile ? 36 : 44}px + env(safe-area-inset-bottom, 0px))`,
             maxHeight: "90vh",
             overflowY: "auto",
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div
-            style={{
-              width: 48,
-              height: 4,
-              borderRadius: 100,
-              background: "rgba(0,0,0,0.15)",
-              margin: "14px auto 24px",
-            }}
-          />
-
           {currentStep !== "complete" && dotSteps.length > 1 && (
-            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 28 }}>
+            <div style={{ display: "flex", gap: 4, marginBottom: isMobile ? 22 : 28 }} aria-hidden>
               {dotSteps.map((_, i) => (
                 <div
                   key={i}
                   style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: i <= dotIndex ? "#C49E64" : "rgba(28,23,18,0.18)",
+                    flex: 1,
+                    height: 2,
+                    background: i <= dotIndex ? C.burgundy : C.rule,
                     transition: "background 0.2s",
                   }}
                 />
@@ -761,21 +819,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
           )}
 
           {currentStep !== "outcome" && currentStep !== "complete" && (
-            <button
-              onClick={goBack}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "0 0 20px",
-                fontSize: 13,
-                color: "#8C7A70",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontFamily: "inherit",
-              }}
-            >
+            <button onClick={goBack} style={BACK_LINK}>
               ← Back
             </button>
           )}
@@ -790,60 +834,62 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
             >
               {currentStep === "outcome" && (
                 <div>
-                  <p style={QUESTION_STYLE}>What did you end up doing?</p>
-                  {(
-                    [
-                      ["bought_it", "Bought it"],
-                      ["didnt_buy", "Didn't buy"],
-                      ["still_deciding", "Still deciding"],
-                    ] as [OutcomeType, string][]
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      style={state.outcome === value ? OPTION_SELECTED : OPTION_BASE}
-                      onClick={() => handleOutcomeSelect(value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  <p style={questionStyle(isMobile)}>What did you end up doing?</p>
+                  <div style={OPTION_LIST}>
+                    {(
+                      [
+                        ["bought_it", "Bought it"],
+                        ["didnt_buy", "Didn't buy"],
+                        ["still_deciding", "Still deciding"],
+                      ] as [OutcomeType, string][]
+                    ).map(([value, label]) => (
+                      <OptionRow
+                        key={value}
+                        label={label}
+                        selected={state.outcome === value}
+                        onClick={() => handleOutcomeSelect(value)}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
 
               {currentStep === "tipping_factor" && state.outcome && (
                 <div>
-                  <p style={QUESTION_STYLE}>
+                  <p style={questionStyle(isMobile)}>
                     {state.outcome === "bought_it"
                       ? "What made you go for it?"
                       : state.outcome === "didnt_buy"
                       ? "What stopped you?"
                       : "What would help you decide?"}
                   </p>
-                  {tippingFactorOptions(state.outcome, primary).map((opt) => (
-                    <div key={opt}>
-                      <button
-                        style={state.tipping_factor === opt ? OPTION_SELECTED : OPTION_BASE}
-                        onClick={() => handleTippingSelect(opt)}
-                      >
-                        {opt}
-                      </button>
-                      {opt === "Something else" && state.tipping_factor === "Something else" && (
-                        <div>
-                          <textarea
-                            rows={3}
-                            placeholder="Tell us more..."
-                            value={state.tipping_factor_other}
-                            onChange={(e) =>
-                              setState((s) => ({ ...s, tipping_factor_other: e.target.value }))
-                            }
-                            style={TEXTAREA_STYLE}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  <div style={OPTION_LIST}>
+                    {tippingFactorOptions(state.outcome, primary).map((opt) => (
+                      <div key={opt}>
+                        <OptionRow
+                          label={opt}
+                          selected={state.tipping_factor === opt}
+                          onClick={() => handleTippingSelect(opt)}
+                        />
+                        {opt === "Something else" && state.tipping_factor === "Something else" && (
+                          <div style={INLINE_FIELD_WRAP}>
+                            <textarea
+                              rows={3}
+                              placeholder="Tell us more..."
+                              value={state.tipping_factor_other}
+                              onChange={(e) =>
+                                setState((s) => ({ ...s, tipping_factor_other: e.target.value }))
+                              }
+                              style={{ ...TEXTAREA_STYLE, marginTop: 0 }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   {state.tipping_factor === "Something else" && (
                     <button
-                      style={CONTINUE_BTN}
+                      style={continueBtn(saving)}
                       disabled={saving}
                       onClick={() => {
                         const nextSteps = buildSteps(state.outcome, primary);
@@ -863,15 +909,15 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
 
               {currentStep === "bought_alternative" && (
                 <div>
-                  <p style={QUESTION_STYLE}>Did you buy something else instead?</p>
-                  <button
-                    style={state.bought_alternative === true ? OPTION_SELECTED : OPTION_BASE}
+                  <p style={questionStyle(isMobile)}>Did you buy something else instead?</p>
+                  <div style={OPTION_LIST}>
+                  <OptionRow
+                    label="Yes, I bought something else"
+                    selected={state.bought_alternative === true}
                     onClick={() => setState((s) => ({ ...s, bought_alternative: true }))}
-                  >
-                    Yes, I bought something else
-                  </button>
+                  />
                   {state.bought_alternative === true && (
-                    <div>
+                    <div style={{ paddingBottom: 20 }}>
                       <input
                         type="url"
                         inputMode="url"
@@ -884,32 +930,32 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                           const pasted = e.clipboardData.getData("text");
                           if (pasted) setTimeout(() => pullPulledProduct(pasted), 0);
                         }}
-                        style={{ ...TEXTAREA_STYLE, resize: undefined }}
+                        style={{ ...TEXTAREA_STYLE, resize: undefined, marginTop: 0 }}
                       />
 
                       {altFetching && (
-                        <p style={{ fontSize: 12, color: "#8C7A70", margin: "6px 2px 0" }}>Reading that link...</p>
+                        <p style={{ ...meta(10.5, C.muted), marginTop: 10 }}>Reading that link...</p>
                       )}
 
-                      {/* What we pulled off the link — she sees the exact image
+                      {/* What we pulled off the link: she sees the exact image
                           that will show up on her card before she commits. */}
                       {!altFetching && altPulled && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "white", border: "1px solid rgba(196,158,100,0.4)", borderRadius: 10, padding: 10, marginTop: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 14 }}>
                           {altPulled.image_url ? (
-                            <img src={altPulled.image_url} alt="" style={{ width: 52, height: 64, objectFit: "cover", borderRadius: 6, flexShrink: 0, background: "#EDE8E2" }} />
+                            <img src={altPulled.image_url} alt="" style={{ width: 56, height: 72, objectFit: "cover", borderRadius: RADIUS, flexShrink: 0, background: C.well, display: "block" }} />
                           ) : (
-                            <div style={{ width: 52, height: 64, borderRadius: 6, flexShrink: 0, background: "#EDE8E2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#8C7A70", textAlign: "center", lineHeight: 1.2 }}>no image</div>
+                            <div style={{ ...meta(8.5, C.muted), width: 56, height: 72, borderRadius: RADIUS, flexShrink: 0, background: C.well, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", lineHeight: 1.3 }}>no image</div>
                           )}
                           <div style={{ minWidth: 0, flex: 1 }}>
-                            {altPulled.brand && <p style={{ fontSize: 13, fontWeight: 700, color: "#1C1712", margin: 0 }}>{altPulled.brand}</p>}
-                            {altPulled.name && <p style={{ fontSize: 11.5, color: "#5A4A42", margin: "2px 0 0", lineHeight: 1.3 }}>{altPulled.name}</p>}
-                            {altPulled.price && <p style={{ fontSize: 12, fontWeight: 600, color: "#1C1712", margin: "4px 0 0" }}>{altPulled.price.startsWith("$") ? altPulled.price : `$${altPulled.price}`}</p>}
+                            {altPulled.brand && <p style={{ ...strong(13), textTransform: "uppercase", letterSpacing: "0.05em" }}>{altPulled.brand}</p>}
+                            {altPulled.name && <p style={{ ...body(13, C.inkSoft), lineHeight: 1.35, marginTop: 3 }}>{altPulled.name}</p>}
+                            {altPulled.price && <p style={{ ...strong(13), marginTop: 5 }}>{altPulled.price.startsWith("$") ? altPulled.price : `$${altPulled.price}`}</p>}
                           </div>
                         </div>
                       )}
 
                       {!altFetching && altFailed && (
-                        <p style={{ fontSize: 11.5, color: "#8C7A70", margin: "6px 2px 0", lineHeight: 1.4 }}>
+                        <p style={{ ...body(12, C.muted), lineHeight: 1.45, marginTop: 8 }}>
                           Couldn't read that link, so there won't be an image. Your link still saves.
                         </p>
                       )}
@@ -919,10 +965,10 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                         placeholder="What is it? (optional) e.g. Reformation Cynthia dress"
                         value={state.alt_product_name}
                         onChange={(e) => setState((s) => ({ ...s, alt_product_name: e.target.value }))}
-                        style={{ ...TEXTAREA_STYLE, resize: undefined, marginTop: 8 }}
+                        style={{ ...TEXTAREA_STYLE, resize: undefined, marginTop: 12 }}
                       />
-                      <p style={{ fontSize: 12, fontWeight: 600, color: "#1C1712", margin: "14px 2px 0" }}>Why this one instead?</p>
-                      <p style={{ fontSize: 10.5, color: "#8C7A70", margin: "3px 2px 0", lineHeight: 1.4 }}>
+                      <p style={{ ...meta(11, C.ink), fontWeight: 700, marginTop: 22 }}>Why this one instead?</p>
+                      <p style={{ ...body(12.5, C.muted), lineHeight: 1.45, marginTop: 5 }}>
                         Optional, and the part women like you will actually read. What made you switch?
                       </p>
                       <textarea
@@ -934,19 +980,19 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                       />
                     </div>
                   )}
-                  <button
-                    style={state.bought_alternative === false ? OPTION_SELECTED : OPTION_BASE}
+                  <OptionRow
+                    label="No, I passed on it entirely"
+                    selected={state.bought_alternative === false}
                     onClick={() => {
                       const next = { ...state, bought_alternative: false, alt_product_url: "", alt_product_name: "", alt_reason: "" };
                       setState(next);
                       saveAndComplete(next, null);
                     }}
-                  >
-                    No, I passed on it entirely
-                  </button>
+                  />
+                  </div>
                   {state.bought_alternative === true && (
                     <button
-                      style={CONTINUE_BTN}
+                      style={continueBtn(saving)}
                       disabled={saving}
                       onClick={() => {
                         // Never make her wait on the link read. Start it if it
@@ -964,7 +1010,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
 
               {currentStep === "size_bought" && (
                 <div>
-                  <p style={QUESTION_STYLE}>What size did you buy?</p>
+                  <p style={questionStyle(isMobile)}>What size did you buy?</p>
                   <input
                     type="text"
                     placeholder="e.g. Medium, Size 6, US 8..."
@@ -973,11 +1019,11 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
                     style={{
                       ...TEXTAREA_STYLE,
                       resize: undefined,
-                      marginBottom: 4,
+                      marginTop: 0,
                     }}
                   />
                   <button
-                    style={CONTINUE_BTN}
+                    style={continueBtn(saving)}
                     disabled={saving}
                     onClick={() => {
                       const nextSteps = buildSteps(state.outcome, primary);
@@ -996,33 +1042,34 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
 
               {currentStep === "fit_result" && (
                 <div>
-                  <p style={QUESTION_STYLE}>How did it actually turn out?</p>
-                  {FIT_RESULT_OPTIONS.map((opt) => (
-                    <div key={opt}>
-                      <button
-                        style={state.fit_result === opt ? OPTION_SELECTED : OPTION_BASE}
-                        onClick={() => handleFitResultSelect(opt)}
-                      >
-                        {opt}
-                      </button>
-                      {opt === "Not at all what I expected" &&
-                        state.fit_result === "Not at all what I expected" && (
-                          <div>
-                            <textarea
-                              rows={3}
-                              placeholder="What happened? (optional)"
-                              value={state.fit_result_note}
-                              onChange={(e) =>
-                                setState((s) => ({ ...s, fit_result_note: e.target.value }))
-                              }
-                              style={TEXTAREA_STYLE}
-                            />
-                          </div>
-                        )}
-                    </div>
-                  ))}
+                  <p style={questionStyle(isMobile)}>How did it actually turn out?</p>
+                  <div style={OPTION_LIST}>
+                    {FIT_RESULT_OPTIONS.map((opt) => (
+                      <div key={opt}>
+                        <OptionRow
+                          label={opt}
+                          selected={state.fit_result === opt}
+                          onClick={() => handleFitResultSelect(opt)}
+                        />
+                        {opt === "Not at all what I expected" &&
+                          state.fit_result === "Not at all what I expected" && (
+                            <div style={INLINE_FIELD_WRAP}>
+                              <textarea
+                                rows={3}
+                                placeholder="What happened? (optional)"
+                                value={state.fit_result_note}
+                                onChange={(e) =>
+                                  setState((s) => ({ ...s, fit_result_note: e.target.value }))
+                                }
+                                style={{ ...TEXTAREA_STYLE, marginTop: 0 }}
+                              />
+                            </div>
+                          )}
+                      </div>
+                    ))}
+                  </div>
                   {state.fit_result === "Not at all what I expected" && (
-                    <button style={CONTINUE_BTN} onClick={advance}>
+                    <button style={continueBtn(false)} onClick={advance}>
                       Continue →
                     </button>
                   )}
@@ -1031,50 +1078,52 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
 
               {currentStep === "size_recommendation" && (
                 <div>
-                  <p style={QUESTION_STYLE}>What would you recommend to your matches?</p>
-                  {SIZE_RECOMMENDATION_OPTIONS.map((opt) => (
-                    <button
-                      key={opt}
-                      style={state.size_recommendation === opt ? OPTION_SELECTED : OPTION_BASE}
-                      onClick={() => handleSizeRecommendationSelect(opt)}
-                    >
-                      {opt}
-                    </button>
-                  ))}
+                  <p style={questionStyle(isMobile)}>What would you recommend to your matches?</p>
+                  <div style={OPTION_LIST}>
+                    {SIZE_RECOMMENDATION_OPTIONS.map((opt) => (
+                      <OptionRow
+                        key={opt}
+                        label={opt}
+                        selected={state.size_recommendation === opt}
+                        onClick={() => handleSizeRecommendationSelect(opt)}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
 
               {currentStep === "outcome_detail" && state.outcome && (
                 <div>
-                  <p style={QUESTION_STYLE}>
+                  <p style={questionStyle(isMobile)}>
                     {outcomeDetailQuestion(primary, state.outcome)}
                   </p>
-                  {outcomeDetailOptions(primary).map((opt) => (
-                    <div key={opt}>
-                      <button
-                        style={state.outcome_detail === opt ? OPTION_SELECTED : OPTION_BASE}
-                        onClick={() => handleOutcomeDetailSelect(opt)}
-                      >
-                        {opt}
-                      </button>
-                      {state.outcome_detail === opt && outcomeDetailHasTextarea(primary, opt) && (
-                        <div>
-                          <textarea
-                            rows={3}
-                            placeholder={isNegativeAnswer(opt) ? "What didn't work? (optional)" : "Tell us more... (optional)"}
-                            value={state.outcome_detail_other}
-                            onChange={(e) =>
-                              setState((s) => ({ ...s, outcome_detail_other: e.target.value }))
-                            }
-                            style={TEXTAREA_STYLE}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  <div style={OPTION_LIST}>
+                    {outcomeDetailOptions(primary).map((opt) => (
+                      <div key={opt}>
+                        <OptionRow
+                          label={opt}
+                          selected={state.outcome_detail === opt}
+                          onClick={() => handleOutcomeDetailSelect(opt)}
+                        />
+                        {state.outcome_detail === opt && outcomeDetailHasTextarea(primary, opt) && (
+                          <div style={INLINE_FIELD_WRAP}>
+                            <textarea
+                              rows={3}
+                              placeholder={isNegativeAnswer(opt) ? "What didn't work? (optional)" : "Tell us more... (optional)"}
+                              value={state.outcome_detail_other}
+                              onChange={(e) =>
+                                setState((s) => ({ ...s, outcome_detail_other: e.target.value }))
+                              }
+                              style={{ ...TEXTAREA_STYLE, marginTop: 0 }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   {state.outcome_detail && outcomeDetailHasTextarea(primary, state.outcome_detail) && (
                     <button
-                      style={CONTINUE_BTN}
+                      style={continueBtn(saving)}
                       disabled={saving}
                       onClick={() => saveAndComplete(state)}
                     >
@@ -1085,43 +1134,23 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
               )}
 
               {currentStep === "complete" && state.outcome && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingTop: 24,
-                    paddingBottom: 16,
-                    textAlign: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      background: "rgba(196,158,100,0.15)",
-                      border: "1.5px solid #C49E64",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 17,
-                      color: "#C49E64",
-                      marginBottom: 16,
-                    }}
+                <div style={{ padding: isMobile ? "10px 0 8px" : "14px 0 10px" }}>
+                  {/* A thin burgundy check, drawn, not a badge. */}
+                  <svg
+                    width="34"
+                    height="26"
+                    viewBox="0 0 34 26"
+                    aria-hidden
+                    style={{ display: "block", marginBottom: 18 }}
                   >
-                    ✓
-                  </div>
-                  <p
-                    style={{
-                      fontSize: 15.5,
-                      color: "#1C1712",
-                      fontFamily: SANS_APP,
-                      lineHeight: 1.4,
-                      maxWidth: 280,
-                    }}
-                  >
+                    <path
+                      d="M1.5 13.5 L11.5 23.5 L32.5 2.5"
+                      fill="none"
+                      stroke={C.burgundy}
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                  <p style={{ ...body(isMobile ? 16 : 17, C.ink), lineHeight: 1.45, maxWidth: "34ch" }}>
                     {completeMessage(state.outcome, state.bought_alternative)}
                   </p>
                 </div>

@@ -1,55 +1,38 @@
 // ── MatchSeal ─────────────────────────────────────────────────────────────────
-// How closely she matches you, as a gold seal rather than a pill: a scalloped
-// stamp, the way a fashion site marks something new. It's the one shape in the
-// system that isn't a rule or a letter, so the number reads first.
+// How closely she matches you: the number in gold, "MATCH" beside it, a thin gold
+// rule underneath. Gold rather than burgundy, because burgundy means "do
+// something" everywhere else. No shape and no bar: most matches today sit
+// between 25 and 60 percent, and a bar that's mostly empty reads as a failing
+// grade.
 import { DISPLAY, SANS } from "@/lib/design";
 
-const GOLD = "#C49E64";
-
-// An 18-scallop edge on a 100-unit box: points on an inner ring, each joined to
-// the next by a curve pulled out toward the rim.
-const SEAL = (() => {
-  const N = 18, r = 42, R = 50;
-  const pt = (rad: number, i: number) => {
-    const a = (2 * Math.PI * i) / N - Math.PI / 2;
-    return `${(50 + rad * Math.cos(a)).toFixed(2)},${(50 + rad * Math.sin(a)).toFixed(2)}`;
-  };
-  let d = `M${pt(r, 0)}`;
-  for (let i = 0; i < N; i++) d += ` Q${pt(R, i + 0.5)} ${pt(r, i + 1)}`;
-  return `${d} Z`;
-})();
+const GOLD = "#C49E64";       // the rule
+const GOLD_TEXT = "#A57D3E";  // the number: a shade deeper so it holds on paper
 
 interface Props {
   score: number;
+  /** Rough visual size; the number is about half of it. */
   size?: number;
-  /** The word "match" beside the seal, for places that introduce it. */
+  /** Kept for existing callers. The word "match" always shows now. */
   withLabel?: boolean;
   labelSize?: number;
 }
 
-export default function MatchSeal({ score, size = 44, withLabel = false, labelSize = 10.5 }: Props) {
+export default function MatchSeal({ score, size = 44, labelSize }: Props) {
   const n = Math.round(score);
+  const num = Math.max(14, Math.round(size * 0.52));
+  const lab = labelSize ?? Math.max(9, Math.round(num * 0.44));
   return (
     <span
       title={`${n}% match`}
       aria-label={`${n}% match`}
-      style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0, lineHeight: 0 }}
+      style={{ display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: Math.max(3, Math.round(num / 6)), flexShrink: 0, lineHeight: 1 }}
     >
-      <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden style={{ display: "block", flexShrink: 0 }}>
-        <path d={SEAL} fill={GOLD} />
-        <text
-          x="50" y="52"
-          textAnchor="middle" dominantBaseline="central"
-          fontFamily={DISPLAY} fontSize={n >= 100 ? 29 : 35} fill="#141210"
-        >
-          {n}%
-        </text>
-      </svg>
-      {withLabel && (
-        <span style={{ fontFamily: SANS, fontSize: labelSize, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#141210", lineHeight: 1 }}>
-          Match
-        </span>
-      )}
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, whiteSpace: "nowrap" }}>
+        <span style={{ fontFamily: DISPLAY, fontSize: num, color: GOLD_TEXT, lineHeight: 1 }}>{n}%</span>
+        <span style={{ fontFamily: SANS, fontSize: lab, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#141210" }}>Match</span>
+      </span>
+      <span aria-hidden style={{ display: "block", height: num >= 20 ? 2 : 1.5, background: GOLD }} />
     </span>
   );
 }

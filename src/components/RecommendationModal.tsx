@@ -8,11 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Link as LinkIcon, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ProductImage } from "./ProductImage";
-
-const INK = "#1C1712";
-const CREAM = "#FDFAF6";
-const MUTED = "#8C7A70";
-const LF = "#7A6AAE";
+import { C, SANS, display, meta } from "@/lib/design";
 
 export interface RecommendationDraft {
   product_url: string | null;
@@ -85,87 +81,95 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
     reset();
   };
 
-  const inputStyle: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 12, border: "1px solid rgba(0,0,0,0.14)", background: "#fff", padding: "11px 13px", fontSize: 12.5, color: INK, fontFamily: "inherit" };
-  const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: INK, margin: "0 0 7px", display: "block" };
+  const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 2, border: `1px solid ${C.rule}`, background: "#FFFFFF", padding: "12px 14px", fontFamily: SANS, fontSize: 14.5, lineHeight: 1.5, color: C.ink, outline: "none" };
+  const label: React.CSSProperties = { ...meta(10.5, C.ink), fontWeight: 700, display: "block", marginBottom: 8 };
+  const optional = <span style={{ ...meta(10, C.muted), fontWeight: 600, marginLeft: 6 }}>(optional)</span>;
 
   return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}
-          style={{ position: "fixed", inset: 0, background: "rgba(28,23,18,0.5)", zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          style={{ position: "fixed", inset: 0, background: C.scrim, zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
           <motion.div onClick={(e) => e.stopPropagation()}
-            initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.98 }}
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            style={{ position: "relative", width: "min(500px, 100%)", maxHeight: "90vh", overflowY: "auto", background: CREAM, borderRadius: 18, boxShadow: "0 24px 64px rgba(0,0,0,0.32)", boxSizing: "border-box" }}
+            style={{ position: "relative", width: "min(560px, 100%)", maxHeight: "90vh", overflowY: "auto", background: C.paper, borderRadius: 2, border: `1px solid ${C.rule}` }}
             className="no-scrollbar"
           >
-            <div style={{ padding: "18px 20px 22px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: LF }}>Recommend a product</span>
-                <button onClick={close} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED }}><X style={{ width: 18, height: 18 }} /></button>
+            <div style={{ padding: "24px 26px 28px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>Recommend a product</span>
+                <button onClick={close} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: C.ink, lineHeight: 0, padding: 4 }}>
+                  <X style={{ width: 20, height: 20 }} strokeWidth={1.5} />
+                </button>
               </div>
-              {lookingForTitle && <p style={{ fontSize: 13, fontWeight: 700, color: INK, margin: "0 0 16px" }}>For: {lookingForTitle}</p>}
+              {lookingForTitle && <p style={{ ...display(30), lineHeight: 0.95, margin: "14px 0 22px" }}>For: {lookingForTitle}</p>}
 
-              {/* URL */}
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Paste the product link</label>
+              {/* The link */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={label}>Paste the product link</label>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, ...inputStyle, padding: "0 12px" }}>
-                    <LinkIcon style={{ width: 16, height: 16, color: MUTED, flexShrink: 0 }} />
-                    <input value={url} onChange={(e) => { setUrl(e.target.value); setUrlError(null); }} onKeyDown={(e) => e.key === "Enter" && extract()} placeholder="Paste product URL" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "11px 0", fontSize: 12.5, color: INK }} />
+                  <div style={{ flex: 1, position: "relative" }}>
+                    <LinkIcon style={{ width: 15, height: 15, color: C.muted, position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                    <input value={url} onChange={(e) => { setUrl(e.target.value); setUrlError(null); }} onKeyDown={(e) => e.key === "Enter" && extract()} placeholder="Paste product URL" style={{ ...field, paddingLeft: 36 }} />
                   </div>
-                  <button onClick={extract} disabled={extracting || !url.trim()} style={{ background: INK, color: CREAM, border: "none", borderRadius: 12, padding: "0 18px", fontSize: 12, fontWeight: 600, cursor: extracting || !url.trim() ? "default" : "pointer", opacity: extracting || !url.trim() ? 0.5 : 1 }}>
+                  <button onClick={extract} disabled={extracting || !url.trim()}
+                    style={{ ...meta(11, "#FFFFFF"), fontWeight: 700, background: C.ink, border: `1px solid ${C.ink}`, borderRadius: 2, padding: "0 18px", cursor: extracting || !url.trim() ? "default" : "pointer", opacity: extracting || !url.trim() ? 0.4 : 1 }}>
                     {extracting ? "…" : "Pull"}
                   </button>
                 </div>
-                {urlError && <p style={{ fontSize: 10.5, color: "#c0392b", margin: "6px 0 0" }}>{urlError}</p>}
+                {urlError && <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.burgundy, margin: "8px 0 0" }}>{urlError}</p>}
               </div>
 
-              {/* Product preview */}
+              {/* What she's recommending */}
               {product && (
-                <div style={{ display: "flex", gap: 12, alignItems: "center", background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, padding: 10, marginBottom: 18 }}>
-                  <div style={{ width: 58, height: 58, borderRadius: 8, overflow: "hidden", background: "#EDE8E2", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ProductImage url={product.image_url} fallback={<LinkIcon style={{ width: 18, height: 18, color: MUTED }} />} />
+                <div style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: 14, alignItems: "center", paddingBottom: 18, marginBottom: 18, borderBottom: `1px solid ${C.rule}` }}>
+                  <div style={{ aspectRatio: "4 / 5", background: C.well, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <ProductImage url={product.image_url} fallback={<LinkIcon style={{ width: 18, height: 18, color: C.muted }} />} />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
-                    <input value={product.brand} onChange={(e) => setProduct({ ...product, brand: e.target.value })} placeholder="Brand" style={{ ...inputStyle, padding: "6px 9px", fontSize: 11.5, fontWeight: 700 }} />
-                    <input value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} placeholder="Product name" style={{ ...inputStyle, padding: "6px 9px", fontSize: 10.5 }} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+                    <input value={product.brand} onChange={(e) => setProduct({ ...product, brand: e.target.value })} placeholder="Brand" style={{ ...field, padding: "8px 10px", fontSize: 13.5, fontWeight: 700 }} />
+                    <input value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} placeholder="Product name" style={{ ...field, padding: "8px 10px", fontSize: 13.5 }} />
                   </div>
                 </div>
               )}
 
-              {/* The rest only after a product is attached */}
+              {/* The rest only once a product is attached */}
               {product && (
                 <>
-                  {/* Would / Wouldn't */}
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={labelStyle}>Your take</label>
-                    <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={label}>Your take</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       {([["buy", "Would buy"], ["do_not_buy", "Wouldn't buy"]] as const).map(([val, lab]) => {
                         const on = recommendation === val;
-                        const col = val === "buy" ? "#16a34a" : "#c0392b";
-                        return <button key={val} onClick={() => setRecommendation(val)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, border: on ? `1.5px solid ${col}` : "1px solid rgba(0,0,0,0.14)", background: on ? (val === "buy" ? "rgba(22,163,74,0.10)" : "rgba(192,57,43,0.10)") : "transparent", color: on ? col : "#5A4A42" }}>{lab}</button>;
+                        return (
+                          <button key={val} onClick={() => setRecommendation(val)}
+                            style={{ ...meta(11.5, on ? "#FFFFFF" : C.ink), fontWeight: 700, padding: "14px 0", borderRadius: 2, cursor: "pointer", background: on ? C.ink : "transparent", border: `1px solid ${C.ink}` }}>
+                            {lab}
+                          </button>
+                        );
                       })}
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={labelStyle}>Why do you recommend this?</label>
-                    <textarea value={reasoning} onChange={(e) => setReasoning(e.target.value)} rows={3} placeholder="What makes this a good pick for them?" style={{ ...inputStyle, resize: "none" }} />
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={label}>Why do you recommend this?</label>
+                    <textarea value={reasoning} onChange={(e) => setReasoning(e.target.value)} rows={3} placeholder="What makes this a good pick for them?" style={{ ...field, resize: "none" }} />
                   </div>
 
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={labelStyle}>Fit note <span style={{ color: MUTED, fontWeight: 400 }}>(optional)</span></label>
-                    <input value={fitNote} onChange={(e) => setFitNote(e.target.value)} placeholder="e.g. Runs big, size down" style={inputStyle} />
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={label}>Fit note{optional}</label>
+                    <input value={fitNote} onChange={(e) => setFitNote(e.target.value)} placeholder="e.g. Runs big, size down" style={field} />
                   </div>
 
-                  <div style={{ marginBottom: 20 }}>
-                    <label style={labelStyle}>Who would this work for? <span style={{ color: MUTED, fontWeight: 400 }}>(optional)</span></label>
-                    <input value={whoFor} onChange={(e) => setWhoFor(e.target.value)} placeholder="e.g. Tall, long torso, smaller bust" style={inputStyle} />
+                  <div style={{ marginBottom: 22 }}>
+                    <label style={label}>Who would this work for?{optional}</label>
+                    <input value={whoFor} onChange={(e) => setWhoFor(e.target.value)} placeholder="e.g. Tall, long torso, smaller bust" style={field} />
                   </div>
 
-                  <button onClick={doSubmit} disabled={!canSubmit} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: canSubmit ? INK : "rgba(0,0,0,0.25)", color: CREAM, border: "none", borderRadius: 100, padding: "14px 0", fontSize: 13, fontWeight: 600, cursor: canSubmit ? "pointer" : "default" }}>
-                    {submitting ? "Sharing…" : <><Check style={{ width: 17, height: 17 }} /> Share recommendation</>}
+                  <button onClick={doSubmit} disabled={!canSubmit}
+                    style={{ width: "100%", ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", padding: "17px 0", borderRadius: 2, border: `1px solid ${C.burgundy}`, background: C.burgundy, cursor: canSubmit ? "pointer" : "default", opacity: canSubmit ? 1 : 0.4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    {submitting ? "Sharing…" : <><Check style={{ width: 15, height: 15 }} /> Share recommendation</>}
                   </button>
                 </>
               )}

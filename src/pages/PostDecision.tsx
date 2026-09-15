@@ -1,11 +1,13 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Loader2, ImageIcon, Link } from "lucide-react";
+import { Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { shouldShowFitPrompt } from "@/components/DialInFitModal";
 import { imageToJpeg } from "@/lib/image";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { C, RADIUS, SANS, body, display, hairline, meta, strong } from "@/lib/design";
 
 type FlowStep = "input" | "extracting" | "preview" | "uncertainty" | "context" | "confidence" | "audience";
 
@@ -66,9 +68,188 @@ const FOLLOWUP_UNCERTAINTIES = [
   "Hard to tell from photos",
 ];
 
+// ── The editorial system, locally ─────────────────────────────────────────────
+// Type, rules and square edges, per src/lib/design.ts. No pills, no cards, no
+// shadows. Selected options are ink-filled with paper text; burgundy is kept
+// for the primary action, the confidence pick and the step marker.
+
+/** The steps the marker counts. "extracting" is part of step one. */
+const STEP_ORDER: FlowStep[] = ["input", "preview", "uncertainty", "context", "confidence", "audience"];
+
+const primaryBtn = (enabled: boolean): CSSProperties => ({
+  ...meta(12, "#FFFFFF"),
+  fontWeight: 700,
+  letterSpacing: "0.16em",
+  width: "100%",
+  background: C.burgundy,
+  border: `1px solid ${C.burgundy}`,
+  borderRadius: RADIUS,
+  padding: "15px 18px",
+  cursor: enabled ? "pointer" : "default",
+  opacity: enabled ? 1 : 0.35,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  transition: "opacity 0.15s",
+});
+
+const secondaryBtn = (enabled: boolean): CSSProperties => ({
+  ...meta(11, C.ink),
+  fontWeight: 700,
+  letterSpacing: "0.16em",
+  background: "transparent",
+  border: `1px solid ${C.ink}`,
+  borderRadius: RADIUS,
+  padding: "0 18px",
+  cursor: enabled ? "pointer" : "default",
+  opacity: enabled ? 1 : 0.35,
+  flexShrink: 0,
+});
+
+const textLink = (colour: string = C.ink): CSSProperties => ({
+  ...meta(11, colour),
+  fontWeight: 700,
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+});
+
+// 16px on phones so iOS doesn't zoom into the field on focus.
+const fieldStyle = (isMobile: boolean): CSSProperties => ({
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: RADIUS,
+  border: `1px solid ${C.rule}`,
+  background: "#FFFFFF",
+  padding: "13px 14px",
+  fontFamily: SANS,
+  fontSize: isMobile ? 16 : 15,
+  lineHeight: 1.5,
+  color: C.ink,
+  outline: "none",
+  resize: "none",
+});
+
+/** A short selectable option: category, sizes. */
+const chip = (on: boolean): CSSProperties => ({
+  fontFamily: SANS,
+  fontSize: 13.5,
+  fontWeight: on ? 600 : 500,
+  lineHeight: 1.2,
+  color: on ? C.paper : C.ink,
+  background: on ? C.ink : "transparent",
+  border: `1px solid ${on ? C.ink : C.rule}`,
+  borderRadius: RADIUS,
+  padding: "10px 14px",
+  cursor: "pointer",
+  transition: "background 0.12s, color 0.12s, border-color 0.12s",
+});
+
+const ellipsis: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+
+const PAGE_CSS = `
+.pd-field::placeholder, .pd-hero::placeholder { color: ${C.muted}; opacity: 1; }
+.pd-field:focus { border-color: ${C.ink} !important; }
+.pd-hero:focus { border-bottom-color: ${C.burgundy} !important; }
+`;
+
+function Masthead({ isMobile, onHome, onFeed }: { isMobile: boolean; onHome: () => void; onFeed: () => void }) {
+  return (
+    <header style={{ background: C.paper, borderBottom: `1px solid ${C.rule}` }}>
+      <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "14px 16px" : "20px 40px" }}>
+        <button onClick={onFeed} style={{ ...textLink(C.ink), justifySelf: "start" }}>← Feed</button>
+        <button
+          onClick={onHome}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", userSelect: "none", fontFamily: SANS, textTransform: "uppercase", letterSpacing: isMobile ? "0.22em" : "0.32em", fontSize: isMobile ? 12 : 15, color: C.ink, whiteSpace: "nowrap" }}
+        >
+          <span style={{ fontWeight: 700 }}>ELEVEN</span>
+          <span style={{ fontWeight: 300 }}>ELEVEN</span>
+        </button>
+        <span />
+      </div>
+    </header>
+  );
+}
+
+function StepMark({ index, total }: { index: number; total: number }) {
+  return (
+    <div style={{ marginBottom: 30 }} aria-label={`Step ${index + 1} of ${total}`}>
+      <div style={{ display: "flex", gap: 4 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 2, background: i <= index ? C.burgundy : C.rule, transition: "background 0.25s" }} />
+        ))}
+      </div>
+      <p style={{ ...meta(10.5, C.ink), marginTop: 10 }}>Step {index + 1} / {total}</p>
+    </div>
+  );
+}
+
+/** The item she's deciding on, carried through the later steps. */
+function MiniPreview({ image, brand, name }: { image: string | null; brand: string; name: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 18, marginBottom: 30, borderBottom: `1px solid ${C.rule}` }}>
+      {image ? (
+        <img src={image} alt={name} style={{ width: 48, height: 64, objectFit: "cover", background: C.well, flexShrink: 0, display: "block" }} />
+      ) : (
+        <div style={{ width: 48, height: 64, background: C.well, flexShrink: 0 }} />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {brand && <p style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em", ...ellipsis }}>{brand}</p>}
+        <p style={{ ...body(14, C.inkSoft), marginTop: brand ? 3 : 0, ...ellipsis }}>{name}</p>
+      </div>
+    </div>
+  );
+}
+
+/** A long option as a full-width row, with a small square check on the right. */
+function OptionRow({ label, on, first, onClick }: { label: string; on: boolean; first: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+        textAlign: "left", background: "none", cursor: "pointer",
+        borderLeft: "none", borderRight: "none",
+        borderTop: first ? `1px solid ${C.rule}` : "none",
+        borderBottom: `1px solid ${C.rule}`,
+        borderRadius: 0,
+        padding: "17px 0",
+        fontFamily: SANS, fontSize: 15.5, lineHeight: 1.35, fontWeight: on ? 700 : 400, color: C.ink,
+      }}
+    >
+      <span>{label}</span>
+      <span
+        aria-hidden
+        style={{
+          width: 18, height: 18, flexShrink: 0, boxSizing: "border-box",
+          border: `1px solid ${on ? C.ink : C.faint}`, borderRadius: RADIUS,
+          background: on ? C.ink : "transparent",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        {on && <Check style={{ width: 12, height: 12, color: C.paper }} strokeWidth={3} />}
+      </span>
+    </button>
+  );
+}
+
+const enter = {
+  initial: { opacity: 0, x: 30 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -30 },
+  transition: { duration: 0.3 },
+};
+
 const PostDecision = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const [flowStep, setFlowStep] = useState<FlowStep>("input");
   // "Who would you especially like input from?" — captured to learn what women
@@ -242,7 +423,7 @@ const PostDecision = () => {
       });
       if (data.price) setPriceNote(String(data.price).replace(/^\$/, ""));
     } catch {
-      setUrlError("Couldn't read that URL — try a screenshot instead");
+      setUrlError("Couldn't read that URL. Try a screenshot instead.");
       setFlowStep("input");
       return;
     }
@@ -285,7 +466,7 @@ const PostDecision = () => {
       setShowSecondUrl(false);
       setSecondUrlInput("");
     } catch {
-      setSecondUrlError("Couldn't read that link — try another");
+      setSecondUrlError("Couldn't read that link. Try another.");
     } finally {
       setExtractingSecond(false);
     }
@@ -387,67 +568,94 @@ const PostDecision = () => {
 
   const displayImage = product?.uploaded_image ?? product?.image_url;
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <span onClick={() => navigate("/", { state: { home: true } })} style={{ letterSpacing: "0.32em", fontSize: 18, color: "#1C1712", cursor: "pointer" }}>
-          <span style={{ fontWeight: 700 }}>ELEVEN</span><span style={{ fontWeight: 300 }}>ELEVEN</span>
-        </span>
-      </div>
+  const field = fieldStyle(isMobile);
+  const heading: CSSProperties = { ...display(isMobile ? "clamp(34px, 10.5vw, 44px)" : 56), marginBottom: 14 };
+  const lede: CSSProperties = { ...body(isMobile ? 15 : 16, C.inkSoft), marginBottom: isMobile ? 26 : 32 };
+  const actions: CSSProperties = { marginTop: 36, display: "flex", flexDirection: "column", gap: 20 };
+  const back: CSSProperties = { ...textLink(C.muted), alignSelf: "center" };
+  const sectionTitle: CSSProperties = { ...strong(14), textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.35 };
+  const section = (first: boolean): CSSProperties => ({ paddingTop: first ? 0 : 24, borderTop: first ? "none" : `1px solid ${C.rule}` });
+  const sizeLabel: CSSProperties = { ...meta(10.5, C.muted), marginBottom: 10 };
+  const errorText: CSSProperties = { ...body(13.5, C.burgundy), marginTop: 8 };
 
-      <div className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
+  // Step marker, derived from the existing flow. Context only counts when it
+  // will be shown (it's always shown today: every concern asks for detail).
+  const steps = STEP_ORDER.filter((s) => s !== "context" || needsContext || uncertainties.length === 0);
+  const stepIndex = Math.max(0, steps.indexOf(flowStep === "extracting" ? "input" : flowStep));
+
+  const mini = product ? (
+    <MiniPreview image={displayImage ?? null} brand={product.brand || product.retailer} name={product.name || "Unnamed item"} />
+  ) : null;
+
+  const toggleSize = (s: string) =>
+    setSizesNote((prev) =>
+      prev.includes(s) ? prev.filter((x) => x !== s) : prev.length < 2 ? [...prev, s] : prev
+    );
+
+  const sizeChips = (sizes: string[], keyPrefix: string) => (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {sizes.map((s) => (
+        <button key={`${keyPrefix}${s}`} onClick={() => toggleSize(s)} aria-pressed={sizesNote.includes(s)} style={{ ...chip(sizesNote.includes(s)), minWidth: 48, padding: "10px 12px" }}>
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Main photo slot: a touch smaller on desktop once a second photo sits beside it.
+  const imgW = secondPhotoPreview && !isMobile ? 96 : 120;
+  const imgH = 160;
+  const emptySlot = (w: number): CSSProperties => ({
+    width: w, height: imgH, boxSizing: "border-box", flexShrink: 0,
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+    background: "transparent", border: `1px solid ${C.rule}`, borderRadius: RADIUS, cursor: "pointer",
+    ...meta(10.5, C.ink), fontWeight: 700, textAlign: "center", padding: 8,
+  });
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, display: "flex", flexDirection: "column" }}>
+      <style>{PAGE_CSS}</style>
+      <Masthead isMobile={isMobile} onHome={() => navigate("/", { state: { home: true } })} onFeed={() => navigate("/feed")} />
+
+      <main style={{ flex: 1, width: "100%", maxWidth: 640, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "24px 20px 72px" : "56px 24px 96px" }}>
+        <StepMark index={stepIndex} total={steps.length} />
+
         <AnimatePresence mode="wait">
 
           {/* ── STEP 1: INPUT ── */}
           {flowStep === "input" && (
-            <motion.div key="input" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">
-                What are you considering?
-              </h2>
-              <p className="text-muted-foreground text-base mb-8">
-                Paste the product link and we'll pull everything automatically.
-              </p>
+            <motion.div key="input" {...enter}>
+              <h1 style={heading}>What are you considering?</h1>
+              <p style={lede}>Paste the product link and we'll pull everything automatically.</p>
 
               {/* ── URL input (primary) ── */}
-              <div
-                className="w-full rounded-2xl border border-border overflow-hidden mb-3"
-                style={{ background: "white" }}
-              >
-                <div className="flex items-center gap-3 px-4 py-3.5">
-                  <Link className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <input
-                    type="url"
-                    placeholder="Paste product URL here"
-                    value={urlInput}
-                    onChange={(e) => { setUrlInput(e.target.value); setUrlError(null); }}
-                    onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
-                    className="flex-1 bg-transparent outline-none text-base text-foreground placeholder:text-muted-foreground"
-                  />
-                </div>
-              </div>
-
-              {urlError && (
-                <p className="text-sm text-red-500 mb-3 px-1">{urlError}</p>
-              )}
-
-              <button
-                onClick={handleUrlSubmit}
-                disabled={!urlInput.trim()}
-                className="w-full py-3.5 rounded-2xl text-base font-semibold transition-opacity disabled:opacity-40"
+              <input
+                type="url"
+                className="pd-hero"
+                placeholder="Paste product URL here"
+                value={urlInput}
+                onChange={(e) => { setUrlInput(e.target.value); setUrlError(null); }}
+                onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
                 style={{
-                  background: "#1C1712",
-                  color: "white",
+                  width: "100%", boxSizing: "border-box",
+                  borderTop: "none", borderLeft: "none", borderRight: "none", borderBottom: `1px solid ${C.ink}`, borderRadius: 0,
+                  background: "transparent", padding: "8px 0 12px",
+                  fontFamily: SANS, fontSize: isMobile ? 20 : 26, color: C.ink, outline: "none",
                 }}
-              >
+              />
+
+              {urlError && <p style={{ ...errorText, marginTop: 10 }}>{urlError}</p>}
+
+              <button onClick={handleUrlSubmit} disabled={!urlInput.trim()} style={{ ...primaryBtn(!!urlInput.trim()), marginTop: 22 }}>
                 Get input on this
               </button>
 
               {/* ── Screenshot fallback ── */}
-              <div className="mt-8">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-sm text-muted-foreground">or upload a screenshot</span>
-                  <div className="flex-1 h-px bg-border" />
+              <div style={{ marginTop: 44 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                  <div style={{ ...hairline(), flex: 1 }} />
+                  <span style={{ ...meta(10.5, C.muted), whiteSpace: "nowrap" }}>or upload a screenshot</span>
+                  <div style={{ ...hairline(), flex: 1 }} />
                 </div>
 
                 <input
@@ -458,18 +666,23 @@ const PostDecision = () => {
                   onChange={handleScreenshotUpload}
                 />
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => screenshotInputRef.current?.click()}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); screenshotInputRef.current?.click(); } }}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className="w-full flex flex-col items-center justify-center gap-2 py-8 rounded-2xl border-2 border-dashed transition-colors cursor-pointer"
                   style={{
-                    borderColor: draggingOver ? "#1C1712" : undefined,
-                    background: draggingOver ? "rgba(28,23,18,0.04)" : undefined,
+                    width: "100%", boxSizing: "border-box",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: isMobile ? "30px 16px" : "40px 16px",
+                    border: `1px solid ${draggingOver ? C.ink : C.rule}`, borderRadius: RADIUS,
+                    background: draggingOver ? "#FFFFFF" : "transparent",
+                    cursor: "pointer", transition: "border-color 0.15s, background 0.15s",
                   }}
                 >
-                  <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                  <span className="text-base text-muted-foreground font-medium">
+                  <span style={{ ...meta(11, draggingOver ? C.burgundy : C.ink), fontWeight: 700, textAlign: "center" }}>
                     {draggingOver ? "Drop to upload" : "Drag & drop or click to upload"}
                   </span>
                 </div>
@@ -479,78 +692,70 @@ const PostDecision = () => {
 
           {/* ── STEP 2: EXTRACTING ── */}
           {flowStep === "extracting" && (
-            <motion.div key="extracting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-24 gap-4">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              <p className="font-sans text-2xl font-light text-foreground">Detecting product...</p>
-              <p className="text-base text-muted-foreground">This takes a few seconds</p>
+            <motion.div key="extracting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ paddingTop: isMobile ? 40 : 64, paddingBottom: 64 }}>
+              <p style={{ ...meta(11, C.ink), fontWeight: 700 }}>Detecting product...</p>
+              <div style={{ position: "relative", height: 2, background: C.rule, overflow: "hidden", margin: "16px 0 14px" }}>
+                <motion.div
+                  style={{ position: "absolute", top: 0, left: 0, height: "100%", width: "40%", background: C.burgundy }}
+                  animate={{ x: ["-100%", "250%"] }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </div>
+              <p style={body(14, C.muted)}>This takes a few seconds</p>
             </motion.div>
           )}
 
           {/* ── STEP 3: PREVIEW ── */}
           {flowStep === "preview" && product && (
-            <motion.div key="preview" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl font-light text-foreground mb-2">
-                {product.name ? "Does this look right?" : "Almost there"}
-              </h2>
-              <p className="text-muted-foreground text-base mb-6">
-                {product.name ? "Edit anything that's off." : "We got the brand — just add the item name and a photo."}
+            <motion.div key="preview" {...enter}>
+              <h1 style={heading}>{product.name ? "Does this look right?" : "Almost there"}</h1>
+              <p style={lede}>
+                {product.name ? "Edit anything that's off." : "We got the brand. Just add the item name and a photo."}
               </p>
 
-              <div className="flex gap-4 mb-6">
+              <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 20 : 24, marginBottom: 32 }}>
                 {/* Image(s) */}
-                <div className="flex-shrink-0 flex gap-2">
-                  <div className="relative">
+                <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "flex-start" }}>
+                  <div>
                     {displayImage ? (
                       <img
                         src={displayImage}
                         alt="Product"
-                        className="rounded-xl object-cover bg-muted"
-                        style={{ width: secondPhotoPreview ? 72 : 96, height: 128 }}
+                        style={{ width: imgW, height: imgH, objectFit: "cover", background: C.well, display: "block" }}
                       />
                     ) : (
-                      <button
-                        onClick={() => screenshotInputRef.current?.click()}
-                        className="w-24 h-32 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-accent transition-colors"
-                      >
-                        <Upload className="w-5 h-5 text-muted-foreground" />
-                        <span className="text-base text-muted-foreground text-center">Add photo</span>
+                      <button onClick={() => screenshotInputRef.current?.click()} style={emptySlot(imgW)}>
+                        <span style={{ fontSize: 20, fontWeight: 300, letterSpacing: 0, lineHeight: 1 }}>+</span>
+                        Add photo
                       </button>
                     )}
                     {displayImage && (
-                      <button
-                        onClick={() => screenshotInputRef.current?.click()}
-                        className="absolute -bottom-2 -right-2 bg-background border border-border rounded-full p-1.5 hover:bg-muted transition-colors"
-                      >
-                        <Upload className="w-3 h-3 text-muted-foreground" />
+                      <button onClick={() => screenshotInputRef.current?.click()} aria-label="Replace photo" style={{ ...textLink(C.ink), marginTop: 9, fontSize: 10 }}>
+                        Replace
                       </button>
                     )}
                     <input ref={screenshotInputRef} type="file" accept="image/*" className="hidden" onChange={handleScreenshotUpload} />
                   </div>
 
                   {displayImage && !secondPhotoPreview && (
-                    <button
-                      onClick={() => secondPhotoInputRef.current?.click()}
-                      className="w-16 h-32 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-accent transition-colors"
-                    >
-                      <Upload className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-base text-muted-foreground text-center leading-tight">+ photo</span>
+                    <button onClick={() => secondPhotoInputRef.current?.click()} style={emptySlot(72)}>
+                      + photo
                     </button>
                   )}
 
                   {secondPhotoPreview && (
-                    <div className="relative">
+                    <div>
                       <img
                         src={secondPhotoPreview}
                         alt="Second photo"
-                        className="rounded-xl object-cover bg-muted"
-                        style={{ width: 72, height: 128 }}
+                        style={{ width: imgW, height: imgH, objectFit: "cover", background: C.well, display: "block" }}
                       />
                       <button
                         onClick={() => { setSecondPhoto(null); setSecondPhotoPreview(null); }}
-                        className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 hover:bg-muted transition-colors"
-                        style={{ lineHeight: 1 }}
+                        aria-label="Remove second photo"
+                        style={{ ...textLink(C.muted), marginTop: 9, fontSize: 10 }}
                       >
-                        <span className="text-base text-muted-foreground">✕</span>
+                        Remove
                       </button>
                     </div>
                   )}
@@ -559,90 +764,104 @@ const PostDecision = () => {
                 </div>
 
                 {/* Editable fields */}
-                <div className="flex-1 space-y-2">
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
                   <input
+                    className="pd-field"
                     value={product.name}
                     onChange={(e) => setProduct({ ...product, name: e.target.value })}
                     placeholder="Item name"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                    style={field}
                   />
                   <input
+                    className="pd-field"
                     value={product.brand}
                     onChange={(e) => setProduct({ ...product, brand: e.target.value })}
                     placeholder="Brand"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                    style={field}
                   />
                   <div>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground">$</span>
+                    <div style={{ position: "relative" }}>
+                      <span style={{ ...body(isMobile ? 16 : 15, C.muted), position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>$</span>
                       <input
+                        className="pd-field"
                         value={priceNote}
                         onChange={(e) => setPriceNote(e.target.value.replace(/[^0-9.]/g, ""))}
                         placeholder="Price"
-                        className="w-full pl-6 pr-3 py-2 rounded-lg border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                        style={{ ...field, paddingLeft: 28 }}
                       />
                     </div>
                     {!priceNote && (
-                      <p className="text-xs text-muted-foreground mt-1 pl-1">Couldn't detect price — enter it manually</p>
+                      <p style={{ ...body(12.5, C.muted), marginTop: 6 }}>Couldn't detect price. Enter it manually.</p>
                     )}
                   </div>
                 </div>
               </div>
 
               {/* Compare a second option (deciding between two) */}
-              <div className="mb-6">
+              <div style={{ marginBottom: 32 }}>
                 {secondProduct ? (
-                  <div className="flex items-center gap-3 p-2 rounded-xl border border-border bg-card">
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderTop: `1px solid ${C.rule}`, borderBottom: `1px solid ${C.rule}` }}>
                     {secondProduct.image_url ? (
-                      <img src={secondProduct.image_url} alt="Second option" className="rounded-lg object-cover bg-muted flex-shrink-0" style={{ width: 44, height: 58 }} />
+                      <img src={secondProduct.image_url} alt="Second option" style={{ width: 44, height: 58, objectFit: "cover", background: C.well, flexShrink: 0, display: "block" }} />
                     ) : (
-                      <div className="rounded-lg bg-muted flex-shrink-0 flex items-center justify-center" style={{ width: 44, height: 58 }}><Link className="w-4 h-4 text-muted-foreground" /></div>
+                      <div style={{ width: 44, height: 58, background: C.well, flexShrink: 0 }} />
                     )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground" style={{ letterSpacing: "0.1em" }}>Comparing with</p>
-                      <p className="text-base text-foreground truncate">{[secondProduct.brand, secondProduct.name].filter(Boolean).join(" ") || secondProduct.source_url}</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={meta(10, C.muted)}>Comparing with</p>
+                      <p style={{ ...body(14.5, C.ink), marginTop: 3, ...ellipsis }}>{[secondProduct.brand, secondProduct.name].filter(Boolean).join(" ") || secondProduct.source_url}</p>
                     </div>
-                    <button onClick={() => setSecondProduct(null)} className="flex-shrink-0 text-muted-foreground hover:text-foreground px-2" aria-label="Remove second option">✕</button>
+                    <button
+                      onClick={() => setSecondProduct(null)}
+                      aria-label="Remove second option"
+                      style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: C.muted, fontFamily: SANS, fontSize: 16, lineHeight: 1, padding: "6px 4px" }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ) : showSecondUrl ? (
                   <div>
-                    <div className="flex gap-2">
+                    <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
                       <input
                         type="url"
+                        className="pd-field"
                         value={secondUrlInput}
                         onChange={(e) => { setSecondUrlInput(e.target.value); setSecondUrlError(null); }}
                         onKeyDown={(e) => e.key === "Enter" && handleSecondUrlSubmit()}
                         placeholder="Paste the other product link"
                         autoFocus
-                        className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                        style={{ ...field, flex: 1, minWidth: 0 }}
                       />
                       <button
                         onClick={handleSecondUrlSubmit}
                         disabled={extractingSecond || !secondUrlInput.trim()}
-                        className="px-4 rounded-lg text-base font-medium disabled:opacity-40"
-                        style={{ background: "#1C1712", color: "#FDFAF6" }}
+                        style={secondaryBtn(!extractingSecond && !!secondUrlInput.trim())}
                       >
                         {extractingSecond ? "…" : "Add"}
                       </button>
                     </div>
-                    {secondUrlError && <p className="text-xs mt-1 pl-1" style={{ color: "#c0392b" }}>{secondUrlError}</p>}
+                    {secondUrlError && <p style={errorText}>{secondUrlError}</p>}
                   </div>
                 ) : (
-                  <button onClick={() => setShowSecondUrl(true)} className="flex items-center gap-1.5 text-base hover:underline" style={{ color: "#C49E64" }}>
-                    <Link className="w-4 h-4" /> Deciding between two? Add the other link
+                  <button
+                    onClick={() => setShowSecondUrl(true)}
+                    style={{ ...body(14.5, C.ink), background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+                  >
+                    Deciding between two?{" "}
+                    <span style={{ color: C.burgundy, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, textDecorationThickness: 1 }}>Add the other link</span>
                   </button>
                 )}
               </div>
 
               {/* Category picker */}
-              <div className="mb-6">
-                <p className="text-base text-muted-foreground mb-2 tracking-wide uppercase" style={{ letterSpacing: "0.1em" }}>Category</p>
-                <div className="flex flex-wrap gap-2">
+              <div>
+                <p style={{ ...meta(11, C.ink), marginBottom: 12 }}>Category</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {CATEGORY_OPTIONS.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setProduct({ ...product, category: product.category === cat ? null : cat })}
-                      className={`pill-button ${product.category === cat ? "active" : ""}`}
+                      aria-pressed={product.category === cat}
+                      style={chip(product.category === cat)}
                     >
                       {cat}
                     </button>
@@ -650,68 +869,48 @@ const PostDecision = () => {
                 </div>
               </div>
 
-              <button
-                onClick={() => setFlowStep("uncertainty")}
-                disabled={!product.name.trim() && !product.brand.trim()}
-                className="w-full text-base tracking-[0.18em] uppercase font-medium disabled:opacity-30 transition-all" style={{ background: "#1C1712", color: "#FDFAF6", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", padding: "16px 0" }}
-              >
-                Looks good — continue
-              </button>
-              <button
-                onClick={() => { setProduct(null); setUrlInput(""); setUrlError(null); setFlowStep("input"); }}
-                className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Start over
-              </button>
+              <div style={actions}>
+                <button
+                  onClick={() => setFlowStep("uncertainty")}
+                  disabled={!product.name.trim() && !product.brand.trim()}
+                  style={primaryBtn(!!(product.name.trim() || product.brand.trim()))}
+                >
+                  Looks good, continue
+                </button>
+                <button
+                  onClick={() => { setProduct(null); setUrlInput(""); setUrlError(null); setFlowStep("input"); }}
+                  style={back}
+                >
+                  Start over
+                </button>
+              </div>
             </motion.div>
           )}
 
           {/* ── STEP 4: UNCERTAINTY ── */}
           {flowStep === "uncertainty" && product && (
-            <motion.div key="uncertainty" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-              {/* Product mini preview */}
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border mb-8">
-                {displayImage ? (
-                  <img src={displayImage} alt={product.name} className="w-12 h-14 rounded-lg object-cover bg-muted flex-shrink-0" />
-                ) : (
-                  <div className="w-12 h-14 rounded-lg bg-muted flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-medium text-foreground truncate">{product.name || "Unnamed item"}</p>
-                  <p className="text-base text-muted-foreground">{product.brand || product.retailer}</p>
-                </div>
-              </div>
+            <motion.div key="uncertainty" {...enter}>
+              {mini}
 
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">
-                What are you unsure about?
-              </h2>
-              <p className="text-muted-foreground text-base mb-8">Select all that apply.</p>
+              <h1 style={heading}>What are you unsure about?</h1>
+              <p style={lede}>Select all that apply.</p>
 
-              <div className="flex flex-wrap gap-3">
-                {UNCERTAINTY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => toggleUncertainty(opt)}
-                    className={`pill-button ${uncertainties.includes(opt) ? "active" : ""}`}
-                  >
-                    {opt}
-                  </button>
+              <div>
+                {UNCERTAINTY_OPTIONS.map((opt, i) => (
+                  <OptionRow key={opt} label={opt} first={i === 0} on={uncertainties.includes(opt)} onClick={() => toggleUncertainty(opt)} />
                 ))}
               </div>
 
-              <div className="mt-8">
+              <div style={actions}>
                 <button
                   onClick={() => setFlowStep(needsContext ? "context" : "confidence")}
                   disabled={uncertainties.length === 0}
-                  className="w-full text-base tracking-[0.18em] uppercase font-medium disabled:opacity-30 transition-all" style={{ background: "#1C1712", color: "#FDFAF6", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", padding: "16px 0" }}
+                  style={primaryBtn(uncertainties.length > 0)}
                 >
                   Continue
                 </button>
-                <button
-                  onClick={() => setFlowStep("preview")}
-                  className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Back
+                <button onClick={() => setFlowStep("preview")} style={back}>
+                  ← Back
                 </button>
               </div>
             </motion.div>
@@ -719,169 +918,106 @@ const PostDecision = () => {
 
           {/* ── STEP 4b: CONTEXT ── */}
           {flowStep === "context" && product && (
-            <motion.div key="context" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-              <h2 className="font-sans text-3xl font-light text-foreground mb-2">
-                Tell us more
-              </h2>
-              <p className="text-muted-foreground text-base mb-8">
-                The more specific you are, the better the input you'll get.
-              </p>
+            <motion.div key="context" {...enter}>
+              <h1 style={heading}>Tell us more</h1>
+              <p style={lede}>The more specific you are, the better the input you'll get.</p>
 
-              <div className="space-y-6">
+              <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
                 {uncertainties.includes("Worth the price") && (
-                  <div>
-                    <p className="text-base font-medium text-foreground mb-3">What's the price?</p>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base text-muted-foreground pointer-events-none">$</span>
+                  <div style={section(true)}>
+                    <p style={{ ...sectionTitle, marginBottom: 12 }}>What's the price?</p>
+                    <div style={{ position: "relative" }}>
+                      <span style={{ ...body(isMobile ? 16 : 15, C.muted), position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>$</span>
                       <input
+                        className="pd-field"
                         value={priceNote}
                         onChange={(e) => setPriceNote(e.target.value.replace(/^\$/, ""))}
                         placeholder="120"
-                        className="w-full pl-7 pr-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                        style={{ ...field, paddingLeft: 28 }}
                       />
                     </div>
                   </div>
                 )}
 
                 {uncertainties.includes("Between sizes") && (
-                  <div>
-                    <p className="text-base font-medium text-foreground mb-1">Which sizes are you deciding between?</p>
-                    <p className="text-base text-muted-foreground mb-3">Select at least 2</p>
+                  <div style={section(!uncertainties.includes("Worth the price"))}>
+                    <p style={{ ...sectionTitle, marginBottom: 4 }}>Which sizes are you deciding between?</p>
+                    <p style={{ ...body(14, C.muted), marginBottom: 18 }}>Select at least 2</p>
 
                     {product?.category === "Shoes" ? (
                       <>
-                        <p className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-2">US sizes</p>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14"].map((s) => (
-                            <button
-                              key={`us${s}`}
-                              onClick={() => setSizesNote((prev) =>
-                                prev.includes(s) ? prev.filter((x) => x !== s) : prev.length < 2 ? [...prev, s] : prev
-                              )}
-                              className={`pill-button ${sizesNote.includes(s) ? "active" : ""}`}
-                            >
-                              {s}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-2">EU sizes</p>
-                        <div className="flex flex-wrap gap-2">
-                          {["35", "35.5", "36", "36.5", "37", "37.5", "38", "38.5", "39", "39.5", "40", "40.5", "41", "41.5", "42", "42.5", "43", "43.5", "44", "44.5", "45", "46", "47"].map((s) => (
-                            <button
-                              key={`eu${s}`}
-                              onClick={() => setSizesNote((prev) =>
-                                prev.includes(s) ? prev.filter((x) => x !== s) : prev.length < 2 ? [...prev, s] : prev
-                              )}
-                              className={`pill-button ${sizesNote.includes(s) ? "active" : ""}`}
-                            >
-                              {s}
-                            </button>
-                          ))}
-                        </div>
+                        <p style={sizeLabel}>US sizes</p>
+                        {sizeChips(["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14"], "us")}
+                        <p style={{ ...sizeLabel, marginTop: 20 }}>EU sizes</p>
+                        {sizeChips(["35", "35.5", "36", "36.5", "37", "37.5", "38", "38.5", "39", "39.5", "40", "40.5", "41", "41.5", "42", "42.5", "43", "43.5", "44", "44.5", "45", "46", "47"], "eu")}
                       </>
                     ) : (
                       <>
-                        <p className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-2">Letter sizes</p>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {["XXS", "XS", "S", "M", "L", "XL", "XXL", "1X", "2X", "3X", "4X"].map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => setSizesNote((prev) =>
-                                prev.includes(s) ? prev.filter((x) => x !== s) : prev.length < 2 ? [...prev, s] : prev
-                              )}
-                              className={`pill-button ${sizesNote.includes(s) ? "active" : ""}`}
-                            >
-                              {s}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-2">Number sizes</p>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {["00", "0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24"].map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => setSizesNote((prev) =>
-                                prev.includes(s) ? prev.filter((x) => x !== s) : prev.length < 2 ? [...prev, s] : prev
-                              )}
-                              className={`pill-button ${sizesNote.includes(s) ? "active" : ""}`}
-                            >
-                              {s}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-2">Waist sizes</p>
-                        <div className="flex flex-wrap gap-2">
-                          {["23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "36", "38", "40"].map((s) => (
-                            <button
-                              key={`w${s}`}
-                              onClick={() => setSizesNote((prev) =>
-                                prev.includes(s) ? prev.filter((x) => x !== s) : prev.length < 2 ? [...prev, s] : prev
-                              )}
-                              className={`pill-button ${sizesNote.includes(s) ? "active" : ""}`}
-                            >
-                              {s}
-                            </button>
-                          ))}
-                        </div>
+                        <p style={sizeLabel}>Letter sizes</p>
+                        {sizeChips(["XXS", "XS", "S", "M", "L", "XL", "XXL", "1X", "2X", "3X", "4X"], "")}
+                        <p style={{ ...sizeLabel, marginTop: 20 }}>Number sizes</p>
+                        {sizeChips(["00", "0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24"], "")}
+                        <p style={{ ...sizeLabel, marginTop: 20 }}>Waist sizes</p>
+                        {sizeChips(["23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "36", "38", "40"], "w")}
                       </>
                     )}
 
-                    <div className="mt-5">
-                      <p className="text-base font-medium text-foreground mb-1">
-                        Anything making you unsure? <span className="font-normal text-muted-foreground">(optional)</span>
+                    <div style={{ marginTop: 24 }}>
+                      <p style={{ ...strong(14.5), marginBottom: 8 }}>
+                        Anything making you unsure? <span style={{ fontWeight: 400, color: C.muted }}>(optional)</span>
                       </p>
                       <textarea
+                        className="pd-field"
                         value={contextNotes["Between sizes"] ?? ""}
                         onChange={(e) => setContextNotes((prev) => ({ ...prev, ["Between sizes"]: e.target.value }))}
                         placeholder="e.g. I'm usually a 7 but this brand runs small, and I have wide feet"
                         rows={2}
-                        className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent resize-none"
+                        style={field}
                       />
                     </div>
                   </div>
                 )}
 
-                {uncertainties.filter(u => u !== "Between sizes" && u !== "Other").map((u) => (
-                  <div key={u}>
-                    <p className="text-base font-medium text-foreground mb-1">{u}</p>
-                    <p className="text-base text-muted-foreground mb-2">What specifically are you unsure about?</p>
+                {uncertainties.filter(u => u !== "Between sizes" && u !== "Other").map((u, i) => (
+                  <div key={u} style={section(i === 0 && !uncertainties.includes("Worth the price") && !uncertainties.includes("Between sizes"))}>
+                    <p style={sectionTitle}>{u}</p>
+                    <p style={{ ...body(14, C.muted), marginTop: 4, marginBottom: 10 }}>What specifically are you unsure about?</p>
                     <textarea
+                      className="pd-field"
                       value={contextNotes[u] ?? ""}
                       onChange={(e) => setContextNotes(prev => ({ ...prev, [u]: e.target.value }))}
-                      placeholder="Be specific — this helps others give you real input..."
+                      placeholder="Be specific. This helps others give you real input..."
                       rows={2}
-                      className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent resize-none"
+                      style={field}
                     />
                   </div>
                 ))}
 
                 {uncertainties.includes("Other") && (
-                  <div>
-                    <p className="text-base font-medium text-foreground mb-1">What else are you unsure about?</p>
+                  <div style={section(uncertainties.length === 1)}>
+                    <p style={{ ...sectionTitle, marginBottom: 10 }}>What else are you unsure about?</p>
                     <textarea
+                      className="pd-field"
                       value={contextNotes["Other"] ?? ""}
                       onChange={(e) => setContextNotes(prev => ({ ...prev, Other: e.target.value }))}
                       placeholder="Describe what's holding you back..."
                       rows={3}
-                      className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent resize-none"
+                      style={field}
                     />
                   </div>
                 )}
               </div>
 
-              <div className="mt-8">
+              <div style={actions}>
                 <button
                   onClick={() => setFlowStep("confidence")}
                   disabled={uncertainties.includes("Between sizes") && sizesNote.length < 2}
-                  className="w-full text-base tracking-[0.18em] uppercase font-medium disabled:opacity-30 transition-all" style={{ background: "#1C1712", color: "#FDFAF6", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", padding: "16px 0" }}
+                  style={primaryBtn(!(uncertainties.includes("Between sizes") && sizesNote.length < 2))}
                 >
                   Continue
                 </button>
-                <button
-                  onClick={() => setFlowStep("uncertainty")}
-                  className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Back
+                <button onClick={() => setFlowStep("uncertainty")} style={back}>
+                  ← Back
                 </button>
               </div>
             </motion.div>
@@ -889,141 +1025,91 @@ const PostDecision = () => {
 
           {/* ── STEP 5: CONFIDENCE ── */}
           {flowStep === "confidence" && product && (
-            <motion.div key="confidence" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border mb-8">
-                {displayImage ? (
-                  <img src={displayImage} alt={product.name} className="w-12 h-14 rounded-lg object-cover bg-muted flex-shrink-0" />
-                ) : (
-                  <div className="w-12 h-14 rounded-lg bg-muted flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-medium text-foreground truncate">{product.name || "Unnamed item"}</p>
-                  <p className="text-base text-muted-foreground">{product.brand || product.retailer}</p>
-                </div>
+            <motion.div key="confidence" {...enter}>
+              {mini}
+
+              <h1 style={heading}>How confident are you right now?</h1>
+              <p style={lede}>1 = not at all · 10 = very confident</p>
+
+              <div style={{ display: "flex", gap: isMobile ? 4 : 6 }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
+                  const on = confidence === n;
+                  return (
+                    <button
+                      key={n}
+                      onClick={() => setConfidence(n)}
+                      aria-pressed={on}
+                      style={{
+                        flex: 1, minWidth: 0, height: isMobile ? 46 : 54, padding: 0,
+                        borderRadius: RADIUS, border: `1px solid ${on ? C.burgundy : C.rule}`,
+                        background: on ? C.burgundy : "transparent", color: on ? "#FFFFFF" : C.ink,
+                        fontFamily: SANS, fontSize: 15, fontWeight: on ? 700 : 500, cursor: "pointer",
+                        transition: "background 0.12s, color 0.12s, border-color 0.12s",
+                      }}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+                <span style={meta(10, C.muted)}>Not confident</span>
+                <span style={meta(10, C.muted)}>Very confident</span>
               </div>
 
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">
-                How confident are you right now?
-              </h2>
-              <p className="text-muted-foreground text-base mb-10">
-                1 = not at all · 10 = very confident
-              </p>
-
-              <div className="flex justify-between gap-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setConfidence(n)}
-                    className="flex-1 aspect-square max-w-[48px] text-base font-medium transition-all"
-                    style={{
-                      borderRadius: 6,
-                      border: confidence === n ? "1px solid #1C1712" : "1px solid hsl(var(--border))",
-                      background: confidence === n ? "#1C1712" : "transparent",
-                      color: confidence === n ? "#FDFAF6" : "hsl(var(--muted-foreground))",
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
+              <div style={actions}>
+                <button onClick={() => setFlowStep("audience")} style={primaryBtn(true)}>
+                  Continue
+                </button>
+                <button onClick={() => setFlowStep("uncertainty")} style={back}>
+                  ← Back
+                </button>
               </div>
-              <div className="flex justify-between text-base text-muted-foreground mt-2 mb-10">
-                <span>Not confident</span>
-                <span>Very confident</span>
-              </div>
-
-              <button
-                onClick={() => setFlowStep("audience")}
-                className="w-full text-base tracking-[0.18em] uppercase font-medium disabled:opacity-30 transition-all" style={{ background: "#1C1712", color: "#FDFAF6", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", padding: "16px 0" }}
-              >
-                Continue
-              </button>
-              <button
-                onClick={() => setFlowStep("uncertainty")}
-                className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Back
-              </button>
             </motion.div>
           )}
 
           {/* ── STEP 6: WHO SHOULD WEIGH IN (optional) ── */}
           {flowStep === "audience" && product && (
-            <motion.div key="audience" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border mb-8">
-                {displayImage ? (
-                  <img src={displayImage} alt={product.name} className="w-12 h-14 rounded-lg object-cover bg-muted flex-shrink-0" />
-                ) : (
-                  <div className="w-12 h-14 rounded-lg bg-muted flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-medium text-foreground truncate">{product.name || "Unnamed item"}</p>
-                  <p className="text-base text-muted-foreground">{product.brand || product.retailer}</p>
-                </div>
-              </div>
+            <motion.div key="audience" {...enter}>
+              {mini}
 
-              <h2 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-2">
-                Who would you especially like input from?
-              </h2>
-              <p className="text-muted-foreground text-base mb-8">
-                Optional (select all that apply)
-              </p>
+              <h1 style={heading}>Who would you especially like input from?</h1>
+              <p style={lede}>Optional (select all that apply)</p>
 
-              <div className="flex flex-col gap-3 mb-6">
-                {AUDIENCE_OPTIONS.map((opt) => {
-                  const on = inputFrom.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => toggleInputFrom(opt)}
-                      className="w-full text-left text-base transition-all"
-                      style={{
-                        borderRadius: 8,
-                        padding: "15px 18px",
-                        border: on ? "1px solid #1C1712" : "1px solid hsl(var(--border))",
-                        background: on ? "#1C1712" : "transparent",
-                        color: on ? "#FDFAF6" : "hsl(var(--foreground))",
-                      }}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
+              <div>
+                {AUDIENCE_OPTIONS.map((opt, i) => (
+                  <OptionRow key={opt} label={opt} first={i === 0} on={inputFrom.includes(opt)} onClick={() => toggleInputFrom(opt)} />
+                ))}
               </div>
 
               {inputFrom.includes("Other") && (
                 <input
                   type="text"
+                  className="pd-field"
                   value={inputFromOther}
                   onChange={(e) => setInputFromOther(e.target.value)}
                   placeholder="Who would you like to hear from?"
-                  className="w-full text-base mb-6"
-                  style={{ borderRadius: 8, padding: "15px 18px", border: "1px solid hsl(var(--border))", background: "transparent", color: "hsl(var(--foreground))", outline: "none" }}
+                  style={{ ...field, marginTop: 16 }}
                 />
               )}
 
-              <p className="text-muted-foreground text-sm mb-8">
+              <p style={{ ...body(13.5, C.muted), marginTop: 18 }}>
                 We'll use this to help connect your decision with relevant people.
               </p>
 
-              <button
-                onClick={submitDecision}
-                disabled={submitting}
-                className="w-full text-base tracking-[0.18em] uppercase font-medium disabled:opacity-30 transition-all" style={{ background: "#1C1712", color: "#FDFAF6", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.22)", padding: "16px 0" }}
-              >
-                {submitting ? "Posting..." : "Post & get input"}
-              </button>
-              <button
-                onClick={() => setFlowStep("confidence")}
-                className="w-full mt-3 text-center text-base text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Back
-              </button>
+              <div style={actions}>
+                <button onClick={submitDecision} disabled={submitting} style={primaryBtn(!submitting)}>
+                  {submitting ? "Posting..." : "Post & get input"}
+                </button>
+                <button onClick={() => setFlowStep("confidence")} style={back}>
+                  ← Back
+                </button>
+              </div>
             </motion.div>
           )}
 
         </AnimatePresence>
-      </div>
-
+      </main>
     </div>
   );
 };

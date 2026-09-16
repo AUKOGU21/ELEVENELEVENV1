@@ -274,7 +274,7 @@ const SignIn = () => {
       <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "36px 20px 72px", boxSizing: "border-box" }}>
         <div style={{ width: "100%", maxWidth: 380 }}>
           <h1 style={{ ...display("clamp(34px, 9.5vw, 46px)"), marginBottom: 26 }}>
-            {mode === "signin" ? "Welcome back." : "Make your account."}
+            {mode === "signin" ? "Welcome back." : "Join the no-guess list."}
           </h1>
 
           {/* Mode toggle */}

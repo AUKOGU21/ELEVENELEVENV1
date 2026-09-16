@@ -1007,7 +1007,7 @@ const Profile = () => {
 
   // ─── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!user) { navigate("/signin"); return; }
+    if (!user) { navigate("/signin?mode=signup"); return; }
     fetchProfile();
     fetchStats();
     fetchDecisions();

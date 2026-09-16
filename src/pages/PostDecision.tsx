@@ -517,7 +517,7 @@ const PostDecision = () => {
 
     if (!user) {
       setSubmitting(false);
-      navigate("/signin");
+      navigate("/signin?mode=signup");
       return;
     }
 

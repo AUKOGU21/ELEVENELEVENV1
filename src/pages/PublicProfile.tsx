@@ -144,7 +144,7 @@ const PublicProfile = () => {
             user={user}
             following={following}
             onChange={(_, on) => setFollowing(on)}
-            onSignIn={() => navigate("/signin")}
+            onSignIn={() => navigate("/signin?mode=signup")}
             size="md"
             variant="editorial"
           />

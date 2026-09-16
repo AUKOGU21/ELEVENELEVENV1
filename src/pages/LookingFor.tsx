@@ -89,7 +89,7 @@ export default function LookingFor() {
 
   const submit = async () => {
     if (!canSubmit) return;
-    if (!user) { navigate("/signin"); return; }
+    if (!user) { navigate("/signin?mode=signup"); return; }
     setSubmitting(true);
     try {
       await supabase.from("decisions").insert({

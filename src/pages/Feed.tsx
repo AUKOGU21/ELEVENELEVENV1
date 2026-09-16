@@ -1251,7 +1251,7 @@ const Feed = () => {
 
   // Post a clarifying reply on a response (one level deep). Notifies the thread.
   const submitReply = async (responseId: string, body: string) => {
-    if (!user) { navigate("/signin"); return; }
+    if (!user) { navigate("/signin?mode=signup"); return; }
     try {
       await supabase.from("response_replies").insert({ response_id: responseId, user_id: user.id, body });
       supabase.functions
@@ -1284,7 +1284,7 @@ const Feed = () => {
   // Not a weigh-in: no recommendation, no match score. This is how anyone reaches
   // the poster on a decided post, where "Weigh in" no longer makes sense.
   const submitComment = async (decisionId: string, body: string) => {
-    if (!user) { navigate("/signin"); return; }
+    if (!user) { navigate("/signin?mode=signup"); return; }
     try {
       const { data, error } = await supabase
         .from("decision_comments")
@@ -1392,7 +1392,7 @@ const Feed = () => {
 
   // Submit a product recommendation on a Looking For post.
   const submitRecommendation = async (lookingForId: string, draft: RecommendationDraft) => {
-    if (!user) { navigate("/signin"); return; }
+    if (!user) { navigate("/signin?mode=signup"); return; }
     setSubmittingRec(true);
     const target = [...decisions, ...myDecisions].find((d) => d.id === lookingForId);
     let matchScore: number | null = null;
@@ -1471,7 +1471,7 @@ const Feed = () => {
   };
 
   const toggleSave = async (decisionId: string) => {
-    if (!user) { navigate("/signin"); return; }
+    if (!user) { navigate("/signin?mode=signup"); return; }
     const isSaved = savedDecisionIds.has(decisionId);
     const next = new Set(savedDecisionIds);
     if (isSaved) {
@@ -2159,7 +2159,7 @@ const Feed = () => {
               isFollowing={followingIds.has(open.user_id)}
               onToggleFollow={setFollowing}
               onViewProfile={() => navigate(user?.id === open.user_id ? "/profile" : `/profile/${open.user_id}`)}
-              onSignIn={() => navigate("/signin")}
+              onSignIn={() => navigate("/signin?mode=signup")}
               onLightbox={(url) => setLightboxUrl(url)}
               onWeighIn={() => startWeighIn(open.id)}
               outcomeLogged={loggedOutcomeIds.has(open.id)}
@@ -2188,8 +2188,8 @@ const Feed = () => {
                   voteCounts={voteCounts}
                   userVotes={userVotes}
                   onRecHelpful={(rid) => handleRecHelpfulVote(rid)}
-                  onAddRecommendation={() => (user ? setRecModalFor(open.id) : navigate("/signin"))}
-                  onSignIn={() => navigate("/signin")}
+                  onAddRecommendation={() => (user ? setRecModalFor(open.id) : navigate("/signin?mode=signup"))}
+                  onSignIn={() => navigate("/signin?mode=signup")}
                   onFound={saveLookingForOutcome}
                   onProductPulled={patchLookingForProduct}
                   onStillLooking={quickStillLooking}
@@ -2212,8 +2212,8 @@ const Feed = () => {
         voteCounts={voteCounts}
         userVotes={userVotes}
         onHelpful={handleRecHelpfulVote}
-        onAddRecommendation={(id) => (user ? setRecModalFor(id) : navigate("/signin"))}
-        onSignIn={() => navigate("/signin")}
+        onAddRecommendation={(id) => (user ? setRecModalFor(id) : navigate("/signin?mode=signup"))}
+        onSignIn={() => navigate("/signin?mode=signup")}
       />
       <RecommendationModal
         open={!!recModalFor}

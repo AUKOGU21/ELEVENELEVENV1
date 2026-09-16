@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, type CSSProperties, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { MirrorCard, type Mirror } from "@/pages/Profile";
 import { motion, AnimatePresence } from "framer-motion";
@@ -235,6 +235,46 @@ const Onboarding = () => {
     "Over 6'0\"":      ["6'1\"","6'2\"","6'3\"","6'4\"","6'5\"+"],
   };
 
+  // She already has a profile when she returns to finish: load it, so the flow
+  // shows her own answers and nothing she skips is written over blank.
+  const loadedFitDetails = useRef<Record<string, any>>({});
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, age, city, height_range, top_size, bottom_size, silhouette_preference, style_aesthetics, fit_details")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!data || cancelled) return;
+      loadedFitDetails.current = (data.fit_details as Record<string, any>) ?? {};
+      const parts = (data.display_name ?? "").trim().split(/\s+/).filter(Boolean);
+      setFirstName(v => v || parts[0] || "");
+      setLastName(v => v || parts.slice(1).join(" "));
+      setAge(v => v || (data.age != null ? String(data.age) : ""));
+      setCity(v => v || data.city || "");
+      setTopSizeValue(v => v || data.top_size || "");
+      setBottomSizeValue(v => v || data.bottom_size || "");
+      setExactHeight(v => v || data.height_range || "");
+      const fit: Record<string, string> = {};
+      for (const [k, val] of Object.entries(loadedFitDetails.current)) {
+        if (typeof val === "string" && val && !k.startsWith("_")) fit[k] = val;
+      }
+      setFitAnswers(prev => (Object.keys(prev).length ? prev : fit));
+      setAnswers(prev => {
+        if (Object.keys(prev).length) return prev;
+        const seeded: Record<string, string[]> = {};
+        if (Array.isArray(data.silhouette_preference) && data.silhouette_preference.length) seeded.silhouette = data.silhouette_preference;
+        if (Array.isArray(data.style_aesthetics) && data.style_aesthetics.length) seeded.style = data.style_aesthetics;
+        const band = Object.entries(HEIGHT_BAND_DETAILS).find(([, hs]) => hs.includes(data.height_range ?? ""));
+        if (band) seeded.height = [band[0]];
+        return seeded;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
   const current  = STEPS[step];
   const selected = answers[current.key] || [];
 
@@ -291,7 +331,7 @@ const Onboarding = () => {
       silhouette: ua["silhouette"] ?? [],
       style: ua["style"] ?? [],
       fit_preference: ufa["Overall fit"] ?? null,
-      fit_details: ufa,
+      fit_details: { ...loadedFitDetails.current, ...ufa },
     }));
   };
 
@@ -306,21 +346,26 @@ const Onboarding = () => {
       silhouette_preference: ua["silhouette"] ?? [],
       style_aesthetics: ua["style"] ?? [],
       fit_preference: ufa["Overall fit"] ?? null,
-      fit_details: ufa,
+      // Her IRL photos live under _fit_photos in here, so this merges.
+      fit_details: { ...loadedFitDetails.current, ...ufa },
       onboarding_completed: true,
     };
     if (fullName) d.display_name = fullName;
+    for (const [k, v] of Object.entries(d)) {
+      if (k === "onboarding_completed") continue;
+      if (v === null || v === "" || (Array.isArray(v) && v.length === 0)) delete d[k];
+    }
     await supabase.from("profiles").update(d).eq("id", user.id);
   };
 
   const next = async () => {
     if (current.key === "account" && resuming && user) {
       setAuthLoading(true);
-      await supabase.from("profiles").update({
-        display_name: fullName || null,
-        age: age ? parseInt(age) : null,
-        city: city || null,
-      }).eq("id", user.id);
+      const basics: Record<string, any> = {};
+      if (fullName) basics.display_name = fullName;
+      if (age) basics.age = parseInt(age);
+      if (city) basics.city = city;
+      if (Object.keys(basics).length) await supabase.from("profiles").update(basics).eq("id", user.id);
       setAuthLoading(false);
       setStep(step + 1);
       return;

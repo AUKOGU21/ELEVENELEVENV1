@@ -117,7 +117,7 @@ const PublicProfile = () => {
 
   const name      = profile.display_name?.trim() || "Anonymous";
   const first     = nameParts(name)[0] ?? name;
-  const tier      = tierFor(stats.helpfulVotes)?.label ?? null;
+  const tier      = tierFor(stats.helpfulVotes)?.label ?? profile.badge_tier ?? null;
   const sil       = silhouetteFor(profile);
   const fitPhotos = fitPhotosFor(profile);
   const styles: string[] = profile.style_aesthetics ?? [];
@@ -155,7 +155,7 @@ const PublicProfile = () => {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink }}>
+    <div className="fixed inset-0 overflow-hidden flex justify-center" style={{ background: C.paper, color: C.ink }}>
 
       <AnimatePresence>
         {lightboxIdx !== null && fitPhotos[lightboxIdx] && (
@@ -163,6 +163,10 @@ const PublicProfile = () => {
         )}
       </AnimatePresence>
 
+      {/* The page scrolls inside this, the way the feed does. iOS leaves blank
+          tiles behind when a document with a fixed header scrolls itself, which
+          is the cream slab that covered the profile. */}
+      <div className="w-full max-w-[1320px] no-scrollbar" style={{ overflowY: "scroll", overscrollBehavior: "contain" }}>
       <ProfileHeader isMobile={isMobile} right={headerRight} />
 
       <main style={wrap(isMobile)}>
@@ -210,6 +214,7 @@ const PublicProfile = () => {
 
         <ProfileFooter isMobile={isMobile} />
       </main>
+      </div>
     </div>
   );
 };

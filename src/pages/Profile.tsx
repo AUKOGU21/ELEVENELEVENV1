@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Bookmark, Camera, Check, ChevronDown, MoreHorizontal, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bookmark, Camera, Check, ChevronDown, LogOut, MoreHorizontal, Plus, X } from "lucide-react";
 import Cropper from "react-easy-crop";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -230,9 +230,9 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
     fontWeight: 700,
     background: "none",
     border: "none",
-    padding: "2px 0 8px",
+    padding: 0,
+    lineHeight: 1,
     cursor: "pointer",
-    borderBottom: "2px solid transparent",
     whiteSpace: "nowrap",
   };
   return (
@@ -1262,7 +1262,7 @@ const Profile = () => {
   const displayName = profile?.display_name?.trim() || user?.email?.split("@")[0] || "You";
   const firstName   = nameParts(displayName)[0] ?? "You";
   const sil         = silhouetteFor(profile);
-  const tier        = tierFor(stats.helpfulVotes)?.label ?? null;
+  const tier        = tierFor(stats.helpfulVotes)?.label ?? profile?.badge_tier ?? null;
   const styles: string[] = profile?.style_aesthetics ?? [];
   const pickerCols  = isMobile ? 3 : 5;
   const remaining   = 3 - fitPhotos.length;
@@ -1449,7 +1449,7 @@ const Profile = () => {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink }}>
+    <div className="fixed inset-0 overflow-hidden flex justify-center" style={{ background: C.paper, color: C.ink }}>
 
       <AnimatePresence>
         {/* ── Crop ─────────────────────────────────────────────────────────── */}
@@ -1572,10 +1572,15 @@ const Profile = () => {
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileSelect} />
 
+      {/* The page scrolls inside this, the way the feed does. iOS leaves blank
+          tiles behind when a document with a fixed header scrolls itself, which
+          is the cream slab that covered the profile. */}
+      <div className="w-full max-w-[1320px] no-scrollbar" style={{ overflowY: "scroll", overscrollBehavior: "contain" }}>
       <ProfileHeader
         isMobile={isMobile}
         right={
           <button onClick={handleSignOut} style={{ ...textLink(C.ink), fontSize: isMobile ? 10.5 : 12, whiteSpace: "nowrap" }}>
+            <LogOut style={{ width: 13, height: 13 }} strokeWidth={1.75} />
             Sign out
           </button>
         }
@@ -1658,6 +1663,7 @@ const Profile = () => {
 
         <ProfileFooter isMobile={isMobile} />
       </main>
+      </div>
 
       <DialInFitModal open={showFitModal} onClose={() => { setShowFitModal(false); fetchProfile(); }} />
     </div>

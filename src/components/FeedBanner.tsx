@@ -70,6 +70,18 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
             Ask for recs <ArrowRight style={{ width: 15, height: 15 }} strokeWidth={2} />
           </button>
         </div>
+        {onInvite && (
+          <button onClick={onInvite} style={{
+            ...meta(11, C.ink), fontWeight: 700, letterSpacing: "0.14em",
+            display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 10, rowGap: 6,
+            background: "none", border: "none", padding: 0, marginTop: 18, cursor: "pointer", textAlign: "left",
+          }}>
+            Know someone with good taste?
+            <span style={{ ...meta(11, C.burgundy), fontWeight: 700, letterSpacing: "0.14em", display: "inline-flex", alignItems: "center", gap: 7 }}>
+              Send an invite <ArrowRight style={{ width: 14, height: 14 }} strokeWidth={2} />
+            </span>
+          </button>
+        )}
         <div style={{ borderBottom: "1px solid rgba(20,18,16,0.32)", marginTop: 20 }} />
       </section>
     );

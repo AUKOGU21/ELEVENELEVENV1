@@ -1,16 +1,13 @@
 // ── RecommendationsDrawer ─────────────────────────────────────────────────────
 // Right-side drawer holding a Looking For post's product recommendations. Same
-// SideDrawer as the responses drawer — this one is about product picks, not
-// discussion. Pins what the person is looking for + budget/priorities at the top.
+// SideDrawer as the responses drawer. This one is about product picks, not
+// discussion. Pins what the person is looking for, plus budget and priorities.
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { C, RADIUS, body, meta, strong } from "@/lib/design";
 import SideDrawer from "./SideDrawer";
 import RecommendationCard, { RecommendationData } from "./RecommendationCard";
 import { formatBudget } from "@/lib/format";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
-const LF = "#7A6AAE";
 
 export interface LookingForForDrawer {
   id: string;
@@ -35,6 +32,23 @@ interface Props {
 
 type FilterKey = "all" | "buy" | "do_not_buy";
 
+// Square, filled. Matches LookingForView's squareBtn.
+const squareBtn = (colour: string = C.ink): React.CSSProperties => ({
+  ...meta(12, "#FFFFFF"),
+  fontWeight: 700,
+  letterSpacing: "0.16em",
+  width: "100%",
+  background: colour,
+  border: `1px solid ${colour}`,
+  borderRadius: RADIUS,
+  padding: "15px 18px",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+});
+
 export default function RecommendationsDrawer({
   open, onClose, lookingFor, user, voteCounts, userVotes, onHelpful, onAddRecommendation, onSignIn,
 }: Props) {
@@ -49,29 +63,46 @@ export default function RecommendationsDrawer({
   const shown = filter === "all" ? sorted : filter === "buy" ? sorted.filter((r) => r.recommendation !== "do_not_buy") : sorted.filter((r) => r.recommendation === "do_not_buy");
   const count = sorted.length;
 
-  const chip = (key: FilterKey, label: string, n: number) => {
+  // Filters are words with a rule under the live one, not pills.
+  const tab = (key: FilterKey, label: string, n: number) => {
     const active = filter === key;
     return (
-      <button key={key} onClick={() => setFilter(key)} style={{
-        padding: "6px 14px", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
-        border: active ? "1px solid transparent" : "1px solid rgba(0,0,0,0.12)",
-        background: active ? INK : "transparent", color: active ? "#FDFAF6" : "#5A4A42",
-      }}>{label} ({n})</button>
+      <button
+        key={key}
+        onClick={() => setFilter(key)}
+        style={{
+          ...meta(10.5, active ? C.ink : C.muted),
+          fontWeight: active ? 700 : 600,
+          background: "none",
+          border: "none",
+          padding: "0 0 5px",
+          cursor: "pointer",
+          borderBottom: `1px solid ${active ? C.ink : "transparent"}`,
+        }}
+      >
+        {label} ({n})
+      </button>
     );
   };
 
+  const priorities = lookingFor.lf_priorities ?? [];
+
   const pinned = (
     <div>
-      <p style={{ fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: LF, margin: "0 0 5px" }}>Looking for</p>
-      <p style={{ fontSize: 13.5, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.35 }}>{lookingFor.lf_title || "Recommendations"}</p>
-      {(lookingFor.lf_budget || (lookingFor.lf_priorities && lookingFor.lf_priorities.length > 0)) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
+      <p style={{ ...meta(10, C.burgundy), marginBottom: 8 }}>Looking for</p>
+      <p style={{ ...strong(14), lineHeight: 1.35 }}>{lookingFor.lf_title || "Recommendations"}</p>
+      {(lookingFor.lf_budget || priorities.length > 0) && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
           {lookingFor.lf_budget && (
-            <span style={{ fontSize: 10, fontWeight: 600, color: "#5A4A42", background: "rgba(0,0,0,0.05)", borderRadius: 100, padding: "3px 10px" }}>{formatBudget(lookingFor.lf_budget)}</span>
+            <p style={body(12.5, C.inkSoft)}>
+              <span style={{ ...meta(10, C.muted), marginRight: 10 }}>Budget</span>{formatBudget(lookingFor.lf_budget)}
+            </p>
           )}
-          {(lookingFor.lf_priorities ?? []).map((p) => (
-            <span key={p} style={{ fontSize: 10, fontWeight: 600, color: LF, background: "rgba(122,106,174,0.12)", border: "1px solid rgba(122,106,174,0.25)", borderRadius: 100, padding: "3px 10px" }}>{p}</span>
-          ))}
+          {priorities.length > 0 && (
+            <p style={body(12.5, C.inkSoft)}>
+              <span style={{ ...meta(10, C.muted), marginRight: 10 }}>Priorities</span>{priorities.join("  /  ")}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -79,30 +110,30 @@ export default function RecommendationsDrawer({
 
   const footer = isOwner ? null : user ? (
     <>
-      <button onClick={() => { onAddRecommendation(lookingFor.id); onClose(); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-        <Plus style={{ width: 17, height: 17 }} /> Add a recommendation
+      <button onClick={() => { onAddRecommendation(lookingFor.id); onClose(); }} style={squareBtn(C.burgundy)}>
+        Add a recommendation <ArrowRight style={{ width: 15, height: 15 }} />
       </button>
-      <p style={{ fontSize: 10.5, color: MUTED, textAlign: "center", margin: "9px 0 0" }}>Share a product link and why you recommend it.</p>
+      <p style={{ ...body(11.5, C.muted), textAlign: "center", margin: "10px 0 0" }}>Share a product link and why you recommend it.</p>
     </>
   ) : (
-    <button onClick={onSignIn} style={{ width: "100%", background: INK, color: "#FDFAF6", border: "none", borderRadius: 100, padding: "13px 0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+    <button onClick={onSignIn} style={squareBtn(C.burgundy)}>
       Sign in to recommend
     </button>
   );
 
   return (
     <SideDrawer open={open} onClose={onClose} title="Recommendations" subtitle={`${count} recommendation${count === 1 ? "" : "s"}`} pinned={pinned} footer={footer}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {chip("all", "All", count)}
-        {chip("buy", "Would buy", buyCount)}
-        {chip("do_not_buy", "Wouldn't buy", noBuyCount)}
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", padding: "16px 0 0", borderBottom: `1px solid ${C.rule}` }}>
+        {tab("all", "All", count)}
+        {tab("buy", "Would buy", buyCount)}
+        {tab("do_not_buy", "Wouldn't buy", noBuyCount)}
       </div>
       {shown.length === 0 ? (
-        <p style={{ fontSize: 12, color: MUTED, textAlign: "center", padding: "28px 0" }}>
-          {count === 0 ? "No recommendations yet — be the first to share a pick." : "None in this filter."}
+        <p style={{ ...body(13.5, C.muted), padding: "28px 0" }}>
+          {count === 0 ? "No recommendations yet. Be the first to share a pick." : "None in this filter."}
         </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div>
           {shown.map((rec) => (
             <RecommendationCard
               key={rec.id}

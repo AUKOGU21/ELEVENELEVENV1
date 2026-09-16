@@ -1,50 +1,54 @@
+// ── CheckEmail ────────────────────────────────────────────────────────────────
+// Where she lands after a sign-in link is sent. Set in the editorial system:
+// paper, one Anton line, rules instead of an icon tile.
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail } from "lucide-react";
+import { C, SANS, body, display, meta, strong } from "@/lib/design";
 
 const CheckEmail = () => {
   const navigate = useNavigate();
   const email = localStorage.getItem("eleven_email") ?? "your inbox";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex items-center px-6 py-4 border-b border-border">
-        <span
-          className="font-sans text-lg tracking-widest text-foreground cursor-pointer"
+    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, display: "flex", flexDirection: "column" }}>
+      <header style={{ borderBottom: `1px solid ${C.rule}`, padding: "17px 20px" }}>
+        <button
           onClick={() => navigate("/")}
+          style={{
+            background: "none", border: "none", padding: 0, cursor: "pointer", userSelect: "none",
+            fontFamily: SANS, textTransform: "uppercase", letterSpacing: "0.28em", fontSize: 13,
+            color: C.ink, whiteSpace: "nowrap",
+          }}
         >
-          ELEVENELEVEN
-        </span>
-      </div>
+          <span style={{ fontWeight: 700 }}>ELEVEN</span>
+          <span style={{ fontWeight: 300 }}>ELEVEN</span>
+        </button>
+      </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "36px 20px 72px", boxSizing: "border-box" }}>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="max-w-sm w-full"
+          style={{ width: "100%", maxWidth: 420 }}
         >
-          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-8">
-            <Mail className="w-6 h-6 text-muted-foreground" />
-          </div>
+          <p style={meta(11, C.burgundy)}>Almost in</p>
 
-          <h1 className="font-sans text-3xl md:text-4xl font-light text-foreground mb-3">
-            Check your inbox
+          <h1 style={{ ...display("clamp(34px, 9.5vw, 46px)"), marginTop: 14 }}>
+            Check your inbox.
           </h1>
 
-          <p className="text-muted-foreground text-sm mb-2">
-            We sent a sign-in link to
-          </p>
-          <p className="text-foreground text-sm font-medium mb-8">
-            {email}
-          </p>
+          <div style={{ borderTop: `1px solid ${C.rule}`, marginTop: 26, paddingTop: 20 }}>
+            <p style={body(15, C.inkSoft)}>We sent a sign-in link to</p>
+            <p style={{ ...strong(16), marginTop: 5 }}>{email}</p>
+          </div>
 
-          <p className="text-muted-foreground text-xs leading-relaxed">
+          <p style={{ ...body(14, C.muted), marginTop: 22, maxWidth: "42ch" }}>
             Click the link in the email to verify your account and start weighing in.
             The link expires in 24 hours.
           </p>
         </motion.div>
-      </div>
+      </main>
     </div>
   );
 };

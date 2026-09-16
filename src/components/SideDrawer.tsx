@@ -1,15 +1,15 @@
 // ── SideDrawer ────────────────────────────────────────────────────────────────
-// Generic right-side sliding drawer (Linear / Notion / IG-comments feel). Keeps
-// the feed in place behind a dim scrim — the user never navigates away. Reused for
-// both the Decision "responses" drawer and the Looking For "recommendations" drawer.
+// Generic right-side sliding drawer. Keeps the feed in place behind a dim scrim,
+// so the user never navigates away. Reused for both the Decision "responses"
+// drawer and the Looking For "recommendations" drawer.
+//
+// Drawn like the rest of the redesign: paper, hairlines, a bare close mark. The
+// only shadow in the system is the one under this panel, because it floats.
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
-const CREAM = "#FDFAF6";
+import { C, meta, strong } from "@/lib/design";
 
 export interface SideDrawerProps {
   open: boolean;
@@ -43,7 +43,7 @@ export default function SideDrawer({ open, onClose, title, subtitle, pinned, foo
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            style={{ position: "fixed", inset: 0, background: "rgba(28,23,18,0.42)", zIndex: 300, backdropFilter: "blur(2px)" }}
+            style={{ position: "fixed", inset: 0, background: C.scrim, zIndex: 300 }}
           />
           <motion.div
             key="panel"
@@ -51,42 +51,41 @@ export default function SideDrawer({ open, onClose, title, subtitle, pinned, foo
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             style={{
               position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 301,
-              width: "min(460px, 100vw)", background: CREAM,
-              boxShadow: "-16px 0 48px rgba(28,23,18,0.22)",
+              width: "min(460px, 100vw)", background: C.paper,
+              boxShadow: "-16px 0 48px rgba(20,18,16,0.14)",
               display: "flex", flexDirection: "column",
             }}
           >
             {/* Header */}
-            <div style={{ flexShrink: 0, padding: "16px 20px 14px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ flexShrink: 0, padding: "18px 20px 14px", borderBottom: `1px solid ${C.ruleStrong}` }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ ...strong(15), textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1.25 }}>{title}</p>
+                  {subtitle && <p style={{ ...meta(10, C.muted), marginTop: 7 }}>{subtitle}</p>}
+                </div>
                 <button
                   onClick={onClose}
                   aria-label="Close"
-                  style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+                  style={{ background: "none", border: "none", padding: 2, cursor: "pointer", lineHeight: 0, color: C.ink, flexShrink: 0 }}
                 >
-                  <X style={{ width: 17, height: 17, color: INK }} />
+                  <X style={{ width: 18, height: 18 }} strokeWidth={1.5} />
                 </button>
-                <div style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
-                  <p style={{ fontSize: 17, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.2 }}>{title}</p>
-                  {subtitle && <p style={{ fontSize: 13, color: MUTED, margin: "2px 0 0" }}>{subtitle}</p>}
-                </div>
-                <div style={{ width: 32, flexShrink: 0 }} />
               </div>
             </div>
 
             {/* Scrollable body */}
             <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
               {pinned && (
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(0,0,0,0.015)" }}>
+                <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rule}` }}>
                   {pinned}
                 </div>
               )}
-              <div style={{ padding: "16px 18px 24px" }}>{children}</div>
+              <div style={{ padding: "4px 20px 28px" }}>{children}</div>
             </div>
 
             {/* Sticky footer */}
             {footer && (
-              <div style={{ flexShrink: 0, padding: "14px 18px", borderTop: "1px solid rgba(0,0,0,0.07)", background: CREAM }}>
+              <div style={{ flexShrink: 0, padding: "16px 20px", borderTop: `1px solid ${C.ruleStrong}`, background: C.paper }}>
                 {footer}
               </div>
             )}

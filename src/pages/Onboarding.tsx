@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ArrowRight, Lock, Calendar, MapPin } from "lucide-react";
+import { ArrowRight, Lock } from "lucide-react";
 import { STEPS, SIZE_OPTIONS, FIT_CATEGORIES } from "@/components/onboarding/OnboardingData";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { computeMatchScore } from "@/lib/matching";
 import { ensureReferral, pendingReferrer } from "@/lib/referral";
-import { Users } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { C, RADIUS, SANS, body, display, hairline, meta, strong } from "@/lib/design";
 
 // ─── Match label helper ───────────────────────────────────────────────────────
 function getMatchLabel(mine: Record<string, any>, them: Record<string, any>): string {
@@ -31,7 +32,6 @@ const FAN_CONFIG = [
   { left: 262, y: 22, rotate: 13,  scale: 0.74, zIndex: 1 },
 ];
 
-// ─── Height visualization constants ──────────────────────────────────────────
 const TOTAL_STEPS = 6;
 const HEIGHT_BANDS_ORDERED = [
   "Under 5'0\"",
@@ -41,60 +41,116 @@ const HEIGHT_BANDS_ORDERED = [
   "5'10\" – 6'0\"",
   "Over 6'0\"",
 ];
-// 5 female silhouettes — UNIFORM scaling (viewBox 80×360, ratio 1∶4.5)
-const SILHOUETTE_SIZES = [
-  { w: 20, h: 90  },   // very short
-  { w: 24, h: 108 },   // short
-  { w: 28, h: 126 },   // medium
-  { w: 32, h: 144 },   // tall
-  { w: 36, h: 162 },   // very tall
-];
 
-// 6 height bands → 5 silhouette indices
-const BAND_TO_SIL_IDX: Record<string, number> = {
-  "Under 5'0\"":    0,
-  "5'0\" – 5'3\"":  1,
-  "5'4\" – 5'6\"":  2,
-  "5'7\" – 5'9\"":  3,
-  "5'10\" – 6'0\"": 4,
-  "Over 6'0\"":     4,
+// ── The editorial system, locally ─────────────────────────────────────────────
+// Set per src/lib/design.ts, like Post a decision and Looking for: paper ground,
+// hairline rules instead of boxes, square edges, Anton for the step headings
+// only. Burgundy is the action colour. Selected options are ink filled with
+// paper text; the image cards take a burgundy rule instead.
+
+const PAGE_CSS = `
+.ob-field::placeholder { color: ${C.muted}; opacity: 1; }
+.ob-field:focus { border-color: ${C.ink} !important; }
+.ob-sugg:hover { background: ${C.well}; }
+`;
+
+const primaryBtn = (enabled: boolean): CSSProperties => ({
+  ...meta(12, "#FFFFFF"),
+  fontWeight: 700,
+  letterSpacing: "0.16em",
+  width: "100%",
+  background: C.burgundy,
+  border: `1px solid ${C.burgundy}`,
+  borderRadius: RADIUS,
+  padding: "15px 18px",
+  cursor: enabled ? "pointer" : "default",
+  opacity: enabled ? 1 : 0.35,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  transition: "opacity 0.15s",
+});
+
+const outlineBtn: CSSProperties = {
+  ...meta(11, C.ink),
+  fontWeight: 700,
+  letterSpacing: "0.16em",
+  width: "100%",
+  background: "transparent",
+  border: `1px solid ${C.ink}`,
+  borderRadius: RADIUS,
+  padding: "13px 16px",
+  cursor: "pointer",
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
-// ── Type system ───────────────────────────────────────────────────────────────
-// Matches the email: Helvetica only, black and white, square edges. No serif, no
-// gold. Uppercase letterspaced labels carry the hierarchy instead of colour.
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
-const INK = "#1C1712";          // the app's ink brown, not pure black
-const INK_SOFT = "#3A3530";
-const MUTED = "#8C7A70";
-const LINE = "rgba(28,23,18,0.16)";
-const GOLD = "#C49E64";
-const GOLD_TINT = "rgba(196,158,100,0.13)";
+const textLink = (colour: string = C.ink): CSSProperties => ({
+  ...meta(11, colour),
+  fontWeight: 700,
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+});
 
-const H1: React.CSSProperties = {
-  // Sentence case, not caps. The weight and the tight tracking carry it.
-  fontFamily: SANS, fontSize: "clamp(25px, 6.6vw, 34px)", lineHeight: 1.08,
-  fontWeight: 700, letterSpacing: "-0.6px",
-  color: INK, margin: "0 0 13px",
-};
-const SUB: React.CSSProperties = {
-  fontFamily: SANS, fontSize: 13, lineHeight: 1.6, color: MUTED,
-  margin: "0 0 30px", maxWidth: "40ch",
-};
-const LABEL: React.CSSProperties = {
-  fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: "2.2px",
-  textTransform: "uppercase", color: INK, margin: "0 0 10px",
-};
-const INPUT: React.CSSProperties = {
-  width: "100%", padding: "14px 16px", border: `1px solid ${LINE}`, borderRadius: 0,
-  background: "#FFFFFF", fontFamily: SANS, fontSize: 15, color: INK, outline: "none",
-};
+/** A short selectable option: fit answers, heights, sizes. */
+const chip = (on: boolean): CSSProperties => ({
+  fontFamily: SANS,
+  fontSize: 13.5,
+  fontWeight: on ? 600 : 500,
+  lineHeight: 1.2,
+  color: on ? C.paper : C.ink,
+  background: on ? C.ink : "transparent",
+  border: `1px solid ${on ? C.ink : C.rule}`,
+  borderRadius: RADIUS,
+  padding: "10px 14px",
+  cursor: "pointer",
+  transition: "background 0.12s, color 0.12s, border-color 0.12s",
+});
+
+/** The same, as a full-width tile in a grid. */
+const tile = (on: boolean): CSSProperties => ({
+  ...chip(on),
+  fontSize: 15,
+  fontWeight: on ? 600 : 500,
+  padding: "15px 10px",
+  textAlign: "center",
+});
+
+function Masthead({ isMobile }: { isMobile: boolean }) {
+  return (
+    <header style={{ background: C.paper, borderBottom: `1px solid ${C.rule}` }}>
+      <div style={{ maxWidth: 1320, margin: "0 auto", display: "flex", justifyContent: "center", padding: isMobile ? "14px 16px" : "20px 40px" }}>
+        <span style={{ userSelect: "none", fontFamily: SANS, textTransform: "uppercase", letterSpacing: isMobile ? "0.22em" : "0.32em", fontSize: isMobile ? 12 : 15, color: C.ink, whiteSpace: "nowrap" }}>
+          <span style={{ fontWeight: 700 }}>ELEVEN</span>
+          <span style={{ fontWeight: 300 }}>ELEVEN</span>
+        </span>
+      </div>
+    </header>
+  );
+}
+
+function StepMark({ index, total }: { index: number; total: number }) {
+  return (
+    <div style={{ marginBottom: 30 }} aria-label={`Step ${index + 1} of ${total}`}>
+      <div style={{ display: "flex", gap: 4 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 2, background: i <= index ? C.burgundy : C.rule, transition: "background 0.25s" }} />
+        ))}
+      </div>
+      <p style={{ ...meta(10.5, C.ink), marginTop: 10 }}>Step {index + 1} / {total}</p>
+    </div>
+  );
+}
 
 const Onboarding = () => {
   const navigate = useNavigate();
   const { signInWithEmail, user } = useAuth();
   const [searchParams] = useSearchParams();
+  const isMobile = useIsMobile();
   const skipAccount = searchParams.get("fromSignup") === "true";
   // Back to finish: she's signed in but her profile never got a name, because
   // signup handed her a session her browser never picked up. The account step
@@ -358,90 +414,91 @@ const Onboarding = () => {
     bottom_size: bottomSizeValue || null,
   };
 
+  // ── Shared page type ───────────────────────────────────────────────────────
+  const heading: CSSProperties = { ...display(isMobile ? "clamp(30px, 9.5vw, 40px)" : 50), marginBottom: 14 };
+  const lede: CSSProperties = { ...body(isMobile ? 15 : 16, C.inkSoft), marginBottom: isMobile ? 24 : 30, maxWidth: "46ch" };
+  const label: CSSProperties = { ...meta(11, C.ink), display: "block", margin: "0 0 10px" };
+  // 16px on phones so iOS doesn't zoom into the field on focus.
+  const field: CSSProperties = {
+    width: "100%", boxSizing: "border-box", borderRadius: RADIUS, border: `1px solid ${C.rule}`, background: "#FFFFFF",
+    padding: "13px 14px", fontFamily: SANS, fontSize: isMobile ? 16 : 15, lineHeight: 1.5, color: C.ink, outline: "none",
+  };
+
   // Shopping-circle confirmation (shown after onboarding when invited by a friend).
   if (circleInviter) {
     return (
-      <div style={{ minHeight: "100vh", background: "#FDFAF6", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", textAlign: "center" }}>
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} style={{ maxWidth: 440, width: "100%" }}>
-          <div style={{ width: 62, height: 62, borderRadius: "50%", margin: "0 auto 22px", background: "rgba(196,158,100,0.14)", border: `1px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Users style={{ width: 26, height: 26, color: INK }} />
-          </div>
-          <h1 style={{ ...H1, fontSize: "clamp(20px, 5.4vw, 26px)", margin: "0 0 14px" }}>
-            You're now part of {circleInviter}'s shopping circle.
-          </h1>
-          <p style={{ fontSize: 16, lineHeight: 1.6, color: "#5A4A42", margin: "0 0 32px" }}>
-            Your take now helps {circleInviter} — and every woman like you — shop with more confidence.
-          </p>
-          <button onClick={() => navigate("/feed")} style={{ width: "100%", maxWidth: 320, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, background: "#1C1712", color: "#FDFAF6", border: "none", borderRadius: 100, padding: "16px 0", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
-            Continue to Feed <ArrowRight style={{ width: 17, height: 17 }} />
-          </button>
-        </motion.div>
+      <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, display: "flex", flexDirection: "column" }}>
+        <Masthead isMobile={isMobile} />
+        <main style={{ flex: 1, width: "100%", maxWidth: 640, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "48px 20px 72px" : "80px 24px 96px" }}>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <p style={{ ...meta(11, C.burgundy), fontWeight: 700, marginBottom: 16 }}>Shopping circle</p>
+            <h1 style={heading}>You're now part of {circleInviter}'s shopping circle.</h1>
+            <p style={lede}>
+              Your take now helps {circleInviter} (and every woman like you) shop with more confidence.
+            </p>
+            <div style={{ ...hairline(), margin: isMobile ? "28px 0" : "36px 0" }} />
+            <button onClick={() => navigate("/feed")} style={primaryBtn(true)}>
+              Continue to feed <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
+            </button>
+          </motion.div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* ─── Segmented progress bar (steps 1–6, hidden on account / quickwin / pinterest) */}
-      {stepNum !== null && (
-        <div className="flex gap-1 px-4 pt-3">
-          {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-            <div
-              key={i}
-              style={{
-                height: 2,
-                flex: 1,
-                borderRadius: 0,
-                background: i < stepNum! ? GOLD : "rgba(196,158,100,0.18)",
-                transition: "background 0.3s",
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Header / logo */}
-      <div className="flex items-center justify-between px-6 py-3">
-        <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 700, letterSpacing: "5px", textTransform: "uppercase", color: INK }}>ELEVENELEVEN</span>
-        {stepNum !== null && (
-          <span style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: MUTED }}>
-            {stepNum} / {TOTAL_STEPS}
-          </span>
-        )}
-      </div>
+    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, display: "flex", flexDirection: "column" }}>
+      <style>{PAGE_CSS}</style>
+      <Masthead isMobile={isMobile} />
 
       {/* Content */}
-      <div className={`flex-1 flex flex-col px-6 max-w-3xl mx-auto w-full overflow-y-auto
-        ${current.type === "pinterest" ? "justify-start pt-4 pb-8" : "justify-center pb-12"}`}
-        style={{ scrollbarWidth: "none" }}>
+      <div
+        style={{
+          flex: 1, width: "100%", maxWidth: 640, margin: "0 auto", boxSizing: "border-box",
+          display: "flex", flexDirection: "column",
+          justifyContent: current.type === "pinterest" ? "flex-start" : "center",
+          padding: isMobile ? "26px 20px 40px" : "44px 24px 56px",
+          overflowY: "auto", scrollbarWidth: "none",
+        }}
+      >
+        {/* ─── Step marker (steps 1–6, hidden on account / quickwin / pinterest) */}
+        {stepNum !== null && <StepMark index={stepNum - 1} total={TOTAL_STEPS} />}
+
         <AnimatePresence mode="wait">
 
           {/* ACCOUNT */}
           {current.type === "account" && (
             <motion.div key="account" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={H1}>{resuming ? "Let's finish your account" : "Let's get started"}</h2>
-              <p style={SUB}>Just the basics.</p>
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <input autoFocus value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name"
-                    style={{ ...INPUT, flex: 1 }} />
-                  <input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name"
-                    style={{ ...INPUT, flex: 1 }} />
+              <h2 style={heading}>{resuming ? "Let's finish your account" : "Let's get started"}</h2>
+              <p style={lede}>Just the basics.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <input autoFocus className="ob-field" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name"
+                    style={{ ...field, flex: 1, minWidth: 0 }} />
+                  <input className="ob-field" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name"
+                    style={{ ...field, flex: 1, minWidth: 0 }} />
                 </div>
                 {!resuming && (
-                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
-                    style={INPUT} />
+                  <input className="ob-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
+                    style={field} />
                 )}
-                <input value={age} onChange={e => setAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" type="text" inputMode="numeric" maxLength={3}
-                  style={INPUT} />
-                <div className="relative">
-                  <input value={city} onChange={e => setCity(e.target.value)} placeholder="City (e.g. New York)"
-                    style={INPUT} />
+                <input className="ob-field" value={age} onChange={e => setAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" type="text" inputMode="numeric" maxLength={3}
+                  style={field} />
+                <div style={{ position: "relative" }}>
+                  <input className="ob-field" value={city} onChange={e => setCity(e.target.value)} placeholder="City (e.g. New York)"
+                    style={field} />
                   {citySuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border overflow-hidden shadow-lg z-10">
+                    <div style={{
+                      position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 10,
+                      background: "#FFFFFF", border: `1px solid ${C.rule}`, borderRadius: RADIUS, overflow: "hidden",
+                    }}>
                       {citySuggestions.map(c => (
-                        <button key={c} type="button" onClick={() => { setCity(c); setCitySuggestions([]); }}
-                          className="w-full text-left px-4 py-2.5 text-base text-foreground hover:bg-muted transition-colors">{c}</button>
+                        <button key={c} type="button" className="ob-sugg" onClick={() => { setCity(c); setCitySuggestions([]); }}
+                          style={{
+                            width: "100%", textAlign: "left", padding: "11px 14px", background: "none",
+                            border: "none", borderRadius: 0, cursor: "pointer",
+                            fontFamily: SANS, fontSize: isMobile ? 16 : 15, color: C.ink,
+                          }}>{c}</button>
                       ))}
                     </div>
                   )}
@@ -452,69 +509,16 @@ const Onboarding = () => {
 
           {/* TRANSITION */}
           {current.type === "transition" && (
-            <motion.div key="transition" {...slideVariants} transition={{ duration: 0.3 }} className="text-center flex flex-col items-center" style={{ marginTop: -32 }}>
-
-              {/* Faint full-background topo lines (top-left decorative) */}
-              <svg
-                viewBox="0 0 320 280"
-                style={{
-                  position: "absolute", top: 0, left: 0, width: "60%", maxWidth: 320,
-                  pointerEvents: "none", opacity: 0.55, zIndex: 0,
-                }}
-                fill="none"
-              >
-                {[40,70,100,130,160,190,220,255].map((r, i) => (
-                  <ellipse key={i} cx="0" cy="0" rx={r * 1.35} ry={r}
-                    stroke="rgba(196,158,100,0.22)" strokeWidth="0.8"
-                    transform={`translate(0, 0)`}
-                  />
-                ))}
-              </svg>
-
-              {/* Glowing orb — pulsating */}
-              <div style={{
-                position: "relative", zIndex: 1,
-                width: 160, height: 160, marginBottom: 40,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <motion.div
-                  animate={{ scale: [1, 1.18, 1], opacity: [0.85, 1, 0.85] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  style={{
-                    position: "absolute", inset: 0,
-                    borderRadius: "50%",
-                    background: "radial-gradient(ellipse at center, rgba(196,158,100,0.72) 0%, rgba(196,158,100,0.38) 28%, rgba(196,158,100,0.14) 55%, transparent 75%)",
-                    filter: "blur(18px)",
-                  }}
-                />
-                <motion.div
-                  animate={{ scale: [1, 1.25, 1], opacity: [0.9, 1, 0.9] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.15 }}
-                  style={{
-                    position: "absolute", inset: "30%",
-                    borderRadius: "50%",
-                    background: "radial-gradient(ellipse at center, rgba(220,185,130,0.9) 0%, rgba(196,158,100,0.5) 50%, transparent 80%)",
-                    filter: "blur(6px)",
-                  }}
-                />
-                <div style={{
-                  width: 7, height: 7, borderRadius: "50%",
-                  background: "#3a2810",
-                  position: "relative", zIndex: 2,
-                }} />
-              </div>
-
-              {/* Title with "you" in gold */}
-              <h2
-                style={{ ...H1, fontSize: "clamp(27px, 7.4vw, 38px)", marginBottom: 20, zIndex: 1, position: "relative" }}
-              >
+            <motion.div key="transition" {...slideVariants} transition={{ duration: 0.3 }}>
+              <p style={{ ...meta(11, C.burgundy), fontWeight: 700, marginBottom: 16 }}>Your profile</p>
+              <h2 style={{ ...display(isMobile ? "clamp(34px, 11vw, 46px)" : 58), marginBottom: 18 }}>
                 Tell us a bit about{" "}
-                <span style={{ color: GOLD }}>you</span>
+                <span style={{ color: C.burgundy }}>you</span>
               </h2>
-
-              <p className="text-muted-foreground text-base" style={{ zIndex: 1, position: "relative", maxWidth: 280 }}>
+              <p style={{ ...body(isMobile ? 15 : 16, C.inkSoft), maxWidth: "34ch" }}>
                 So you can see what actually works before you buy anything.
               </p>
+              <div style={{ ...hairline(), marginTop: isMobile ? 28 : 36 }} />
             </motion.div>
           )}
 
@@ -523,33 +527,22 @@ const Onboarding = () => {
               Dial in your fit modal, asked once, here, where she is already answering. */}
           {current.type === "fit" && (
             <motion.div key="fit" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={H1}>Dial in your fit</h2>
-              <p style={SUB}>Make your matches and responses more precise in seconds.</p>
+              <h2 style={heading}>Dial in your fit</h2>
+              <p style={lede}>Make your matches and responses more precise in seconds.</p>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                {FIT_CATEGORIES.map(cat => (
-                  <div key={cat.label}>
-                    <p style={LABEL}>{cat.label}</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                {FIT_CATEGORIES.map((cat, ci) => (
+                  <div key={cat.label} style={{ paddingTop: ci === 0 ? 0 : 22, borderTop: ci === 0 ? "none" : `1px solid ${C.rule}` }}>
+                    <p style={label}>{cat.label}</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {cat.options.map(opt => {
                         const active = fitAnswers[cat.label] === opt;
                         return (
                           <button
                             key={opt}
                             onClick={() => toggleFit(cat.label, opt)}
-                            style={{
-                              padding: "10px 16px",
-                              border: `1.5px solid ${active ? GOLD : LINE}`,
-                              background: active ? GOLD_TINT : "transparent",
-                              color: INK_SOFT,
-                              fontFamily: SANS,
-                              fontSize: 12.5,
-                              fontWeight: active ? 600 : 500,
-                              letterSpacing: "0.2px",
-                              cursor: "pointer",
-                              transition: "all .14s",
-                              whiteSpace: "nowrap",
-                            }}
+                            aria-pressed={active}
+                            style={{ ...chip(active), whiteSpace: "nowrap" }}
                           >
                             {opt}
                           </button>
@@ -561,35 +554,24 @@ const Onboarding = () => {
               </div>
             </motion.div>
           )}
-          {/* HEIGHT — abstract icon height picker */}
+
+          {/* HEIGHT */}
           {current.type === "select" && (
             <motion.div key="height" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={{ ...H1, textAlign: "center" }}>
-                {current.title}
-              </h2>
+              <h2 style={heading}>{current.title}</h2>
+              {current.subtitle && <p style={lede}>{current.subtitle}</p>}
 
               {/* ── Height band tiles ── */}
-              <div className="grid grid-cols-2 gap-3 mt-6 mb-6">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {HEIGHT_BANDS_ORDERED.map(band => {
                   const active = selected.includes(band);
                   return (
                     <button key={band}
                       onClick={() => { toggleOption(band); setExactHeight(""); }}
-                      className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4 px-3"
-                      style={{
-                        background: active ? GOLD_TINT : "transparent",
-                        borderColor: active ? GOLD : LINE,
-                        color: "hsl(var(--foreground))",
-                      }}
+                      aria-pressed={active}
+                      style={tile(active)}
                     >
                       {band}
-                      {active && (
-                        <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#5C3D1E" }}>
-                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </span>
-                      )}
                     </button>
                   );
                 })}
@@ -601,29 +583,15 @@ const Onboarding = () => {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="mb-4"
+                  style={{ marginTop: 26, paddingTop: 24, borderTop: `1px solid ${C.rule}` }}
                 >
-                  <p className="text-base font-medium text-foreground mb-3">Tell us your exact height</p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <p style={label}>Tell us your exact height</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                     {HEIGHT_BAND_DETAILS[selected[0]].map(ht => {
                       const active = exactHeight === ht;
                       return (
-                        <button key={ht} onClick={() => setExactHeight(ht)}
-                          className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-3"
-                          style={{
-                            background: active ? GOLD_TINT : "transparent",
-                            borderColor: active ? GOLD : LINE,
-                            color: "hsl(var(--foreground))",
-                          }}
-                        >
+                        <button key={ht} onClick={() => setExactHeight(ht)} aria-pressed={active} style={tile(active)}>
                           {ht}
-                          {active && (
-                            <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#5C3D1E" }}>
-                              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </span>
-                          )}
                         </button>
                       );
                     })}
@@ -636,42 +604,27 @@ const Onboarding = () => {
           {/* SIZING — 3A: Top */}
           {current.key === "sizing_top" && (
             <motion.div key="sizing_top" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={{ ...H1, textAlign: "center", marginBottom: 4 }}>Top size</h2>
-              <p className="text-muted-foreground text-base mb-5 text-center">What size do you usually reach for?</p>
+              <h2 style={heading}>Top size</h2>
+              <p style={lede}>What size do you usually reach for?</p>
 
               {/* Toggle */}
               <button
                 onClick={() => { setTopSizeMode(m => m === "letter" ? "number" : "letter"); setTopSizeValue(""); }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-border bg-background text-base font-medium text-foreground hover:bg-muted/60 transition-colors mb-5"
+                style={{ ...outlineBtn, marginBottom: 20 }}
               >
                 {topSizeMode === "letter" ? "Use number sizing instead" : "Use letter sizing instead"}
-                <span style={{ fontSize: 15 }}>⇄</span>
               </button>
 
               {/* Size tiles */}
               {topSizeMode === "letter" ? (
-                <div className="flex flex-col gap-3 mb-6">
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {[["XXS","XS","S","M"], ["L","XL","XXL"], ["1X","2X","3X","4X"]].map((row, ri) => (
-                    <div key={ri} className={`grid gap-3 ${row.length === 3 ? "grid-cols-3" : "grid-cols-4"}`}>
+                    <div key={ri} style={{ display: "grid", gridTemplateColumns: `repeat(${row.length === 3 ? 3 : 4}, 1fr)`, gap: 8 }}>
                       {row.map(s => {
                         const active = topSizeValue === s;
                         return (
-                          <button key={s} onClick={() => setTopSizeValue(v => v === s ? "" : s)}
-                            className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
-                            style={{
-                              background: active ? GOLD_TINT : "transparent",
-                              borderColor: active ? GOLD : LINE,
-                              color: "hsl(var(--foreground))",
-                            }}
-                          >
+                          <button key={s} onClick={() => setTopSizeValue(v => v === s ? "" : s)} aria-pressed={active} style={tile(active)}>
                             {s}
-                            {active && (
-                              <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#5C3D1E" }}>
-                                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              </span>
-                            )}
                           </button>
                         );
                       })}
@@ -679,26 +632,12 @@ const Onboarding = () => {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-3 mb-6">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                   {["00–0","2–4","6–8","10–12","14–16","18–20","22–24"].map(s => {
                     const active = topSizeValue === s;
                     return (
-                      <button key={s} onClick={() => setTopSizeValue(v => v === s ? "" : s)}
-                        className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
-                        style={{
-                          background: active ? GOLD_TINT : "transparent",
-                          borderColor: active ? GOLD : LINE,
-                          color: "hsl(var(--foreground))",
-                        }}
-                      >
+                      <button key={s} onClick={() => setTopSizeValue(v => v === s ? "" : s)} aria-pressed={active} style={tile(active)}>
                         {s}
-                        {active && (
-                          <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#5C3D1E" }}>
-                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                              <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </span>
-                        )}
                       </button>
                     );
                   })}
@@ -710,42 +649,27 @@ const Onboarding = () => {
           {/* SIZING — 3B: Bottom */}
           {current.key === "sizing_bottom" && (
             <motion.div key="sizing_bottom" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={{ ...H1, textAlign: "center", marginBottom: 4 }}>Bottom size</h2>
-              <p className="text-muted-foreground text-base mb-5 text-center">What size do you usually reach for?</p>
+              <h2 style={heading}>Bottom size</h2>
+              <p style={lede}>What size do you usually reach for?</p>
 
               {/* Toggle */}
               <button
                 onClick={() => { setBottomSizeMode(m => m === "letter" ? "number" : "letter"); setBottomSizeValue(""); }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-border bg-background text-base font-medium text-foreground hover:bg-muted/60 transition-colors mb-5"
+                style={{ ...outlineBtn, marginBottom: 20 }}
               >
                 {bottomSizeMode === "letter" ? "Use number sizing instead" : "Use letter sizing instead"}
-                <span style={{ fontSize: 15 }}>⇄</span>
               </button>
 
               {/* Size tiles */}
               {bottomSizeMode === "letter" ? (
-                <div className="flex flex-col gap-3 mb-6">
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {[["XXS","XS","S","M"], ["L","XL","XXL"], ["1X","2X","3X","4X"]].map((row, ri) => (
-                    <div key={ri} className={`grid gap-3 ${row.length === 3 ? "grid-cols-3" : "grid-cols-4"}`}>
+                    <div key={ri} style={{ display: "grid", gridTemplateColumns: `repeat(${row.length === 3 ? 3 : 4}, 1fr)`, gap: 8 }}>
                       {row.map(s => {
                         const active = bottomSizeValue === s;
                         return (
-                          <button key={s} onClick={() => setBottomSizeValue(v => v === s ? "" : s)}
-                            className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
-                            style={{
-                              background: active ? GOLD_TINT : "transparent",
-                              borderColor: active ? GOLD : LINE,
-                              color: "hsl(var(--foreground))",
-                            }}
-                          >
+                          <button key={s} onClick={() => setBottomSizeValue(v => v === s ? "" : s)} aria-pressed={active} style={tile(active)}>
                             {s}
-                            {active && (
-                              <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#5C3D1E" }}>
-                                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              </span>
-                            )}
                           </button>
                         );
                       })}
@@ -753,26 +677,12 @@ const Onboarding = () => {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-3 mb-6">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                   {["00–0","2–4","6–8","10–12","14–16","18–20","22–24"].map(s => {
                     const active = bottomSizeValue === s;
                     return (
-                      <button key={s} onClick={() => setBottomSizeValue(v => v === s ? "" : s)}
-                        className="relative flex items-center justify-center border text-base font-medium transition-all duration-200 py-4"
-                        style={{
-                          background: active ? GOLD_TINT : "transparent",
-                          borderColor: active ? GOLD : LINE,
-                          color: "hsl(var(--foreground))",
-                        }}
-                      >
+                      <button key={s} onClick={() => setBottomSizeValue(v => v === s ? "" : s)} aria-pressed={active} style={tile(active)}>
                         {s}
-                        {active && (
-                          <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#5C3D1E" }}>
-                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                              <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </span>
-                        )}
                       </button>
                     );
                   })}
@@ -784,38 +694,33 @@ const Onboarding = () => {
           {/* SILHOUETTE & STYLE */}
           {current.type === "image-select" && (
             <motion.div key={current.key} {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={H1}>{current.title}</h2>
-              <p className="text-muted-foreground text-base mb-6">{current.subtitle}</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <h2 style={heading}>{current.title}</h2>
+              {current.subtitle && <p style={lede}>{current.subtitle}</p>}
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: 10 }}>
                 {current.options?.map(opt => {
                   const isSelected = selected.includes(opt.label);
                   return (
                   <button key={opt.label} onClick={() => toggleOption(opt.label)}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = GOLD;
-                      e.currentTarget.style.transform = "scale(1.04)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = isSelected ? GOLD : LINE;
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
+                    aria-pressed={isSelected}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = isSelected ? C.burgundy : C.ink; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = isSelected ? C.burgundy : C.rule; }}
                     style={{
-                      borderRadius: 0,
-                      border: `2px solid ${isSelected ? GOLD : LINE}`,
+                      borderRadius: RADIUS,
+                      border: `1px solid ${isSelected ? C.burgundy : C.rule}`,
                       textAlign: "left",
-                      background: "var(--card)",
+                      background: "transparent",
                       cursor: "pointer",
-                      transition: "border-color 0.15s, transform 0.15s",
+                      transition: "border-color 0.15s",
                       display: "flex",
                       flexDirection: "column",
                       padding: 0,
                     }}>
-                    <div style={{ aspectRatio: "2/3", background: "var(--muted)", overflow: "hidden", width: "100%", flexShrink: 0, borderRadius: "14px 14px 0 0" }}>
+                    <div style={{ aspectRatio: "2/3", background: C.well, overflow: "hidden", width: "100%", flexShrink: 0 }}>
                       <img src={opt.image} alt={opt.label} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%", display: "block" }} />
                     </div>
-                    <div style={{ padding: "10px 12px 14px" }}>
-                      <p style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)", lineHeight: 1.3, margin: 0, textTransform: "lowercase" }}>{opt.label}</p>
-                      {opt.desc && <p style={{ fontSize: 15, color: "var(--muted-foreground)", marginTop: 5, lineHeight: 1.4, textTransform: "lowercase" }}>{opt.desc}</p>}
+                    <div style={{ padding: "11px 12px 14px", borderTop: `1px solid ${isSelected ? C.burgundy : C.rule}` }}>
+                      <p style={{ ...strong(13, isSelected ? C.burgundy : C.ink), lineHeight: 1.3 }}>{opt.label}</p>
+                      {opt.desc && <p style={{ ...body(12.5, C.muted), marginTop: 5, lineHeight: 1.4 }}>{opt.desc}</p>}
                     </div>
                   </button>
                 );
@@ -826,33 +731,23 @@ const Onboarding = () => {
 
           {/* QUICK WIN */}
           {current.type === "quickwin" && (
-            <motion.div key="quickwin" {...slideVariants} transition={{ duration: 0.3 }} className="text-center">
+            <motion.div key="quickwin" {...slideVariants} transition={{ duration: 0.3 }}>
               <AnimatePresence mode="wait">
                 {quickWinPhase === "loading" ? (
                   <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <p style={{ ...H1, fontSize: "clamp(21px, 5.6vw, 28px)", marginBottom: 40 }}>
-                      We're finding your closest matches
-                    </p>
-                    <div className="flex gap-3 justify-center">
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i} className="w-2.5 h-2.5 rounded-full bg-foreground"
-                          animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.15, 0.8] }}
-                          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }} />
-                      ))}
+                    <h2 style={heading}>We're finding your closest matches</h2>
+                    <div style={{ position: "relative", height: 2, background: C.rule, overflow: "hidden", marginTop: 8 }}>
+                      <motion.div
+                        style={{ position: "absolute", top: 0, left: 0, height: "100%", width: "40%", background: C.burgundy }}
+                        animate={{ x: ["-100%", "250%"] }}
+                        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                      />
                     </div>
                   </motion.div>
                 ) : (
                   <motion.div key="ready" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-                    <p style={{ ...H1, fontSize: "clamp(21px, 5.6vw, 28px)", marginBottom: 40 }}>
-                      You're already matching with<br />people similar to you
-                    </p>
-                    <div className="flex gap-3 justify-center">
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i} className="w-2.5 h-2.5 rounded-full bg-foreground"
-                          animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.15, 0.8] }}
-                          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }} />
-                      ))}
-                    </div>
+                    <h2 style={heading}>You're already matching with people similar to you</h2>
+                    <div style={{ height: 2, background: C.burgundy, marginTop: 8 }} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -862,41 +757,32 @@ const Onboarding = () => {
           {/* PINTEREST — Profile complete */}
           {current.type === "pinterest" && (
             <motion.div key="pinterest" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
-              className="text-center w-full">
+              style={{ width: "100%" }}>
 
-              {/* Checkmark icon */}
-              <div style={{ position: "relative", display: "inline-block", marginBottom: 16 }}>
-                <span style={{ position: "absolute", top: -10, left: -18, fontSize: 15, color: "rgba(184,149,106,0.75)", pointerEvents: "none" }}>✦</span>
-                <span style={{ position: "absolute", top: -14, right: -6, fontSize: 16,  color: "rgba(184,149,106,0.55)", pointerEvents: "none" }}>+</span>
-                <span style={{ position: "absolute", bottom: -6, right: -20, fontSize: 16, color: "rgba(184,149,106,0.70)", pointerEvents: "none" }}>✦</span>
-                <div style={{ width: 54, height: 54, borderRadius: "50%", border: "1.5px solid #B8956A", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent" }}>
-                  <Check style={{ width: 22, height: 22, color: "#B8956A" }} />
-                </div>
-              </div>
-
-              {/* Heading */}
-              <p className="text-base tracking-widest uppercase text-muted-foreground mb-3">Profile complete</p>
-              <h2 style={{ ...H1, fontSize: "clamp(32px, 9vw, 46px)", marginBottom: 14 }}>
+              <p style={{ ...meta(11, C.burgundy), fontWeight: 700, marginBottom: 14 }}>Profile complete</p>
+              <h2 style={{ ...display(isMobile ? "clamp(44px, 15vw, 64px)" : 76), marginBottom: 16 }}>
                 You're in.
               </h2>
-              <p className="text-muted-foreground text-base leading-relaxed mb-1">
+              <p style={{ ...body(isMobile ? 15 : 16, C.inkSoft), maxWidth: "40ch" }}>
                 We've matched you with women who share your fit, size, and style.
               </p>
-              <p style={{ fontFamily: SANS, fontSize: 15, fontWeight: 700, color: INK, marginBottom: 28 }}>Your feed is ready.</p>
+              <p style={{ ...strong(15), marginTop: 6 }}>Your feed is ready.</p>
+
+              <div style={{ ...hairline(), margin: isMobile ? "26px 0" : "32px 0" }} />
 
               {/* ── Fan of match cards ── */}
-              <div style={{ position: "relative", width: "100%", maxWidth: 370, height: 215, margin: "0 auto 28px", overflow: "visible" }}>
+              <div style={{ position: "relative", width: "100%", maxWidth: 370, height: 215, margin: "0 auto 30px", overflow: "visible" }}>
                 {paddedMatches.map((m, i) => {
                   const cfg = FAN_CONFIG[i];
                   const initial = m ? (m.display_name?.trim() || "?")[0].toUpperCase() : "?";
                   const label   = m ? getMatchLabel(tempProfile, m) : null;
-                  const isCenter = i === 2;
 
                   return (
                     <motion.div key={i}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.07, duration: 0.4 }}
+                      title={label ?? undefined}
                       style={{
                         position: "absolute",
                         left: cfg.left,
@@ -905,8 +791,9 @@ const Onboarding = () => {
                         height: 180,
                         borderRadius: 0,
                         overflow: "hidden",
-                        background: m?.avatar_url ? "transparent" : `hsl(${20 + i * 18}, 22%, ${82 - i * 3}%)`,
-                        boxShadow: isCenter ? "0 10px 36px rgba(0,0,0,0.20)" : "0 4px 14px rgba(0,0,0,0.11)",
+                        background: C.well,
+                        border: `1px solid ${C.rule}`,
+                        boxSizing: "border-box",
                         transform: `rotate(${cfg.rotate}deg) scale(${cfg.scale})`,
                         transformOrigin: "bottom center",
                         zIndex: cfg.zIndex,
@@ -917,12 +804,10 @@ const Onboarding = () => {
                       {m?.avatar_url ? (
                         <img src={m.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
                       ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: 12 }}>
-                          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(0,0,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "rgba(0,0,0,0.45)" }}>
-                            {initial}
-                          </div>
+                        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 12 }}>
+                          <span style={{ ...display(26, C.faint) }}>{initial}</span>
                           {m?.display_name && (
-                            <p style={{ fontSize: 15, fontWeight: 600, color: "rgba(0,0,0,0.45)", textAlign: "center", lineHeight: 1.3 }}>
+                            <p style={{ ...meta(9.5, C.muted), textAlign: "center", lineHeight: 1.3 }}>
                               {m.display_name.split(" ")[0]}
                             </p>
                           )}
@@ -935,57 +820,41 @@ const Onboarding = () => {
               </div>
 
               {/* CTA */}
-              <button onClick={next}
-                style={{
-                  width: "100%", padding: "17px 0", borderRadius: 0, background: INK, color: "#FFFFFF",
-                  border: "none", cursor: "pointer", fontFamily: SANS, fontSize: 13, fontWeight: 700,
-                  letterSpacing: "2.4px", textTransform: "uppercase",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                }}>
+              <button onClick={next} style={primaryBtn(true)}>
                 Go to my feed
-                <ArrowRight style={{ width: 14, height: 14 }} />
+                <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
               </button>
 
               {/* Welcome-email confirmation */}
-              <p style={{ marginTop: 16, fontFamily: SANS, fontSize: 12.5, lineHeight: 1.55, color: MUTED, textAlign: "center" }}>
-                ✉️ we just sent a welcome to your inbox — check spam or promotions if you don't see it.
+              <p style={{ ...body(13, C.muted), marginTop: 16, textAlign: "center" }}>
+                We just sent a welcome to your inbox. Check spam or promotions if you don't see it.
               </p>
             </motion.div>
           )}
 
         </AnimatePresence>
-      </div>
 
-      {/* Bottom — hidden on quickwin (auto-advances) and pinterest (CTA is inline) */}
-      {current.type !== "quickwin" && current.type !== "pinterest" && (
-        <div className="px-6 pb-8 max-w-3xl mx-auto w-full">
-          <button onClick={next} disabled={!canContinue() || authLoading}
-            style={{
-              width: "100%", padding: "17px 0", border: `2px solid ${INK}`, borderRadius: 0,
-              background: INK, color: "#FFFFFF", fontFamily: SANS, fontSize: 13, fontWeight: 700,
-              letterSpacing: "2.4px", textTransform: "uppercase",
-              cursor: (!canContinue() || authLoading) ? "default" : "pointer",
-              opacity: (!canContinue() || authLoading) ? 0.28 : 1, transition: "opacity .15s",
-            }}>
-            {authLoading ? "Sending..." : current.type === "transition" ? "Get started" : "Continue"}
-          </button>
-          {step > 0 && current.type !== "transition" && (
-            <button onClick={() => setStep(step - 1)}
-              style={{ width: "100%", marginTop: 14, background: "none", border: "none", fontFamily: SANS,
-                       fontSize: 11, letterSpacing: "1.8px", textTransform: "uppercase", color: MUTED,
-                       cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: "6px 0" }}>
-              Back
+        {/* Bottom — hidden on quickwin (auto-advances) and pinterest (CTA is inline) */}
+        {current.type !== "quickwin" && current.type !== "pinterest" && (
+          <div style={{ marginTop: 36 }}>
+            <button onClick={next} disabled={!canContinue() || authLoading} style={primaryBtn(canContinue() && !authLoading)}>
+              {authLoading ? "Sending..." : current.type === "transition" ? "Get started" : "Continue"}
             </button>
-          )}
-          {/* Privacy note — shown on all onboarding screens */}
-          <div className="flex items-center justify-center gap-1.5 mt-4">
-            <Lock style={{ width: 11, height: 11, color: "rgba(120,105,88,0.45)" }} />
-            <span style={{ fontFamily: SANS, fontSize: 10, color: MUTED, letterSpacing: "1.6px", textTransform: "uppercase" }}>
-              We keep your info private
-            </span>
+            {step > 0 && current.type !== "transition" && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+                <button onClick={() => setStep(step - 1)} style={textLink(C.muted)}>
+                  ← Back
+                </button>
+              </div>
+            )}
+            {/* Privacy note — shown on all onboarding screens */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 20 }}>
+              <Lock style={{ width: 11, height: 11, color: C.faint }} strokeWidth={2} />
+              <span style={meta(10, C.muted)}>We keep your info private</span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

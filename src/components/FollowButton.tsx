@@ -5,9 +5,7 @@
 import { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
+import { C, RADIUS, SANS } from "@/lib/design";
 
 interface Props {
   targetUserId: string;
@@ -16,7 +14,7 @@ interface Props {
   onChange: (targetUserId: string, following: boolean) => void;
   onSignIn?: () => void;
   size?: "sm" | "md";
-  /** "editorial" is the redesign's square button; "pill" is the original. */
+  /** "editorial" is the redesign's small caps button; "pill" is the plainer original. */
   variant?: "pill" | "editorial";
 }
 
@@ -71,12 +69,12 @@ export default function FollowButton({ targetUserId, user, following, onChange, 
         aria-pressed={following}
         style={{
           display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontFamily: SANS,
           fontSize: small ? 9 : 10.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase",
-          padding: small ? "4px 7px" : "8px 13px", borderRadius: 2, cursor: busy ? "default" : "pointer", lineHeight: 1.2,
+          padding: small ? "4px 7px" : "8px 13px", borderRadius: RADIUS, cursor: busy ? "default" : "pointer", lineHeight: 1.2,
           ...(following
-            ? { background: "transparent", border: "1px solid rgba(20,18,16,0.22)", color: "#8A8178" }
-            : { background: "#141210", border: "1px solid #141210", color: "#F7F4EF" }),
+            ? { background: "transparent", border: `1px solid ${C.rule}`, color: C.muted }
+            : { background: C.ink, border: `1px solid ${C.ink}`, color: C.paper }),
         }}
       >
         {following
@@ -93,17 +91,18 @@ export default function FollowButton({ targetUserId, user, following, onChange, 
       aria-pressed={following}
       style={{
         display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0,
+        fontFamily: SANS,
         fontSize: small ? 10 : 12,
         fontWeight: 700,
         letterSpacing: "0.02em",
         padding: small ? "3px 9px" : "5px 13px",
-        borderRadius: 100,
+        borderRadius: RADIUS,
         cursor: busy ? "default" : "pointer",
         whiteSpace: "nowrap",
         transition: "all .15s",
         ...(following
-          ? { background: "transparent", border: `1px solid rgba(28,23,18,0.16)`, color: MUTED }
-          : { background: INK, border: `1px solid ${INK}`, color: "#FDFAF6" }),
+          ? { background: "transparent", border: `1px solid ${C.rule}`, color: C.muted }
+          : { background: C.ink, border: `1px solid ${C.ink}`, color: C.paper }),
       }}
     >
       {following

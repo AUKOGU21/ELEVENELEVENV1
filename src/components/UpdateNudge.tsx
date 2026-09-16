@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { C, RADIUS, SANS, body, meta } from "@/lib/design";
 
 // Nudges users onto the latest deploy so nobody keeps operating on a stale
 // bundle after we ship changes (the class of bug that made a "closed" decision
@@ -64,6 +65,8 @@ export default function UpdateNudge() {
 
   if (!updateAvailable) return null;
 
+  // Set like the push nudge: white, a hairline border, square edges. It floats
+  // over the feed, so it keeps the one soft shadow that lifts it off the paper.
   return (
     <div
       role="status"
@@ -75,30 +78,31 @@ export default function UpdateNudge() {
         zIndex: 9999,
         display: "flex",
         alignItems: "center",
-        gap: 14,
+        gap: 16,
         maxWidth: "calc(100vw - 32px)",
-        padding: "12px 14px 12px 18px",
-        borderRadius: 100,
-        background: "#1C1712",
-        color: "#FDFAF6",
-        border: "1px solid rgba(255,255,255,0.10)",
-        boxShadow: "0 6px 24px rgba(0,0,0,0.28)",
-        fontSize: 15,
+        boxSizing: "border-box",
+        padding: "12px 12px 12px 18px",
+        borderRadius: RADIUS,
+        background: "#FFFFFF",
+        border: `1px solid ${C.ruleStrong}`,
+        boxShadow: "0 6px 18px rgba(20,18,16,0.10)",
+        fontFamily: SANS,
       }}
     >
-      <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>New version available</span>
+      <span style={{ ...body(14.5, C.ink), fontWeight: 700, whiteSpace: "nowrap" }}>
+        New version available
+      </span>
       <button
         onClick={() => window.location.reload()}
         style={{
-          flexShrink: 0,
-          padding: "7px 16px",
-          borderRadius: 100,
-          background: "#FDFAF6",
-          color: "#1C1712",
-          border: "none",
-          fontSize: 14,
+          ...meta(11, "#FFFFFF"),
           fontWeight: 700,
-          letterSpacing: "0.02em",
+          letterSpacing: "0.16em",
+          flexShrink: 0,
+          padding: "11px 16px",
+          borderRadius: RADIUS,
+          background: C.burgundy,
+          border: `1px solid ${C.burgundy}`,
           cursor: "pointer",
         }}
       >

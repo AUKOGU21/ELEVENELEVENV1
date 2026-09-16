@@ -2,17 +2,16 @@
 // The personalized landing a friend hits from a share link. Leads with the
 // inviter's name ("Alexis invited you.") and remembers the referrer so the
 // shopping-circle relationship can be created once they finish onboarding.
+//
+// Set in the editorial system: paper, one oversized Anton welcome, a rule, and
+// one burgundy way in. It's the first page a new person sees, so it carries the
+// most type and the least furniture.
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { resolveInviter, rememberReferrer } from "@/lib/referral";
-import { SANS_APP } from "@/lib/type";
-
-const INK = "#1C1712";
-const CREAM = "#FDFAF6";
-const MUTED = "#8C7A70";
-const GOLD = "#C49E64";
+import { C, RADIUS, SANS, body, display, meta } from "@/lib/design";
 
 export default function InvitePage() {
   const { code } = useParams();
@@ -27,33 +26,79 @@ export default function InvitePage() {
   }, [code]);
 
   return (
-    <div style={{ minHeight: "100vh", background: CREAM, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", textAlign: "center" }}>
-      <span className="font-sans uppercase select-none" style={{ letterSpacing: "0.32em", fontSize: 16, color: INK, marginBottom: 40 }}>
-        <span style={{ fontWeight: 700 }}>ELEVEN</span><span style={{ fontWeight: 300 }}>ELEVEN</span>
-      </span>
+    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, display: "flex", flexDirection: "column" }}>
+      <header style={{ borderBottom: `1px solid ${C.rule}`, padding: "17px 20px" }}>
+        <span style={{ fontFamily: SANS, textTransform: "uppercase", letterSpacing: "0.28em", fontSize: 13, color: C.ink, whiteSpace: "nowrap", userSelect: "none" }}>
+          <span style={{ fontWeight: 700 }}>ELEVEN</span>
+          <span style={{ fontWeight: 300 }}>ELEVEN</span>
+        </span>
+      </header>
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} style={{ maxWidth: 460, width: "100%" }}>
-        <div style={{ width: 60, height: 60, borderRadius: "50%", margin: "0 auto 22px", background: "rgba(196,158,100,0.14)", border: `1px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Users style={{ width: 27, height: 27, color: "#A07848" }} />
-        </div>
+      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px 80px", boxSizing: "border-box" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          style={{ width: "100%", maxWidth: 520 }}
+        >
+          <p style={meta(11, C.burgundy)}>An invitation</p>
 
-        <h1 style={{ fontFamily: SANS_APP, fontSize: 36, fontWeight: 700, lineHeight: 1.06, color: INK, margin: "0 0 18px", letterSpacing: "-0.02em" }}>
-          {loading ? " " : name ? `${name} invited you.` : "You're invited to ELEVENELEVEN."}
-        </h1>
-        <p style={{ fontSize: 17, lineHeight: 1.6, color: "#5A4A42", margin: "0 0 34px" }}>
-          {name
-            ? "The person who invited you trusts your opinion. Create your profile so they can include you in their shopping circle."
-            : "Create your profile and help women like you make better shopping decisions."}
-        </p>
+          <h1 style={{ ...display("clamp(40px, 11vw, 66px)"), marginTop: 16 }}>
+            {loading ? " " : name ? `${name} invited you.` : "You're invited to ElevenEleven."}
+          </h1>
 
-        <button onClick={() => navigate("/onboarding")} style={{ width: "100%", maxWidth: 340, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, background: INK, color: CREAM, border: "none", borderRadius: 100, padding: "16px 0", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
-          Create My Profile <ArrowRight style={{ width: 17, height: 17 }} />
-        </button>
+          <div style={{ borderTop: `1px solid ${C.rule}`, marginTop: 28, paddingTop: 22 }}>
+            <p style={{ ...body(16), maxWidth: "44ch" }}>
+              {name
+                ? "The person who invited you trusts your opinion. Create your profile so they can include you in their shopping circle."
+                : "Create your profile and help women like you make better shopping decisions."}
+            </p>
+          </div>
 
-        <p style={{ fontSize: 13, color: MUTED, margin: "18px 0 0" }}>
-          Already have an account? <button onClick={() => navigate("/signin")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#A07848", fontWeight: 600, textDecoration: "underline" }}>Sign in</button>
-        </p>
-      </motion.div>
+          <button
+            onClick={() => navigate("/onboarding")}
+            style={{
+              ...meta(12, "#FFFFFF"),
+              fontWeight: 700,
+              letterSpacing: "0.16em",
+              width: "100%",
+              maxWidth: 340,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              background: C.burgundy,
+              border: `1px solid ${C.burgundy}`,
+              borderRadius: RADIUS,
+              padding: "16px 18px",
+              marginTop: 32,
+              cursor: "pointer",
+            }}
+          >
+            Create my profile <ArrowRight style={{ width: 15, height: 15 }} strokeWidth={2} />
+          </button>
+
+          <p style={{ ...body(13.5, C.muted), marginTop: 20 }}>
+            Already have an account?{" "}
+            <button
+              onClick={() => navigate("/signin")}
+              style={{
+                ...body(13.5, C.burgundy),
+                fontWeight: 600,
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+                textDecorationThickness: 1,
+              }}
+            >
+              Sign in
+            </button>
+          </p>
+        </motion.div>
+      </main>
     </div>
   );
 }

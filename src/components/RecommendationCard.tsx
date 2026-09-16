@@ -1,11 +1,12 @@
 // ── RecommendationCard ────────────────────────────────────────────────────────
-// One product recommendation on a Looking For post. Like ResponseCard, but the
-// product itself (image, brand, name, price) is the centerpiece.
-import { ThumbsUp, Check, ExternalLink } from "lucide-react";
-import { ringStyle } from "@/lib/tiers";
-import MatchBadge from "./MatchBadge";
-import { ProductImage } from "./ProductImage";
-import { formatName, getInitials, recommendationLabel, timeAgo } from "@/lib/format";
+// One product recommendation on a Looking For post, drawn the way LookingForView
+// draws its picks: the woman who sent it, how closely she matches, her verdict,
+// then the product itself. No card around it. A rule underneath instead.
+import { Check, ExternalLink, ThumbsUp } from "lucide-react";
+import { C, body, meta, strong } from "@/lib/design";
+import { formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
+import { Avatar } from "./DecisionTile";
+import MatchSeal from "./MatchSeal";
 
 export interface RecommendationData {
   id: string;
@@ -32,79 +33,95 @@ interface Props {
   onHelpful: (recId: string) => void;
 }
 
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
+const textLink = (colour: string = C.ink): React.CSSProperties => ({
+  ...meta(11, colour),
+  fontWeight: 700,
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  textDecoration: "none",
+});
 
 export default function RecommendationCard({ rec, counts, myVote, canVote, onHelpful }: Props) {
-  const isBuy = rec.recommendation !== "do_not_buy";
   const price = rec.price_note ? (rec.price_note.startsWith("$") ? rec.price_note : `$${rec.price_note}`) : null;
-  return (
-    <div style={{ background: "rgba(0,0,0,0.035)", borderRadius: 14, padding: "13px 15px", border: "1px solid rgba(0,0,0,0.06)" }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <div style={{ ...ringStyle(rec.profiles?.badge_tier, 1.5), width: 30, height: 30, borderRadius: "50%", background: "#3A3530", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, color: "white", fontWeight: 700 }}>
-            {rec.profiles?.avatar_url
-              ? <img src={rec.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : getInitials(rec.profiles?.display_name ?? null)}
-          </div>
-          <div style={{ minWidth: 0, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1A1A1A" }}>{formatName(rec.profiles?.display_name ?? null)}</span>
-            <MatchBadge score={rec.match_score} />
-          </div>
-        </div>
-        <div style={{ flexShrink: 0, borderRadius: 100, padding: "3px 10px", fontSize: 10.5, fontWeight: 600, whiteSpace: "nowrap", background: isBuy ? "rgba(22,163,74,0.10)" : "rgba(192,57,43,0.10)", color: isBuy ? "#16a34a" : "#c0392b" }}>
-          {recommendationLabel(rec.recommendation)}
-        </div>
+  const hasProduct = !!(rec.product_name || rec.brand_name || rec.product_image_url || rec.product_url);
+
+  // The product row is only a link when there is somewhere to go. It used to
+  // render as an anchor whenever any product field was set, so a pick with only
+  // a brand name looked tappable and went nowhere.
+  const productRow = hasProduct && (
+    <>
+      <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {rec.product_image_url
+          ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
+          : <span style={meta(9, C.faint)}>{rec.product_url ? "Link" : "No image"}</span>}
       </div>
+      <div style={{ minWidth: 0 }}>
+        {rec.brand_name && <p style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.brand_name}</p>}
+        {rec.product_name && <p style={{ ...body(12, C.inkSoft), textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.product_name}</p>}
+        <p style={{ ...meta(10, C.ink), marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          {price && <span style={{ ...body(12.5, C.ink), textTransform: "none", letterSpacing: 0, marginRight: 8 }}>{price}</span>}
+          {rec.product_url && <><ExternalLink style={{ width: 11, height: 11 }} /> {prettyHost(rec.product_url)}</>}
+        </p>
+      </div>
+    </>
+  );
 
-      {/* Reasoning */}
-      <p style={{ fontSize: 12.5, lineHeight: 1.55, color: "#5A4A42", margin: "0 0 10px" }}>{rec.reasoning}</p>
+  const productGrid: React.CSSProperties = {
+    display: "grid", gridTemplateColumns: "56px 1fr", gap: 12, alignItems: "center", marginTop: 13,
+  };
 
-      {/* Product preview tile */}
-      {(rec.product_name || rec.brand_name || rec.product_image_url || rec.product_url) && (
-        <a
-          href={rec.product_url ?? undefined}
-          target={rec.product_url ? "_blank" : undefined}
-          rel="noopener noreferrer"
-          style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "#FDFAF6", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, padding: 10, marginBottom: rec.fit_note || rec.who_for ? 10 : 12 }}
-        >
-          <div style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, overflow: "hidden", background: "#EDE8E2", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ProductImage url={rec.product_image_url} fallback={<ExternalLink style={{ width: 18, height: 18, color: MUTED }} />} />
+  return (
+    <div style={{ paddingTop: 20, paddingBottom: 20, borderBottom: `1px solid ${C.rule}` }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <Avatar url={rec.profiles?.avatar_url ?? null} name={rec.profiles?.display_name ?? null} tier={rec.profiles?.badge_tier} size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
+              <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(rec.profiles?.display_name ?? null)}</span>
+              {rec.match_score != null && <MatchSeal score={rec.match_score} size={28} />}
+              <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
+            </div>
+            <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(rec.created_at)}</span>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {rec.brand_name && <p style={{ fontSize: 12, fontWeight: 700, color: INK, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.brand_name}</p>}
-            {rec.product_name && <p style={{ fontSize: 10.5, color: MUTED, margin: "1px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.product_name}</p>}
-            {price && <p style={{ fontSize: 11.5, fontWeight: 600, color: INK, margin: "3px 0 0" }}>{price}</p>}
-          </div>
-          {rec.product_url && <ExternalLink style={{ width: 15, height: 15, color: MUTED, flexShrink: 0 }} />}
-        </a>
-      )}
 
-      {/* Fit note / who-for */}
-      {(rec.fit_note || rec.who_for) && (
-        <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-          {rec.fit_note && <p style={{ fontSize: 11, color: "#5A4A42", margin: 0 }}><span style={{ color: MUTED }}>Fit —</span> {rec.fit_note}</p>}
-          {rec.who_for && <p style={{ fontSize: 11, color: "#5A4A42", margin: 0 }}><span style={{ color: MUTED }}>Best for —</span> {rec.who_for}</p>}
+          <p style={{ ...body(14, C.ink), marginTop: 10 }}>{rec.reasoning}</p>
+
+          {hasProduct && (
+            rec.product_url ? (
+              <a
+                href={rec.product_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ ...productGrid, textDecoration: "none", color: "inherit" }}
+              >
+                {productRow}
+              </a>
+            ) : (
+              <div style={productGrid}>{productRow}</div>
+            )
+          )}
+
+          {(rec.fit_note || rec.who_for) && (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+              {rec.fit_note && <p style={body(13, C.inkSoft)}><span style={{ ...meta(10, C.muted), marginRight: 10 }}>Fit</span>{rec.fit_note}</p>}
+              {rec.who_for && <p style={body(13, C.inkSoft)}><span style={{ ...meta(10, C.muted), marginRight: 10 }}>Best for</span>{rec.who_for}</p>}
+            </div>
+          )}
+
+          <button
+            onClick={() => canVote && onHelpful(rec.id)}
+            disabled={!canVote}
+            style={{ ...textLink(myVote === "helpful" ? C.burgundy : C.ink), marginTop: 14, cursor: canVote ? "pointer" : "default", opacity: canVote || counts.helpful > 0 ? 1 : 0.5 }}
+          >
+            {myVote === "helpful" ? <Check style={{ width: 13, height: 13 }} /> : <ThumbsUp style={{ width: 13, height: 13 }} strokeWidth={1.75} />}
+            Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}
+          </button>
         </div>
-      )}
-
-      {/* Footer */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <button
-          onClick={() => canVote && onHelpful(rec.id)}
-          style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "5px 13px", borderRadius: 100,
-            border: `1.5px solid ${myVote === "helpful" ? "rgba(58,53,48,0.35)" : "rgba(0,0,0,0.15)"}`,
-            background: myVote === "helpful" ? "rgba(58,53,48,0.08)" : "white",
-            color: myVote === "helpful" ? "#1A1A1A" : "#5A4A42",
-            cursor: canVote ? "pointer" : "default", fontSize: 11, fontWeight: 600, opacity: canVote ? 1 : 0.55,
-          }}
-        >
-          {myVote === "helpful" ? <Check style={{ width: 12, height: 12 }} /> : <ThumbsUp style={{ width: 12, height: 12 }} />}
-          <span>Helpful{counts.helpful > 0 ? ` (${counts.helpful})` : ""}</span>
-        </button>
-        <span style={{ fontSize: 11, color: MUTED }}>{timeAgo(rec.created_at)}</span>
       </div>
     </div>
   );

@@ -1,78 +1,196 @@
+// ── Index ─────────────────────────────────────────────────────────────────────
+// The public landing page: the first thing an invited woman sees. Signed in, she
+// is sent to the feed instead, so everything here is written for someone who has
+// never used it.
+//
+// Set as a magazine cover rather than a SaaS page, per src/lib/design.ts. The
+// hero photograph (a woman beside her own reflections, which is the product's
+// whole idea) is left light and the type sits on paper next to it, so nothing
+// needs a dark scrim to be legible. Hierarchy comes from Anton, scale and
+// hairline rules. No cards, no glass, no shadows, no serifs.
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/format";
+import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
 import logoSymbol from "@/assets/logo-symbol.png";
 import heroImage from "@/assets/hero-editorial.png";
 
-const INK          = "#1C1712";
-const INK_MID      = "rgba(28,23,18,0.52)";
-const INK_FAINT    = "rgba(28,23,18,0.22)";
-const DIVIDER      = "rgba(28,23,18,0.10)";
+const PAGE_CSS = `
+.e11-cta { transition: background 0.18s, border-color 0.18s, opacity 0.18s; }
+.e11-cta:hover { background: #5E1414; border-color: #5E1414; }
+.e11-link { transition: opacity 0.18s; }
+.e11-link:hover { opacity: 0.6; }
+`;
 
-// Base colour sampled directly from the hero image wall — warm white, not beige
-const SECTION_BASE = "#ECE7DF";
+const MAX = 1320;
 
-// Stark light-beam background — high opacity beams, radial glow source
-const BEAM_BG = [
-  // Bright light-source glow upper-right
-  "radial-gradient(ellipse 55% 70% at 94% 5%,  rgba(255,255,250,1.0)  0%, rgba(255,254,248,0.75) 25%, transparent 55%)",
-  // Wide soft fill across the right half
-  "radial-gradient(ellipse 50% 80% at 85% 55%, rgba(255,253,245,0.55) 0%, transparent 60%)",
-  // Stark narrow beams
-  "linear-gradient(112deg, transparent 28%, rgba(255,255,252,0.88) 32%, rgba(255,255,252,0.60) 34%, transparent 37%)",
-  "linear-gradient(118deg, transparent 48%, rgba(255,255,252,0.72) 51%, rgba(255,255,252,0.42) 53%, transparent 56%)",
-  "linear-gradient(108deg, transparent 65%, rgba(255,255,252,0.60) 68%, rgba(255,255,252,0.30) 70%, transparent 73%)",
-  SECTION_BASE,
-].join(", ");
+const cta = (mobile: boolean): React.CSSProperties => ({
+  ...meta(12, "#FFFFFF"),
+  fontWeight: 700,
+  letterSpacing: "0.16em",
+  background: C.burgundy,
+  border: `1px solid ${C.burgundy}`,
+  borderRadius: RADIUS,
+  padding: mobile ? "16px 24px" : "18px 32px",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+});
 
-// Alternate: beams from lower-right for visual variety
-const BEAM_BG_ALT = [
-  "radial-gradient(ellipse 55% 65% at 96% 90%,  rgba(255,255,250,1.0)  0%, rgba(255,254,248,0.70) 25%, transparent 52%)",
-  "radial-gradient(ellipse 45% 70% at 80% 40%,  rgba(255,253,245,0.50) 0%, transparent 58%)",
-  "linear-gradient(115deg, transparent 20%, rgba(255,255,252,0.82) 24%, rgba(255,255,252,0.50) 26%, transparent 30%)",
-  "linear-gradient(120deg, transparent 44%, rgba(255,255,252,0.68) 47%, rgba(255,255,252,0.38) 49%, transparent 53%)",
-  "linear-gradient(110deg, transparent 68%, rgba(255,255,252,0.55) 71%, rgba(255,255,252,0.25) 73%, transparent 77%)",
-  "#EAE4DC",
-].join(", ");
+const navLink = (colour: string = C.ink): React.CSSProperties => ({
+  ...meta(11, colour),
+  fontWeight: 700,
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  textDecoration: "none",
+});
 
-// Truly frosted glass — very transparent so beams show through
-const GLASS_BG     = "rgba(255, 255, 255, 0.18)";
-const GLASS_BORDER = "1px solid rgba(255, 255, 255, 0.90)";
-const GLASS_SHADOW = "0 8px 40px rgba(160,140,110,0.10), inset 0 1.5px 0 rgba(255,255,255,1.0), inset 0 -1px 0 rgba(255,255,255,0.4)";
+const rise = {
+  initial: { opacity: 0, y: 16 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-60px" },
+};
 
+/** An eyebrow, a rule, and an oversized Anton headline. Opens every section. */
+function SectionHead({ eyebrow, lines, isMobile, onDark = false }: {
+  eyebrow: string;
+  lines: string[];
+  isMobile: boolean;
+  onDark?: boolean;
+}) {
+  const rule = onDark ? "rgba(247,244,239,0.22)" : C.rule;
+  return (
+    <motion.div {...rise} transition={{ duration: 0.6 }}>
+      <p style={meta(11, onDark ? "rgba(247,244,239,0.62)" : C.ink)}>{eyebrow}</p>
+      <div style={{ height: 1, background: rule, margin: isMobile ? "16px 0 22px" : "20px 0 30px" }} />
+      <h2 style={display(isMobile ? 34 : "clamp(42px, 5.6vw, 78px)", onDark ? C.paper : C.ink)}>
+        {lines.map((l, i) => (
+          <span key={i} style={{ display: "block" }}>{l}</span>
+        ))}
+      </h2>
+    </motion.div>
+  );
+}
 
-// ─── SVG Icons (outline, thin) ────────────────────────────────────────────────
-const IconPerson = () => (
-  <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="13" cy="9.5" r="4.5" stroke={INK} strokeWidth="1.4"/>
-    <path d="M3.5 23C3.5 18.306 7.806 14.5 13 14.5C18.194 14.5 22.5 18.306 22.5 23" stroke={INK} strokeWidth="1.4" strokeLinecap="round"/>
-  </svg>
-);
+/** One item in a section: a number, a short Anton title, and what it means.
+ *  Separated from its neighbours by a rule, never boxed. */
+function Item({ n, title, lead, note, isMobile, index }: {
+  n: string;
+  title: string;
+  lead: string;
+  note: string;
+  isMobile: boolean;
+  index: number;
+}) {
+  return (
+    <motion.div
+      {...rise}
+      transition={{ duration: 0.5, delay: Math.min(index, 3) * 0.08 }}
+      style={{
+        minWidth: 0,
+        paddingTop: isMobile ? 20 : 0,
+        paddingBottom: isMobile ? 20 : 0,
+        paddingLeft: isMobile ? 0 : index === 0 ? 0 : 28,
+        paddingRight: isMobile ? 0 : 28,
+        borderTop: isMobile ? `1px solid ${C.rule}` : "none",
+        borderLeft: isMobile || index === 0 ? "none" : `1px solid ${C.rule}`,
+      }}
+    >
+      <p style={meta(11, C.muted)}>{n}</p>
+      <h3 style={{ ...display(isMobile ? 24 : "clamp(22px, 2.2vw, 30px)"), marginTop: 12 }}>{title}</h3>
+      <p style={{ ...body(isMobile ? 15 : 15.5, C.ink), marginTop: 14, maxWidth: "38ch" }}>{lead}</p>
+      <p style={{ ...body(isMobile ? 13.5 : 14, C.muted), marginTop: 8, maxWidth: "38ch" }}>{note}</p>
+    </motion.div>
+  );
+}
 
-const IconChat = () => (
-  <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M4 5.5C4 4.672 4.672 4 5.5 4H20.5C21.328 4 22 4.672 22 5.5V16.5C22 17.328 21.328 18 20.5 18H8L4 22V5.5Z" stroke={INK} strokeWidth="1.4" strokeLinejoin="round"/>
-    <path d="M9 10.5H17M9 13.5H14" stroke={INK} strokeWidth="1.4" strokeLinecap="round"/>
-  </svg>
-);
+const PROBLEM = [
+  {
+    n: "01",
+    title: "Reviews",
+    lead: "Written by strangers with different bodies and different standards.",
+    note: "Volume is not relevance. Thousands of reviews and none of them are from someone like you.",
+  },
+  {
+    n: "02",
+    title: "Size charts",
+    lead: "Static measurements with no context for how things actually fit.",
+    note: "Numbers without nuance. Your body does not live in a chart.",
+  },
+  {
+    n: "03",
+    title: "Model imagery",
+    lead: "One body, styled to sell, not to inform.",
+    note: "You were never the reference point. The model was.",
+  },
+];
 
-const IconGroup = () => (
-  <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="9" cy="10" r="3.5" stroke={INK} strokeWidth="1.4"/>
-    <circle cx="17" cy="10" r="3.5" stroke={INK} strokeWidth="1.4"/>
-    <path d="M1.5 22C1.5 18.41 4.91 15.5 9 15.5C13.09 15.5 16.5 18.41 16.5 22" stroke={INK} strokeWidth="1.4" strokeLinecap="round"/>
-    <path d="M17 15.5C21.09 15.5 24.5 18.41 24.5 22" stroke={INK} strokeWidth="1.4" strokeLinecap="round"/>
-  </svg>
-);
+const STEPS = [
+  {
+    n: "01",
+    title: "Build your profile",
+    lead: "Tell us your fit, your style preferences, and what you are looking for.",
+    note: "Your silhouette, sizing, fit preferences, and style sensibility. This is how we find your mirrors.",
+  },
+  {
+    n: "02",
+    title: "Post what you are considering",
+    lead: "Share the pieces you are thinking about and we will take it from there.",
+    note: "Link a product. Set your confidence score. Tell us exactly what is making you hesitate.",
+  },
+  {
+    n: "03",
+    title: "Get tailored feedback",
+    lead: "Real feedback from women who match your profile and your style.",
+    note: "Matched input from women who share your shape, taste, and fit reality, before you commit.",
+  },
+];
 
-// ─── Component ────────────────────────────────────────────────────────────────
+const WHY = [
+  {
+    n: "Signal",
+    title: "Trusted human input",
+    lead: "You are not plugging numbers into an algorithm.",
+    note: "You are seeing what actually happened (what fit, what did not, and why) from women who match your profile.",
+  },
+  {
+    n: "Clarity",
+    title: "Save time",
+    lead: "Stop scrolling through hundreds of irrelevant reviews.",
+    note: "ELEVENELEVEN surfaces what matters to you, fast.",
+  },
+  {
+    n: "Confidence",
+    title: "Decide with certainty",
+    lead: "Real outcomes from women who share your shape and your standards.",
+    note: "That is what turns a hesitation into a clear answer.",
+  },
+  {
+    n: "Community",
+    title: "You are not deciding alone",
+    lead: "Shopping is a solo decision. ELEVENELEVEN makes it a shared one.",
+    note: "Real women, matched to you, who understand your body and your preferences.",
+  },
+];
+
+// ── Component ────────────────────────────────────────────────────────────────
 const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading } = useAuth();
+  const isMobile = useIsMobile();
   // The wordmark sends { home: true } — she asked for the landing page, so the
   // redirect below has to stay out of the way.
   const wantsHome = (location.state as { home?: boolean } | null)?.home;
@@ -99,451 +217,262 @@ const Index = () => {
     return () => { cancelled = true; };
   }, [user, wantsHome]);
 
-  // Her initials chip, sized for whichever nav is showing.
+  // Her initials chip, squared off like everything else.
   const avatarChip = (size: number) => (
     <button
       onClick={() => navigate("/feed")}
       aria-label="Go to your feed"
-      className="rounded-full flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+      className="e11-link"
       style={{
         width: size,
         height: size,
         flexShrink: 0,
-        background: "rgba(255,255,255,0.14)",
-        border: "1px solid rgba(255,255,255,0.45)",
-        color: "rgba(255,255,255,0.95)",
+        padding: 0,
+        overflow: "hidden",
+        background: C.well,
+        border: `1px solid ${C.rule}`,
+        borderRadius: RADIUS,
+        color: C.ink,
+        fontFamily: SANS,
         fontSize: size * 0.34,
-        fontWeight: 600,
+        fontWeight: 700,
         letterSpacing: "0.02em",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
       {myProfile?.avatar_url
-        ? <img src={myProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+        ? <img src={myProfile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         : <span>{getInitials(myProfile?.display_name)}</span>}
     </button>
   );
 
-  return (
-    <div className="min-h-screen" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+  // The cover line is deliberately not animated in. It is the first thing an
+  // invited woman sees, so it must never depend on JavaScript having run: a
+  // throttled or slow tab was leaving it faded to nothing. The scroll reveals
+  // further down are a different matter, since the page is already legible by
+  // the time she gets to them.
+  const heroType = (
+    <div style={{ maxWidth: 620 }}>
+      <h1 style={display(isMobile ? 40 : "clamp(52px, 6.2vw, 92px)")}>
+        <span style={{ display: "block" }}>Stop guessing.</span>
+        <span style={{ display: "block" }}>Shop with context.</span>
+      </h1>
 
-      {/* ═══ HERO ═══════════════════════════════════════════════════════════════ */}
-      <section
-        className="relative overflow-hidden"
-        style={{ height: "100svh", minHeight: 620 }}
+      <p style={{ ...body(isMobile ? 15.5 : 17, C.inkSoft), marginTop: isMobile ? 20 : 26, maxWidth: "40ch" }}>
+        Get input from women who share your fit, style, and preferences, before you buy.
+      </p>
+
+      <button
+        onClick={() => navigate("/signin?mode=signup")}
+        className="e11-cta"
+        style={{ ...cta(isMobile), marginTop: isMobile ? 26 : 34 }}
       >
-        {/* Full-bleed image — swap heroImage import for your new editorial photo */}
-        <img
-          src={heroImage}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ objectPosition: "80% center" }}
-        />
+        Get matched <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
+      </button>
+    </div>
+  );
 
-        {/* Gradient overlay — left-side darken so white text is legible */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to right, rgba(6,4,2,0.78) 0%, rgba(6,4,2,0.42) 38%, rgba(6,4,2,0.06) 72%, transparent 100%)," +
-              "linear-gradient(to top,   rgba(6,4,2,0.55) 0%, rgba(6,4,2,0.0) 55%)",
-          }}
-        />
+  const heroPhoto = (
+    <img
+      src={heroImage}
+      alt=""
+      aria-hidden
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        objectPosition: "62% center",
+        display: "block",
+        background: C.well,
+      }}
+    />
+  );
 
-        {/* ── Nav ── */}
-        <nav className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 md:px-14 py-7">
-          {/* Wordmark */}
-          <span className="select-none uppercase" style={{ letterSpacing: "0.32em", fontSize: 18, color: "rgba(255,255,255,0.92)" }}>
+  return (
+    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, overflowX: "hidden" }}>
+      <style>{PAGE_CSS}</style>
+
+      {/* ═══ MASTHEAD ═══════════════════════════════════════════════════════ */}
+      <header style={{ background: C.paper, borderBottom: `1px solid ${C.rule}` }}>
+        <div style={{
+          maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
+          padding: isMobile ? "14px 18px" : "20px 40px",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+        }}>
+          <span
+            className="select-none"
+            style={{
+              fontFamily: SANS, textTransform: "uppercase", color: C.ink, whiteSpace: "nowrap",
+              letterSpacing: isMobile ? "0.22em" : "0.32em", fontSize: isMobile ? 12 : 15,
+            }}
+          >
             <span style={{ fontWeight: 700 }}>ELEVEN</span>
             <span style={{ fontWeight: 300 }}>ELEVEN</span>
           </span>
 
-          {/* Links */}
-          <div className="hidden md:flex items-center gap-8">
-            <button
-              onClick={() => navigate("/feed")}
-              className="uppercase transition-opacity hover:opacity-60"
-              style={{ color: "rgba(255,255,255,0.72)", fontSize: 14, letterSpacing: "0.18em" }}
-            >
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 16 : 28 }}>
+            <button onClick={() => navigate("/feed")} className="e11-link" style={navLink(C.ink)}>
               Feed
             </button>
-            {user ? avatarChip(34) : (
-              <button
-                onClick={() => navigate("/signin")}
-                className="uppercase transition-opacity hover:opacity-60"
-                style={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: 14, letterSpacing: "0.2em" }}
-              >
-                Sign in →
+            {user ? avatarChip(isMobile ? 30 : 34) : (
+              <button onClick={() => navigate("/signin")} className="e11-link" style={navLink(C.ink)}>
+                Sign in <ArrowRight style={{ width: 13, height: 13 }} strokeWidth={2} />
               </button>
             )}
           </div>
-
-          {/* Mobile nav */}
-          <div className="flex md:hidden items-center gap-4">
-            <button
-              onClick={() => navigate("/feed")}
-              className="text-xs tracking-widest uppercase"
-              style={{ color: "rgba(255,255,255,0.72)" }}
-            >
-              Feed
-            </button>
-            {user ? avatarChip(28) : (
-              <button
-                onClick={() => navigate("/signin")}
-                className="text-xs tracking-widest uppercase"
-                style={{ color: "rgba(255,255,255,0.9)" }}
-              >
-                Sign in
-              </button>
-            )}
-          </div>
-        </nav>
-
-        {/* ── Hero text — left zone, woman pushed to 80% right ── */}
-        <div
-          className="absolute left-0 z-10 px-6 md:px-14 w-[88vw] md:w-[56vw]"
-          style={{ top: "40%" }}
-        >
-          <motion.h1
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              fontFamily: "'Bodoni Moda', serif",
-              fontOpticalSizing: "auto",
-              fontSize: "clamp(1.85rem, 5.2vw, 5.8rem)",
-              lineHeight: 1.04,
-              fontWeight: 400,
-              color: "#FFFFFF",
-              letterSpacing: "-0.01em",
-              marginBottom: "1.4rem",
-            }}
-          >
-            stop guessing.<br />
-            shop with context.
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.85, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              fontSize: 18,
-              lineHeight: 1.65,
-              color: "rgba(255,255,255,0.78)",
-              marginBottom: "2.25rem",
-              maxWidth: 420,
-            }}
-          >
-            Get input from women who share your fit, style, and preferences — before you buy.
-          </motion.p>
-
-          <motion.button
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.7 }}
-            onClick={() => navigate("/signin?mode=signup")}
-            style={{
-              display: "inline-block",
-              padding: "16px 44px",
-              fontSize: 11,
-              letterSpacing: "0.24em",
-              textTransform: "uppercase",
-              fontWeight: 600,
-              color: "#FFFFFF",
-              background: "rgba(255,255,255,0.06)",
-              border: "1.5px solid rgba(255,255,255,0.95)",
-              cursor: "pointer",
-              boxShadow:
-                "0 0 32px rgba(255,255,255,0.45), 0 0 80px rgba(255,255,255,0.2), 0 0 140px rgba(255,255,255,0.08), inset 0 0 28px rgba(255,255,255,0.08)",
-              transition: "all 0.25s ease",
-            }}
-            whileHover={{
-              boxShadow:
-                "0 0 48px rgba(255,255,255,0.6), 0 0 100px rgba(255,255,255,0.28), 0 0 180px rgba(255,255,255,0.12), inset 0 0 36px rgba(255,255,255,0.12)",
-            }}
-          >
-            GET MATCHED
-          </motion.button>
         </div>
-      </section>
+      </header>
 
-      {/* ═══ THE PROBLEM ═════════════════════════════════════════════════════════ */}
-      <section className="relative px-8 md:px-14 pt-24 pb-28 overflow-hidden" style={{ background: BEAM_BG }}>
-        <div className="max-w-7xl mx-auto relative z-10">
+      {/* ═══ HERO ═══════════════════════════════════════════════════════════ */}
+      {isMobile ? (
+        <section>
+          <div style={{ padding: "34px 18px 32px" }}>{heroType}</div>
+          <div style={{ width: "100%", aspectRatio: "4 / 5", overflow: "hidden" }}>{heroPhoto}</div>
+        </section>
+      ) : (
+        <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 0.92fr) minmax(0, 1fr)", alignItems: "stretch", minHeight: "min(88svh, 820px)" }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "72px 40px 72px max(40px, calc((100vw - 1320px) / 2 + 40px))" }}>
+            {heroType}
+          </div>
+          <div style={{ overflow: "hidden" }}>{heroPhoto}</div>
+        </section>
+      )}
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: INK_MID, marginBottom: 32 }}
-          >
-            The problem
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            style={{ borderTop: `1px solid ${DIVIDER}`, paddingTop: 40, marginBottom: 48 }}
-          >
-            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(2.8rem, 5.2vw, 5.2rem)", fontWeight: 300, lineHeight: 1.04, color: INK, maxWidth: "14em" }}>
-              Finding it is easy.<br />Trusting it is <em style={{ fontStyle: "italic" }}>hard.</em>
-            </h2>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-4">
-            {[
-              { label: "Reviews",       heading: "Written by strangers with different bodies, different standards.", desc: "Volume isn't relevance. Thousands of reviews and none of them are from someone like you." },
-              { label: "Size charts",   heading: "Static measurements with no context for how things actually fit.", desc: "Numbers without nuance. Your body doesn't live in a chart." },
-              { label: "Model imagery", heading: "One body, styled to sell — not to inform.",                        desc: "You were never the reference point. The model was." },
-            ].map((item, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.12 }}
-                style={{ background: GLASS_BG, border: GLASS_BORDER, borderRadius: 16, padding: "28px 28px 32px", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", boxShadow: GLASS_SHADOW }}>
-                <p style={{ fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: INK_MID, marginBottom: 20 }}>{item.label}</p>
-                <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(1.25rem, 2vw, 1.55rem)", fontWeight: 400, lineHeight: 1.35, color: INK, marginBottom: 14 }}>{item.heading}</h3>
-                <p style={{ fontSize: 13, lineHeight: 1.7, color: INK_MID }}>{item.desc}</p>
-              </motion.div>
+      {/* ═══ THE PROBLEM ════════════════════════════════════════════════════ */}
+      <section style={{ background: C.paper, borderTop: `1px solid ${C.rule}` }}>
+        <div style={{ maxWidth: MAX, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "48px 18px 52px" : "100px 40px 110px" }}>
+          <SectionHead eyebrow="The problem" lines={["Finding it is easy.", "Trusting it is hard."]} isMobile={isMobile} />
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
+            marginTop: isMobile ? 26 : 56,
+          }}>
+            {PROBLEM.map((it, i) => (
+              <Item key={it.n} n={it.n} title={it.title} lead={it.lead} note={it.note} isMobile={isMobile} index={i} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ HOW IT WORKS ════════════════════════════════════════════════════════ */}
-      <section
-        className="relative px-8 md:px-14 pt-24 pb-28 overflow-hidden"
-        style={{ background: BEAM_BG_ALT }}
-      >
-        <div className="max-w-7xl mx-auto relative z-10">
-
-          {/* Label */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.28em",
-              textTransform: "uppercase",
-              color: INK_MID,
-              marginBottom: 32,
-            }}
-          >
-            How it works
-          </motion.p>
-
-          {/* Headline */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            style={{ borderTop: `1px solid ${DIVIDER}`, paddingTop: 40, marginBottom: 48 }}
-          >
-            <h2
-              style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: "clamp(3rem, 5.5vw, 5.5rem)",
-                fontWeight: 300,
-                lineHeight: 1.04,
-                letterSpacing: "-0.01em",
-                color: INK,
-                maxWidth: "10em",
-              }}
-            >
-              From uncertainty<br />to confidence.
-            </h2>
-          </motion.div>
-
-          {/* Numbered steps row */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="grid grid-cols-3 mb-5"
-          >
-            {["01", "02", "03"].map((n, i) => (
-              <div
-                key={n}
-                className="flex items-center gap-5"
-                style={{ paddingRight: i < 2 ? 24 : 0, paddingLeft: i > 0 ? 24 : 0 }}
-              >
-                <span
-                  style={{
-                    fontFamily: "'Cormorant Garamond', serif",
-                    fontSize: "clamp(2rem, 3vw, 3rem)",
-                    fontWeight: 300,
-                    color: INK_MID,
-                    letterSpacing: "0.02em",
-                    lineHeight: 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  {n}
-                </span>
-                <div style={{ flex: 1, height: 1, background: DIVIDER }} />
-              </div>
-            ))}
-          </motion.div>
-
-          {/* Cards */}
-          <div className="grid md:grid-cols-3 gap-4">
-            {[
-              { icon: <IconPerson />, label: "Build your profile",        heading: "Tell us your fit, style preferences, and what you're looking for.",    desc: "Your silhouette, sizing, fit preferences, and style sensibility. This is how we find your mirrors." },
-              { icon: <IconChat />,   label: "Post what you're considering", heading: "Share the pieces you're thinking about — we'll take it from there.", desc: "Link a product. Set your confidence score. Tell us exactly what's making you hesitate." },
-              { icon: <IconGroup />,  label: "Get tailored feedback",     heading: "Get real feedback from women who match your profile and style.",        desc: "Matched input from women who share your shape, taste, and fit reality — before you commit." },
-            ].map((step, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.55, delay: i * 0.12 }}
-                style={{ background: GLASS_BG, border: GLASS_BORDER, borderRadius: 16, padding: "32px 28px 36px", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", boxShadow: GLASS_SHADOW }}>
-                <div style={{ marginBottom: 20 }}>{step.icon}</div>
-                <p style={{ fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: INK_MID, marginBottom: 16 }}>{step.label}</p>
-                <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(1.35rem, 2.2vw, 1.65rem)", fontWeight: 400, lineHeight: 1.3, color: INK, marginBottom: 16 }}>{step.heading}</h3>
-                <p style={{ fontSize: 13, lineHeight: 1.7, color: INK_MID }}>{step.desc}</p>
-              </motion.div>
+      {/* ═══ HOW IT WORKS ═══════════════════════════════════════════════════ */}
+      <section style={{ background: C.well, borderTop: `1px solid ${C.rule}` }}>
+        <div style={{ maxWidth: MAX, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "48px 18px 52px" : "100px 40px 110px" }}>
+          <SectionHead eyebrow="How it works" lines={["From uncertainty", "to confidence."]} isMobile={isMobile} />
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
+            marginTop: isMobile ? 26 : 56,
+          }}>
+            {STEPS.map((it, i) => (
+              <Item key={it.n} n={it.n} title={it.title} lead={it.lead} note={it.note} isMobile={isMobile} index={i} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ WHY IT WORKS ════════════════════════════════════════════════════════ */}
-      <section className="relative px-8 md:px-14 pt-24 pb-28 overflow-hidden" style={{ background: BEAM_BG }}>
-        <div className="max-w-7xl mx-auto relative z-10">
-
-          <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
-            style={{ fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: INK_MID, marginBottom: 32 }}>
-            Why it works
-          </motion.p>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }}
-            style={{ borderTop: `1px solid ${DIVIDER}`, paddingTop: 40, marginBottom: 40 }}>
-            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(2.6rem, 5vw, 5rem)", fontWeight: 300, lineHeight: 1.04, color: INK }}>
-              No measurements.<br />No body scans.<br />No <em style={{ fontStyle: "italic" }}>guessing.</em>
-            </h2>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            {[
-              { tag: "Signal",     heading: "Trusted human input",    desc: "You're not plugging numbers into an algorithm. You're seeing what actually happened — what fit, what didn't, and why — from women who match your profile." },
-              { tag: "Clarity",    heading: "Save time",              desc: "Stop scrolling through hundreds of irrelevant reviews. ELEVENELEVEN surfaces what matters to you, fast." },
-              { tag: "Confidence", heading: "Decide with certainty",  desc: "Real outcomes from women who share your shape and your standards. That's what turns a hesitation into a clear answer." },
-              { tag: "Community",  heading: "You're not deciding alone", desc: "Shopping is a solo decision. ELEVENELEVEN makes it a shared one — real women, matched to you, who understand your body and your preferences." },
-            ].map((item, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.1 }}
-                style={{ background: GLASS_BG, border: GLASS_BORDER, borderRadius: 16, padding: "28px 28px 32px", backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)", boxShadow: GLASS_SHADOW }}>
-                <p style={{ fontSize: 9, letterSpacing: "0.26em", textTransform: "uppercase", color: INK_MID, marginBottom: 16 }}>{item.tag}</p>
-                <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(1.25rem, 2vw, 1.5rem)", fontWeight: 400, lineHeight: 1.35, color: INK, marginBottom: 14 }}>{item.heading}</h3>
-                <p style={{ fontSize: 13, lineHeight: 1.7, color: INK_MID }}>{item.desc}</p>
-              </motion.div>
+      {/* ═══ WHY IT WORKS ═══════════════════════════════════════════════════ */}
+      <section style={{ background: C.paper, borderTop: `1px solid ${C.rule}` }}>
+        <div style={{ maxWidth: MAX, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "48px 18px 52px" : "100px 40px 110px" }}>
+          <SectionHead eyebrow="Why it works" lines={["No measurements.", "No body scans.", "No guessing."]} isMobile={isMobile} />
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
+            rowGap: isMobile ? 0 : 44,
+            marginTop: isMobile ? 26 : 56,
+          }}>
+            {WHY.map((it, i) => (
+              <Item
+                key={it.n}
+                n={it.n}
+                title={it.title}
+                lead={it.lead}
+                note={it.note}
+                isMobile={isMobile}
+                index={i % 2}
+              />
             ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ BOTTOM CTA ══════════════════════════════════════════════════════════ */}
-      <section
-        className="relative overflow-hidden flex flex-col items-center justify-center text-center py-36"
-        style={{ background: "#3A3530" }}
-      >
+      {/* ═══ CLOSING ════════════════════════════════════════════════════════ */}
+      <section style={{ position: "relative", background: C.ink, overflow: "hidden" }}>
         {/* Faint watermark */}
         <img
           src={logoSymbol}
           alt=""
           aria-hidden
-          className="absolute left-1/2 top-1/2 pointer-events-none select-none"
           style={{
-            height: "130%",
-            width: "auto",
-            transform: "translate(-50%, -50%)",
-            opacity: 0.04,
-            filter: "invert(1)",
+            position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)",
+            height: "130%", width: "auto", maxWidth: "none",
+            opacity: 0.05, filter: "invert(1)", pointerEvents: "none", userSelect: "none",
           }}
         />
-
-        <div className="relative z-10 px-6 max-w-2xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: "clamp(2.4rem, 5vw, 4.5rem)",
-              fontWeight: 300,
-              lineHeight: 1.04,
-              color: "#FDFAF6",
-              marginBottom: 20,
-            }}
-          >
-            Cart full.<br />Confidence low?
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(253,250,246,0.55)", marginBottom: 40 }}
-          >
-            Shop smarter. Powered by people like you.
-          </motion.p>
-
-          <motion.button
-            initial={{ opacity: 0, y: 8 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.35 }}
-            onClick={() => navigate("/signin?mode=signup")}
-            style={{
-              display: "inline-block",
-              padding: "14px 40px",
-              fontSize: 11,
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-              fontWeight: 600,
-              color: "#FFFFFF",
-              background: "transparent",
-              border: "1px solid rgba(255,255,255,0.6)",
-              cursor: "pointer",
-              boxShadow: "0 0 20px rgba(255,255,255,0.1), 0 0 60px rgba(255,255,255,0.05)",
-              transition: "all 0.25s ease",
-            }}
-            whileHover={{
-              boxShadow: "0 0 32px rgba(255,255,255,0.2), 0 0 80px rgba(255,255,255,0.08)",
-              borderColor: "rgba(255,255,255,0.9)",
-            }}
-          >
-            Sign up — it's free
-          </motion.button>
+        <div style={{
+          position: "relative", zIndex: 1,
+          maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
+          padding: isMobile ? "56px 18px 60px" : "120px 40px 130px",
+        }}>
+          <motion.div {...rise} transition={{ duration: 0.7 }}>
+            <p style={meta(11, "rgba(247,244,239,0.62)")}>Start now</p>
+            <div style={{ height: 1, background: "rgba(247,244,239,0.22)", margin: isMobile ? "16px 0 22px" : "20px 0 30px" }} />
+            <h2 style={display(isMobile ? 40 : "clamp(48px, 6.4vw, 96px)", C.paper)}>
+              <span style={{ display: "block" }}>Cart full.</span>
+              <span style={{ display: "block" }}>Confidence low?</span>
+            </h2>
+            <p style={{ ...body(isMobile ? 15 : 16.5, "rgba(247,244,239,0.62)"), marginTop: isMobile ? 20 : 26, maxWidth: "38ch" }}>
+              Shop smarter. Powered by people like you.
+            </p>
+            <button
+              onClick={() => navigate("/signin?mode=signup")}
+              className="e11-cta"
+              style={{ ...cta(isMobile), marginTop: isMobile ? 26 : 34 }}
+            >
+              Sign up, it's free <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
+            </button>
+          </motion.div>
         </div>
       </section>
 
-      {/* ═══ FOOTER ══════════════════════════════════════════════════════════════ */}
-      <footer
-        className="py-10 px-8 md:px-14 flex flex-col md:grid md:grid-cols-3 items-center gap-4"
-        style={{ background: "#3A3530", borderTop: "1px solid rgba(255,255,255,0.07)" }}
-      >
-        <span className="md:justify-self-start" style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(253,250,246,0.28)" }}>
-          <span style={{ fontWeight: 700 }}>ELEVEN</span>
-          <span style={{ fontWeight: 300 }}>ELEVEN</span>
-        </span>
-        <a
-          href="mailto:hello@geteleveneleven.com"
-          className="md:justify-self-center"
-          style={{ fontSize: 13, letterSpacing: "0.04em", color: "rgba(253,250,246,0.55)", textDecoration: "none", transition: "color 0.2s", textAlign: "center" }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.9)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(253,250,246,0.55)"; }}
-        >
-          Questions? hello@geteleveneleven.com
-        </a>
-        <span className="md:justify-self-end" style={{ fontSize: 10, letterSpacing: "0.16em", color: "rgba(253,250,246,0.22)" }}>
-          © 2026 ELEVENELEVEN — All rights reserved
-        </span>
-      </footer>
+      {/* ═══ FOOTER ═════════════════════════════════════════════════════════ */}
+      <footer style={{ background: C.ink, borderTop: "1px solid rgba(247,244,239,0.14)" }}>
+        <div style={{
+          maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
+          padding: isMobile ? "26px 18px 34px" : "34px 40px",
+          display: isMobile ? "flex" : "grid",
+          flexDirection: "column",
+          gridTemplateColumns: isMobile ? undefined : "1fr auto 1fr",
+          alignItems: isMobile ? "flex-start" : "center",
+          gap: isMobile ? 14 : 16,
+        }}>
+          <span style={{
+            fontFamily: SANS, textTransform: "uppercase", whiteSpace: "nowrap",
+            fontSize: 11, letterSpacing: "0.22em", color: "rgba(247,244,239,0.42)",
+            justifySelf: "start",
+          }}>
+            <span style={{ fontWeight: 700 }}>ELEVEN</span>
+            <span style={{ fontWeight: 300 }}>ELEVEN</span>
+          </span>
 
+          <a
+            href="mailto:hello@geteleveneleven.com"
+            className="e11-link"
+            style={{ ...strong(13, "rgba(247,244,239,0.72)"), textDecoration: "none", justifySelf: "center", textAlign: isMobile ? "left" : "center" }}
+          >
+            Questions? hello@geteleveneleven.com
+          </a>
+
+          <span style={{
+            ...meta(10, "rgba(247,244,239,0.34)"),
+            letterSpacing: "0.16em", fontWeight: 500, justifySelf: "end", textAlign: isMobile ? "left" : "right",
+          }}>
+            © 2026 ELEVENELEVEN. All rights reserved.
+          </span>
+        </div>
+      </footer>
     </div>
   );
 };

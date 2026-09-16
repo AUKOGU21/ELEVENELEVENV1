@@ -1,8 +1,67 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { C, RADIUS, SANS, body, display, meta } from "@/lib/design";
+
+// ── The front door, set in the editorial system ───────────────────────────────
+// Paper, rules and square edges per src/lib/design.ts. Nothing here changes what
+// the form does: same fields, same handlers, same sign-in-link flow.
+
+const PAGE_CSS = `
+.ee-field::placeholder { color: ${C.muted}; opacity: 1; }
+.ee-field:focus { border-color: ${C.ink} !important; }
+`;
+
+const wordmarkBtn: CSSProperties = {
+  background: "none", border: "none", padding: 0, cursor: "pointer", userSelect: "none",
+  fontFamily: SANS, textTransform: "uppercase", letterSpacing: "0.28em", fontSize: 13,
+  color: C.ink, whiteSpace: "nowrap",
+};
+
+/** The two ways in, as tabs on a rule rather than a segmented pill. */
+const tabBtn = (on: boolean): CSSProperties => ({
+  ...meta(11, on ? C.ink : C.muted),
+  fontWeight: 700,
+  background: "none",
+  border: "none",
+  borderBottom: `2px solid ${on ? C.burgundy : "transparent"}`,
+  padding: "0 0 11px",
+  marginBottom: -1,
+  cursor: "pointer",
+  transition: "color 0.15s, border-color 0.15s",
+});
+
+// 16px so iOS doesn't zoom into the field on focus.
+const fieldStyle: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: RADIUS,
+  border: `1px solid ${C.rule}`,
+  background: "transparent",
+  padding: "13px 14px",
+  fontFamily: SANS,
+  fontSize: 16,
+  lineHeight: 1.5,
+  color: C.ink,
+  outline: "none",
+};
+
+const primaryBtn = (enabled: boolean): CSSProperties => ({
+  ...meta(12, "#FFFFFF"),
+  fontWeight: 700,
+  letterSpacing: "0.16em",
+  width: "100%",
+  background: C.burgundy,
+  border: `1px solid ${C.burgundy}`,
+  borderRadius: RADIUS,
+  padding: "16px 18px",
+  marginTop: 8,
+  cursor: enabled ? "pointer" : "default",
+  opacity: enabled ? 1 : 0.3,
+  transition: "opacity 0.15s",
+});
 
 // Where a failed signup or sign-in gets written down.
 //
@@ -202,33 +261,33 @@ const SignIn = () => {
     : firstName.trim() && lastName.trim() && email.trim() && password.trim() && confirm.trim();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex items-center px-6 py-4 border-b border-border">
-        <span
-          className="font-sans text-lg tracking-widest text-foreground cursor-pointer"
-          onClick={() => navigate("/")}
-        >
-          ELEVENELEVEN
-        </span>
-      </div>
+    <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, display: "flex", flexDirection: "column" }}>
+      <style>{PAGE_CSS}</style>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6">
-        <div className="w-full max-w-sm">
+      <header style={{ borderBottom: `1px solid ${C.rule}`, padding: "17px 20px" }}>
+        <button onClick={() => navigate("/")} style={wordmarkBtn}>
+          <span style={{ fontWeight: 700 }}>ELEVEN</span>
+          <span style={{ fontWeight: 300 }}>ELEVEN</span>
+        </button>
+      </header>
+
+      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "36px 20px 72px", boxSizing: "border-box" }}>
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <h1 style={{ ...display("clamp(34px, 9.5vw, 46px)"), marginBottom: 26 }}>
+            {mode === "signin" ? "Welcome back." : "Make your account."}
+          </h1>
+
           {/* Mode toggle */}
-          <div className="flex gap-1 p-1 bg-muted rounded-xl mb-8">
+          <div style={{ display: "flex", gap: 30, borderBottom: `1px solid ${C.rule}`, marginBottom: 28 }}>
             <button
               onClick={() => { setMode("signin"); setError(null); setNotice(null); setLinkState("idle"); }}
-              className={`flex-1 py-2 rounded-lg text-base font-medium transition-all ${
-                mode === "signin" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
+              style={tabBtn(mode === "signin")}
             >
               Sign in
             </button>
             <button
               onClick={() => { setMode("signup"); setError(null); setNotice(null); setLinkState("idle"); }}
-              className={`flex-1 py-2 rounded-lg text-base font-medium transition-all ${
-                mode === "signup" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
+              style={tabBtn(mode === "signup")}
             >
               Create account
             </button>
@@ -241,21 +300,23 @@ const SignIn = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="space-y-3"
+              style={{ display: "flex", flexDirection: "column", gap: 10 }}
             >
               {mode === "signup" && (
-                <div className="flex gap-3">
+                <div style={{ display: "flex", gap: 10 }}>
                   <input
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="First name"
-                    className="w-0 flex-1 min-w-0 px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                    className="ee-field"
+                    style={{ ...fieldStyle, width: 0, flex: 1, minWidth: 0 }}
                   />
                   <input
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="Last name"
-                    className="w-0 flex-1 min-w-0 px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                    className="ee-field"
+                    style={{ ...fieldStyle, width: 0, flex: 1, minWidth: 0 }}
                   />
                 </div>
               )}
@@ -266,7 +327,8 @@ const SignIn = () => {
                 placeholder="Email"
                 type="email"
                 autoComplete="email"
-                className="w-full px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                className="ee-field"
+                style={fieldStyle}
               />
               <input
                 value={password}
@@ -275,7 +337,8 @@ const SignIn = () => {
                 type="password"
                 autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 onKeyDown={(e) => e.key === "Enter" && mode === "signin" && handleSignIn()}
-                className="w-full px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                className="ee-field"
+                style={fieldStyle}
               />
               {mode === "signup" && (
                 <input
@@ -285,28 +348,29 @@ const SignIn = () => {
                   type="password"
                   autoComplete="new-password"
                   onKeyDown={(e) => e.key === "Enter" && handleSignUp()}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-card text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+                  className="ee-field"
+                  style={fieldStyle}
                 />
               )}
 
               {notice && !error && (
-                <p className="text-base text-muted-foreground text-center">{notice}</p>
+                <p style={{ ...body(14, C.inkSoft), marginTop: 4 }}>{notice}</p>
               )}
               {error && (
-                <p className="text-base text-red-500 text-center">{error}</p>
+                <p style={{ ...body(14, C.burgundy), marginTop: 4 }}>{error}</p>
               )}
 
               <button
                 onClick={mode === "signin" ? handleSignIn : handleSignUp}
                 disabled={!canSubmit || loading}
-                className="w-full py-4 rounded-full bg-primary text-primary-foreground text-base tracking-widest uppercase font-medium disabled:opacity-30 hover:bg-primary/90 transition-all mt-2"
+                style={primaryBtn(!!canSubmit && !loading)}
               >
                 {loading ? "..." : mode === "signin" ? "Sign in" : "Create account"}
               </button>
 
               {mode === "signin" && (
                 linkState === "sent" ? (
-                  <p className="text-sm text-muted-foreground text-center pt-2">
+                  <p style={{ ...body(13.5, C.muted), marginTop: 6 }}>
                     Sent. Check {email.trim()} for a link to sign in. It works for an hour.
                   </p>
                 ) : (
@@ -314,7 +378,14 @@ const SignIn = () => {
                     type="button"
                     onClick={sendSignInLink}
                     disabled={linkState === "sending"}
-                    className="w-full text-sm text-muted-foreground underline underline-offset-4 pt-2 disabled:opacity-40"
+                    style={{
+                      ...body(13.5, C.muted),
+                      background: "none", border: "none", padding: 0, marginTop: 6,
+                      textAlign: "left", alignSelf: "flex-start",
+                      textDecoration: "underline", textUnderlineOffset: 3, textDecorationThickness: 1,
+                      cursor: linkState === "sending" ? "default" : "pointer",
+                      opacity: linkState === "sending" ? 0.4 : 1,
+                    }}
                   >
                     {linkState === "sending" ? "Sending..." : "Email me a sign-in link"}
                   </button>
@@ -323,7 +394,7 @@ const SignIn = () => {
             </motion.div>
           </AnimatePresence>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

@@ -11,11 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell } from "lucide-react";
 import { pushState, enablePush, isStandalone, type PushState } from "@/lib/push";
-import { SANS_APP } from "@/lib/type";
-
-const INK = "#1C1712";
-const MUTED = "#8C7A70";
-const GOLD = "#C49E64";
+import { C, RADIUS, body as bodyText, display, meta } from "@/lib/design";
 
 const SNOOZE_DAYS = 14;      // "Not now"
 const BLOCKED_DAYS = 60;     // she said no to the browser prompt, so back well off
@@ -85,7 +81,7 @@ export default function NotificationPrompt({ userId, isMobile }: { userId: strin
   const blocked = state === "denied";
 
   const title = done
-    ? "You're all set ✦"
+    ? "You're all set."
     : blocked
     ? "Notifications are blocked"
     : "Turn on push notifications";
@@ -97,14 +93,18 @@ export default function NotificationPrompt({ userId, isMobile }: { userId: strin
     : "Get a ping when someone weighs in on your decision.";
 
   const dark: React.CSSProperties = {
-    flex: 1, padding: "13px 18px", borderRadius: 100, border: "none",
-    background: INK, color: "#FDFAF6", fontSize: 14, fontWeight: 600,
-    cursor: "pointer", fontFamily: "inherit", opacity: busy ? 0.6 : 1,
+    ...meta(11.5, "#FFFFFF"),
+    flex: 1, fontWeight: 700, letterSpacing: "0.16em",
+    padding: "15px 18px", borderRadius: RADIUS,
+    background: C.burgundy, border: `1px solid ${C.burgundy}`,
+    cursor: "pointer", opacity: busy ? 0.6 : 1,
   };
   const ghost: React.CSSProperties = {
-    flex: 1, padding: "13px 18px", borderRadius: 100, border: "1px solid rgba(0,0,0,0.14)",
-    background: "transparent", color: MUTED, fontSize: 14, fontWeight: 600,
-    cursor: "pointer", fontFamily: "inherit",
+    ...meta(11.5, C.ink),
+    flex: 1, fontWeight: 700, letterSpacing: "0.16em",
+    padding: "15px 18px", borderRadius: RADIUS,
+    background: "transparent", border: `1px solid ${C.rule}`,
+    cursor: "pointer",
   };
 
   return (
@@ -115,7 +115,7 @@ export default function NotificationPrompt({ userId, isMobile }: { userId: strin
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={notNow}
-          style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }}
+          style={{ position: "absolute", inset: 0, background: C.scrim }}
         />
         <motion.div
           role="dialog"
@@ -127,23 +127,15 @@ export default function NotificationPrompt({ userId, isMobile }: { userId: strin
           transition={{ type: "spring", damping: 26, stiffness: 320 }}
           onClick={(e) => e.stopPropagation()}
           style={{
-            position: "relative", width: "100%", maxWidth: 380,
-            background: "#F5EFEA", borderRadius: 22, padding: isMobile ? "26px 22px 22px" : "30px 26px 24px",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.32)", textAlign: "center",
+            position: "relative", width: "100%", maxWidth: 400,
+            background: C.paper, borderRadius: RADIUS, padding: isMobile ? "26px 22px 24px" : "30px 28px 26px",
+            boxShadow: "0 20px 60px rgba(20,18,16,0.22)", textAlign: "left",
           }}
         >
-          <div style={{
-            width: 54, height: 54, borderRadius: "50%", margin: "0 auto 16px",
-            background: "rgba(196,158,100,0.16)", border: `1px solid ${GOLD}`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Bell style={{ width: 24, height: 24, color: "#A07848" }} />
-          </div>
+          <Bell style={{ width: 20, height: 20, color: C.ink, display: "block", marginBottom: 16 }} strokeWidth={1.5} />
 
-          <p style={{ fontFamily: SANS_APP, fontSize: 19.5, fontWeight: 700, color: INK, margin: 0, lineHeight: 1.25, letterSpacing: "-0.015em" }}>
-            {title}
-          </p>
-          <p style={{ fontSize: 13.5, color: MUTED, margin: "9px 0 0", lineHeight: 1.5 }}>
+          <p style={display(isMobile ? 28 : 32)}>{title}</p>
+          <p style={{ ...bodyText(14, C.inkSoft), marginTop: 12, maxWidth: "34ch" }}>
             {body}
           </p>
 
@@ -155,7 +147,7 @@ export default function NotificationPrompt({ userId, isMobile }: { userId: strin
                 <>
                   <button ref={closeRef} style={ghost} onClick={notNow}>Not now</button>
                   <button style={dark} disabled={busy} onClick={turnOn}>
-                    {busy ? "Turning on…" : "Turn on"}
+                    {busy ? "Turning on..." : "Turn on"}
                   </button>
                 </>
               )}

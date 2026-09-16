@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/lib/supabase";
@@ -70,12 +70,6 @@ const navLink = (colour: string = C.ink): React.CSSProperties => ({
   textDecoration: "none",
 });
 
-const rise = {
-  initial: { opacity: 0, y: 16 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-60px" },
-};
-
 /** Section label and the long rule that runs off beside it. */
 function Head({ label, onDark, isMobile }: { label: string; onDark: boolean; isMobile: boolean }) {
   return (
@@ -87,12 +81,13 @@ function Head({ label, onDark, isMobile }: { label: string; onDark: boolean; isM
 }
 
 /** A statement set on leather: Anton, intentional line breaks, room around it. */
-function Statement({ lines, isMobile }: { lines: string[][]; isMobile: boolean }) {
+function Statement({ lines, mobileLines, isMobile }: { lines: string[][]; mobileLines?: string[][]; isMobile: boolean }) {
+  const blocks = isMobile ? (mobileLines ?? lines) : lines;
   return (
-    <motion.div {...rise} transition={{ duration: 0.6 }}>
-      {lines.map((block, bi) => (
-        <p key={bi} style={{ ...display(isMobile ? "clamp(26px, 7.4vw, 34px)" : "clamp(34px, 3.6vw, 54px)", CREAM), lineHeight: 1.08, marginTop: bi === 0 ? 0 : isMobile ? 28 : 44 }}>
-          {block.map((l, i) => <span key={i} style={{ display: "block" }}>{l}</span>)}
+    <motion.div>
+      {blocks.map((block, bi) => (
+        <p key={bi} style={{ ...display(isMobile ? "clamp(19px, 6vw, 30px)" : "clamp(32px, 5vw, 72px)", CREAM), lineHeight: 1.1, marginTop: bi === 0 ? 0 : isMobile ? 26 : 48 }}>
+          {block.map((l, i) => <span key={i} style={{ display: "block", whiteSpace: "nowrap" }}>{l}</span>)}
         </p>
       ))}
     </motion.div>
@@ -197,29 +192,30 @@ const Index = () => {
           position: "relative", zIndex: 2,
           maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
           padding: isMobile ? "16px 18px 0" : "26px 40px 0",
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+          display: "flex", alignItems: "center", justifyContent: "flex-end", gap: isMobile ? 12 : 22,
         }}>
-          <span
-            className="select-none"
-            style={{
-              fontFamily: SANS, textTransform: "uppercase", color: C.ink, whiteSpace: "nowrap",
-              letterSpacing: isMobile ? "0.22em" : "0.32em", fontSize: isMobile ? 12 : 15,
-            }}
-          >
-            <span style={{ fontWeight: 700 }}>ELEVEN</span>
-            <span style={{ fontWeight: 300 }}>ELEVEN</span>
-          </span>
-
-          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 16 : 28 }}>
-            <button onClick={() => navigate("/feed")} className="e11-link" style={navLink(C.ink)}>
-              Feed <ArrowRight style={{ width: 13, height: 13 }} strokeWidth={2} />
-            </button>
-            {user ? avatarChip(isMobile ? 30 : 34) : (
-              <button onClick={() => navigate("/signin")} className="e11-link" style={navLink(C.ink)}>
-                Sign in <ArrowRight style={{ width: 13, height: 13 }} strokeWidth={2} />
+          <button onClick={() => navigate("/feed")} className="e11-link" style={navLink(C.ink)}>
+            Feed <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />
+          </button>
+          {user ? avatarChip(isMobile ? 30 : 34) : (
+            <>
+              <button
+                onClick={() => navigate("/signin?mode=signup")}
+                className="e11-cta"
+                style={{
+                  ...meta(isMobile ? 10.5 : 11, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.14em",
+                  background: C.burgundy, border: `1px solid ${C.burgundy}`, borderRadius: RADIUS,
+                  padding: isMobile ? "9px 13px" : "11px 20px", cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                }}
+              >
+                Join <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />
               </button>
-            )}
-          </div>
+              <button onClick={() => navigate("/signin")} className="e11-link" style={navLink(C.ink)}>
+                Sign in <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />
+              </button>
+            </>
+          )}
         </div>
 
         {/* The wordmark, and the women walking across it. The type never waits on
@@ -267,7 +263,7 @@ const Index = () => {
 
           {isMobile ? (
             <div style={{ marginTop: 34 }}>
-              <motion.div {...rise} transition={{ duration: 0.6 }}>
+              <motion.div>
                 {PROBLEM_WORDS.map((w) => (
                   <p key={w} style={{ ...display("clamp(42px, 13.5vw, 62px)", CREAM), lineHeight: 1.02 }}>{w}</p>
                 ))}
@@ -288,7 +284,7 @@ const Index = () => {
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.05fr)", columnGap: 48, marginTop: 64, minHeight: 440 }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 30, paddingBottom: 12 }}>
                 {PROBLEM_NOTES.map(([n, a, b], i) => (
-                  <motion.div key={n} {...rise} transition={{ duration: 0.5, delay: i * 0.08 }} style={{ display: "grid", gridTemplateColumns: "66px 1fr", gap: 16, alignItems: "baseline" }}>
+                  <motion.div key={n} style={{ display: "grid", gridTemplateColumns: "66px 1fr", gap: 16, alignItems: "baseline" }}>
                     <span style={{ ...display(30, CREAM_SOFT) }}>{n} /</span>
                     <span style={{ ...meta(13, CREAM), lineHeight: 1.7, letterSpacing: "0.06em" }}>
                       <span style={{ display: "block" }}>{a}</span>
@@ -298,7 +294,7 @@ const Index = () => {
                 ))}
               </div>
 
-              <motion.div {...rise} transition={{ duration: 0.6 }} style={{ textAlign: "right" }}>
+              <motion.div style={{ textAlign: "right" }}>
                 {PROBLEM_WORDS.map((w) => (
                   <p key={w} style={{ ...display("clamp(60px, 7.6vw, 122px)", CREAM), lineHeight: 0.98, letterSpacing: "-0.01em" }}>{w}</p>
                 ))}
@@ -312,7 +308,7 @@ const Index = () => {
       <section style={{ ...leather(BURGUNDY_LEATHER), color: CREAM, borderTop: `1px solid ${CREAM_RULE}` }}>
         <div style={{ ...inner, padding: isMobile ? "56px 18px 72px" : "110px 40px 140px" }}>
           <Head label="The idea" onDark isMobile={isMobile} />
-          <div style={{ marginTop: isMobile ? 46 : 96, maxWidth: isMobile ? "100%" : "44ch" }}>
+          <div style={{ marginTop: isMobile ? 46 : 96 }}>
             <Statement
               isMobile={isMobile}
               lines={[
@@ -337,7 +333,7 @@ const Index = () => {
             alignItems: "center",
           }}>
             {/* The photograph, outlined rather than boxed. */}
-            <motion.div {...rise} transition={{ duration: 0.6 }} style={{ order: isMobile ? 1 : 0 }}>
+            <motion.div style={{ order: isMobile ? 1 : 0 }}>
               <div style={{ border: `1px solid ${C.burgundy}`, borderRadius: RADIUS, padding: isMobile ? 12 : 18 }}>
                 <img
                   src={MODEL_PORTRAIT}
@@ -350,7 +346,7 @@ const Index = () => {
 
             <div style={{ order: isMobile ? 2 : 1, display: "flex", flexDirection: "column", gap: isMobile ? 40 : 64 }}>
               {STEPS.map(([n, title, copy], i) => (
-                <motion.div key={n} {...rise} transition={{ duration: 0.5, delay: i * 0.08 }} style={{ display: "grid", gridTemplateColumns: isMobile ? "56px 1fr" : "82px 1fr", columnGap: isMobile ? 14 : 22, alignItems: "start" }}>
+                <motion.div key={n} style={{ display: "grid", gridTemplateColumns: isMobile ? "56px 1fr" : "82px 1fr", columnGap: isMobile ? 14 : 22, alignItems: "start" }}>
                   <span style={{ ...display(isMobile ? 34 : 52, C.burgundy), lineHeight: 0.9 }}>{n}</span>
                   <div style={{ minWidth: 0 }}>
                     <p style={{ ...display(isMobile ? 26 : 36, C.ink), lineHeight: 1 }}>{title}</p>
@@ -367,10 +363,14 @@ const Index = () => {
       <section style={{ ...leather(BURGUNDY_LEATHER), color: CREAM }}>
         <div style={{ ...inner, padding: isMobile ? "56px 18px 72px" : "110px 40px 140px" }}>
           <Head label="Why it works" onDark isMobile={isMobile} />
-          <div style={{ marginTop: isMobile ? 46 : 96, maxWidth: isMobile ? "100%" : "44ch" }}>
+          <div style={{ marginTop: isMobile ? 46 : 96 }}>
             <Statement
               isMobile={isMobile}
               lines={[[
+                "Someone else's experience helped you decide.",
+                "Yours helps whoever comes next.",
+              ]]}
+              mobileLines={[[
                 "Someone else's experience",
                 "helped you decide.",
                 "Yours helps",
@@ -387,15 +387,7 @@ const Index = () => {
           maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
           padding: isMobile ? "44px 18px 26px" : "56px 40px 40px",
         }}>
-          <div style={{ maxWidth: isMobile ? 200 : 240 }}>
-            <p style={{ ...meta(isMobile ? 10.5 : 11.5, C.ink), lineHeight: 1.7 }}>
-              <span style={{ display: "block" }}>The next decision</span>
-              <span style={{ display: "block" }}>is yours</span>
-            </p>
-            <div style={{ height: 1, background: C.burgundy, marginTop: 14 }} />
-          </div>
-
-          <motion.div {...rise} transition={{ duration: 0.6 }} style={{ textAlign: "center", padding: isMobile ? "44px 0 0" : "64px 0 0" }}>
+          <motion.div style={{ textAlign: "center", padding: isMobile ? "56px 0 0" : "96px 0 0" }}>
             <h2 style={{ ...display(isMobile ? "clamp(46px, 15vw, 72px)" : "clamp(72px, 9.4vw, 148px)", C.burgundy), lineHeight: 0.92 }}>
               <span style={{ display: "block" }}>What are you</span>
               <span style={{ display: "block" }}>deciding on?</span>

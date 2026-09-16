@@ -37,7 +37,16 @@ const PAGE_CSS = `
 .e11-link:hover { opacity: 0.6; }
 /* The walk: two copies of the same strip, sliding one full copy then resetting. */
 @keyframes e11-walk { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
-.e11-walk { animation: e11-walk 30s linear infinite; will-change: transform; }
+.e11-walk {
+  animation-name: e11-walk;
+  animation-duration: 30s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-direction: normal;
+  animation-fill-mode: none;
+  animation-play-state: running;
+  will-change: transform;
+}
 @media (prefers-reduced-motion: reduce) { .e11-walk { animation: none; } }
 `;
 
@@ -423,7 +432,7 @@ const Index = () => {
             <img
               src={logoSymbol}
               alt="ElevenEleven"
-              style={{ height: isMobile ? 48 : 64, width: "auto", display: "block", justifySelf: "start" }}
+              style={{ height: isMobile ? 48 : 64, width: "auto", display: "block", justifySelf: "start", alignSelf: isMobile ? "flex-end" : "auto" }}
             />
 
             <a

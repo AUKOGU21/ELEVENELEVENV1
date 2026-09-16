@@ -37,7 +37,7 @@ const PAGE_CSS = `
 .e11-link:hover { opacity: 0.6; }
 /* The walk: two copies of the same strip, sliding one full copy then resetting. */
 @keyframes e11-walk { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
-.e11-walk { animation: e11-walk 64s linear infinite; will-change: transform; }
+.e11-walk { animation: e11-walk 30s linear infinite; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .e11-walk { animation: none; } }
 `;
 
@@ -423,7 +423,7 @@ const Index = () => {
             <img
               src={logoSymbol}
               alt="ElevenEleven"
-              style={{ height: isMobile ? 30 : 36, width: "auto", display: "block", justifySelf: "start" }}
+              style={{ height: isMobile ? 48 : 64, width: "auto", display: "block", justifySelf: "start" }}
             />
 
             <a

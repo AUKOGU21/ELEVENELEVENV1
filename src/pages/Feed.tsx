@@ -1733,8 +1733,15 @@ const Feed = () => {
           />
         )}
         {!loading && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: activeTab === "feed" ? (isMobile ? "18px 0 16px" : "26px 0 24px") : (isMobile ? "10px 0 16px" : "14px 0 24px") }}>
-            <div className="no-scrollbar" style={{ display: "flex", gap: isMobile ? 20 : 40, overflowX: "auto", minWidth: 0 }}>
+          <div style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            justifyContent: "space-between",
+            gap: isMobile ? 10 : 16,
+            margin: activeTab === "feed" ? (isMobile ? "18px 0 16px" : "26px 0 24px") : (isMobile ? "10px 0 16px" : "14px 0 24px"),
+          }}>
+            <div className="no-scrollbar" style={{ display: "flex", gap: isMobile ? 22 : 40, overflowX: "auto", minWidth: 0, width: isMobile ? "100%" : undefined }}>
               {CATEGORY_OPTIONS.map((cat) => (
                 <button
                   key={cat}
@@ -1751,7 +1758,7 @@ const Feed = () => {
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               // Safari draws its own white rounded box over a select unless the
               // native appearance is turned off.
-              style={{ ...e11Meta(11, E11.ink), fontWeight: 700, letterSpacing: "0.2em", background: "transparent", border: "none", borderRadius: 0, WebkitAppearance: "none", appearance: "none", cursor: "pointer", outline: "none", flexShrink: 0, paddingBottom: 8 }}
+              style={{ ...e11Meta(11, E11.ink), fontWeight: 700, letterSpacing: "0.2em", background: "transparent", border: "none", borderRadius: 0, WebkitAppearance: "none", appearance: "none", cursor: "pointer", outline: "none", flexShrink: 0, paddingBottom: 8, alignSelf: isMobile ? "flex-end" : "auto", textAlign: isMobile ? "right" : "left" }}
             >
               <option value="newest">Newest</option>
               <option value="relevant">Most relevant</option>

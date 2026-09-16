@@ -17,6 +17,42 @@ const RESHOW_DAYS = 21;
 
 const HIGHLIGHT = "#F4E06B";
 
+/** The three dots that open Safari's menu, drawn rather than described. */
+function DotsGlyph({ size = 17 }: { size?: number }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: size + 11, height: size + 11, flexShrink: 0, margin: "0 3px",
+      border: `1px solid ${C.ruleStrong}`, borderRadius: RADIUS, background: "#FFFFFF",
+      verticalAlign: "middle",
+    }}>
+      <svg width={size} height={size} viewBox="0 0 24 24" fill={C.ink} aria-hidden>
+        <circle cx="5" cy="12" r="1.9" />
+        <circle cx="12" cy="12" r="1.9" />
+        <circle cx="19" cy="12" r="1.9" />
+      </svg>
+    </span>
+  );
+}
+
+/** The iOS Share glyph, drawn rather than described. */
+function ShareGlyph({ size = 17 }: { size?: number }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: size + 11, height: size + 11, flexShrink: 0, margin: "0 3px",
+      border: `1px solid ${C.ruleStrong}`, borderRadius: RADIUS, background: "#FFFFFF",
+      verticalAlign: "middle",
+    }}>
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 15V3" />
+        <path d="M8 7l4-4 4 4" />
+        <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+      </svg>
+    </span>
+  );
+}
+
 function Mark({ children }: { children: React.ReactNode }) {
   return <mark style={{ background: HIGHLIGHT, color: C.ink, padding: "1px 5px" }}>{children}</mark>;
 }
@@ -26,7 +62,13 @@ const STEPS: { label: string; title: React.ReactNode; note?: string; items: Reac
     label: "Step one",
     title: <>Add <Mark>ElevenEleven</Mark> to your home screen</>,
     items: [
-      <>Tap <b>Share</b>, the square with the arrow. On Android, tap the <b>⋮</b> menu, top right.</>,
+      <>
+        Tap <DotsGlyph /> in the bar at the <b>bottom</b> of Safari. On Android it is the
+        <b> ⋮</b> menu, top right.
+      </>,
+      <>
+        In that menu, tap <ShareGlyph /> <b>Share</b>.
+      </>,
       <>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</>,
     ],
   },

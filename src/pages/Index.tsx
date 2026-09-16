@@ -9,7 +9,7 @@
 // leather. The leather is photographed (public/home), never faked in CSS.
 // Scale, type, whitespace and one slow horizontal movement carry it. No cards,
 // no pills, no icons, no serifs.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
@@ -37,16 +37,7 @@ const PAGE_CSS = `
 .e11-link:hover { opacity: 0.6; }
 /* The walk: two copies of the same strip, sliding one full copy then resetting. */
 @keyframes e11-walk { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
-.e11-walk {
-  animation-name: e11-walk;
-  animation-duration: 30s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-direction: normal;
-  animation-fill-mode: none;
-  animation-play-state: running;
-  will-change: transform;
-}
+.e11-walk { will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .e11-walk { animation: none; } }
 `;
 
@@ -191,6 +182,40 @@ const Index = () => {
     </button>
   );
 
+  // The walk. Driven here rather than in CSS: the shorthand's iteration count
+  // was not surviving, so the strip made a single pass and held. This keeps a
+  // handle on the animation, so it can be checked and restarted.
+  const walkRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const track = walkRef.current;
+    if (!track) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const anim = track.animate(
+      [{ transform: "translate3d(0, 0, 0)" }, { transform: "translate3d(-50%, 0, 0)" }],
+      { duration: 30000, iterations: Infinity, easing: "linear" },
+    );
+    // A tab that sleeps can leave an animation idle or finished. Whenever the
+    // page comes back, make sure it is still running.
+    const keepGoing = () => {
+      if (document.visibilityState !== "visible") return;
+      if (anim.playState === "finished" || anim.playState === "idle") {
+        try { anim.cancel(); } catch { /* already gone */ }
+        anim.play();
+      } else if (anim.playState === "paused") {
+        anim.play();
+      }
+    };
+    document.addEventListener("visibilitychange", keepGoing);
+    window.addEventListener("pageshow", keepGoing);
+    const beat = window.setInterval(keepGoing, 5000);
+    return () => {
+      document.removeEventListener("visibilitychange", keepGoing);
+      window.removeEventListener("pageshow", keepGoing);
+      clearInterval(beat);
+      anim.cancel();
+    };
+  }, []);
+
   const leather = (src: string): React.CSSProperties => ({
     backgroundImage: `url(${src})`,
     backgroundSize: "cover",
@@ -257,7 +282,7 @@ const Index = () => {
           </h1>
 
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
-            <div className="e11-walk" style={{ display: "flex", width: "max-content" }}>
+            <div ref={walkRef} className="e11-walk" style={{ display: "flex", width: "max-content" }}>
               {[0, 1].map((i) => (
                 <img
                   key={i}

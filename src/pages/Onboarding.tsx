@@ -1,5 +1,6 @@
 import { useState, useEffect, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { MirrorCard, type Mirror } from "@/pages/Profile";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Lock } from "lucide-react";
 import { STEPS, SIZE_OPTIONS, FIT_CATEGORIES } from "@/components/onboarding/OnboardingData";
@@ -11,26 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { C, RADIUS, SANS, body, display, hairline, meta, strong } from "@/lib/design";
 
 // ─── Match label helper ───────────────────────────────────────────────────────
-function getMatchLabel(mine: Record<string, any>, them: Record<string, any>): string {
-  const mySil   = (mine?.silhouette_preference ?? [])[0];
-  const theirSil = (them?.silhouette_preference ?? [])[0];
-  if (mySil && theirSil && mySil === theirSil) return "Similar build";
-  if (mine?.height_range && them?.height_range && mine.height_range === them.height_range) return "Similar height";
-  const myStyles: string[]    = mine?.style_aesthetics ?? [];
-  const theirStyles: string[] = them?.style_aesthetics ?? [];
-  if (myStyles.some(s => theirStyles.includes(s))) return "Similar style";
-  if (mine?.top_size && them?.top_size && mine.top_size === them.top_size) return "Similar size";
-  return "Close match";
-}
 
-// ─── Fan card layout config (5 cards) ────────────────────────────────────────
-const FAN_CONFIG = [
-  { left: -22, y: 22, rotate: -13, scale: 0.74, zIndex: 1 },
-  { left: 52,  y: 9,  rotate: -6,  scale: 0.87, zIndex: 2 },
-  { left: 124, y: 0,  rotate: 0,   scale: 1.0,  zIndex: 5 },
-  { left: 196, y: 9,  rotate: 6,   scale: 0.87, zIndex: 2 },
-  { left: 262, y: 22, rotate: 13,  scale: 0.74, zIndex: 1 },
-];
 
 const TOTAL_STEPS = 6;
 const HEIGHT_BANDS_ORDERED = [
@@ -231,7 +213,7 @@ const Onboarding = () => {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, display_name, avatar_url, silhouette_preference, style_aesthetics, height_range, top_size, bottom_size")
+        .select("id, display_name, avatar_url, age, city, silhouette_preference, style_aesthetics, height_range, top_size, bottom_size")
         .neq("id", user.id)
         .limit(100);
       if (!data || data.length === 0) return;
@@ -401,18 +383,7 @@ const Onboarding = () => {
   };
 
   // Pad matches to always have 5 slots (null = placeholder)
-  const paddedMatches: (any | null)[] = [
-    ...onboardingMatches,
-    ...Array(Math.max(0, 5 - onboardingMatches.length)).fill(null),
-  ];
 
-  const tempProfile = {
-    silhouette_preference: answers["silhouette"] ?? [],
-    style_aesthetics:      answers["style"]      ?? [],
-    height_range: exactHeight || answers["height"]?.[0] || null,
-    top_size:    topSizeValue    || null,
-    bottom_size: bottomSizeValue || null,
-  };
 
   // ── Shared page type ───────────────────────────────────────────────────────
   const heading: CSSProperties = { ...display(isMobile ? "clamp(30px, 9.5vw, 40px)" : 50), marginBottom: 14 };
@@ -715,8 +686,8 @@ const Onboarding = () => {
                       flexDirection: "column",
                       padding: 0,
                     }}>
-                    <div style={{ aspectRatio: "2/3", background: C.well, overflow: "hidden", width: "100%", flexShrink: 0 }}>
-                      <img src={opt.image} alt={opt.label} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%", display: "block" }} />
+                    <div style={{ aspectRatio: "2 / 3", background: C.well, overflow: "hidden", width: "100%", flexShrink: 0 }}>
+                      <img src={opt.image} alt={opt.label} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} />
                     </div>
                     <div style={{ padding: "11px 12px 14px", borderTop: `1px solid ${isSelected ? C.burgundy : C.rule}` }}>
                       <p style={{ ...strong(13, isSelected ? C.burgundy : C.ink), lineHeight: 1.3 }}>{opt.label}</p>
@@ -770,54 +741,16 @@ const Onboarding = () => {
 
               <div style={{ ...hairline(), margin: isMobile ? "26px 0" : "32px 0" }} />
 
-              {/* ── Fan of match cards ── */}
-              <div style={{ position: "relative", width: "100%", maxWidth: 370, height: 215, margin: "0 auto 30px", overflow: "visible" }}>
-                {paddedMatches.map((m, i) => {
-                  const cfg = FAN_CONFIG[i];
-                  const initial = m ? (m.display_name?.trim() || "?")[0].toUpperCase() : "?";
-                  const label   = m ? getMatchLabel(tempProfile, m) : null;
-
-                  return (
-                    <motion.div key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.07, duration: 0.4 }}
-                      title={label ?? undefined}
-                      style={{
-                        position: "absolute",
-                        left: cfg.left,
-                        top: cfg.y,
-                        width: 110,
-                        height: 180,
-                        borderRadius: 0,
-                        overflow: "hidden",
-                        background: C.well,
-                        border: `1px solid ${C.rule}`,
-                        boxSizing: "border-box",
-                        transform: `rotate(${cfg.rotate}deg) scale(${cfg.scale})`,
-                        transformOrigin: "bottom center",
-                        zIndex: cfg.zIndex,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {/* Photo or placeholder */}
-                      {m?.avatar_url ? (
-                        <img src={m.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 12 }}>
-                          <span style={{ ...display(26, C.faint) }}>{initial}</span>
-                          {m?.display_name && (
-                            <p style={{ ...meta(9.5, C.muted), textAlign: "center", lineHeight: 1.3 }}>
-                              {m.display_name.split(" ")[0]}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                    </motion.div>
-                  );
-                })}
-              </div>
+              {/* Her closest matches, drawn as the mirrors on her profile are. */}
+              {onboardingMatches.length > 0 && (
+                <div style={isMobile
+                  ? { display: "flex", gap: 12, overflowX: "auto", scrollbarWidth: "none", margin: "0 -16px 30px", padding: "0 16px 4px", scrollSnapType: "x mandatory" }
+                  : { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 20, marginBottom: 30 }}>
+                  {onboardingMatches.slice(0, 3).map((m: Mirror) => (
+                    <MirrorCard key={m.id} m={m} isMobile={isMobile} onOpen={() => navigate(`/profile/${m.id}`)} />
+                  ))}
+                </div>
+              )}
 
               {/* CTA */}
               <button onClick={next} style={primaryBtn(true)}>

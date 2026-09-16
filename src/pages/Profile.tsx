@@ -880,10 +880,10 @@ function ImageOption({ image, label, selected, dim, onClick }: {
       style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", opacity: dim ? 0.3 : 1, transition: "opacity .15s", minWidth: 0 }}
     >
       <span style={{
-        display: "block", aspectRatio: "3 / 4", background: C.well, borderRadius: RADIUS, overflow: "hidden",
+        display: "block", aspectRatio: "2 / 3", background: C.well, borderRadius: RADIUS, overflow: "hidden",
         outline: selected ? `2px solid ${C.burgundy}` : "none", outlineOffset: 2,
       }}>
-        <img src={image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
+        <img src={image} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} />
       </span>
       <span style={{ ...meta(10, selected ? C.burgundy : C.ink), fontWeight: 700, lineHeight: 1.35, display: "block", marginTop: 9 }}>{label}</span>
     </button>
@@ -901,7 +901,7 @@ function SaveRow({ onSave, onCancel, disabled, saving }: { onSave: () => void; o
   );
 }
 
-type Mirror = {
+export type Mirror = {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
@@ -913,7 +913,7 @@ type Mirror = {
   score: number;
 };
 
-function MirrorCard({ m, isMobile, onOpen }: { m: Mirror; isMobile: boolean; onOpen: () => void }) {
+export function MirrorCard({ m, isMobile, onOpen }: { m: Mirror; isMobile: boolean; onOpen: () => void }) {
   const name = m.display_name?.trim() || "Anonymous";
   const sil = Array.isArray(m.silhouette_preference) ? m.silhouette_preference[0] : null;
   const line = [m.age, m.city?.split(",")[0]].filter(Boolean).join(" · ");

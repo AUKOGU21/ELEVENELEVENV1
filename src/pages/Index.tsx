@@ -3,11 +3,12 @@
 // is sent to the feed instead, so everything here is written for someone who has
 // never used it.
 //
-// Set as a magazine cover rather than a SaaS page, per src/lib/design.ts. The
-// hero photograph (a woman beside her own reflections, which is the product's
-// whole idea) is left light and the type sits on paper next to it, so nothing
-// needs a dark scrim to be legible. Hierarchy comes from Anton, scale and
-// hairline rules. No cards, no glass, no shadows, no serifs.
+// Set as a fashion cover rather than a SaaS page. Six sections: a hero where the
+// women walk across the wordmark, the problem and the idea on burgundy leather,
+// how it works on white, why it works back on leather, and the sign-up on white
+// leather. The leather is photographed (public/home), never faked in CSS.
+// Scale, type, whitespace and one slow horizontal movement carry it. No cards,
+// no pills, no icons, no serifs.
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -17,14 +18,26 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/format";
 import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
-import logoSymbol from "@/assets/logo-symbol.png";
-import heroImage from "@/assets/hero-editorial.png";
+
+const BURGUNDY_LEATHER = "/home/leather-burgundy.png";
+const WHITE_LEATHER    = "/home/leather-white.png";
+const MODELS_STRIP     = "/home/models-strip.png";
+const MODEL_PORTRAIT   = "/home/model-leather-pants.png";
+
+// Cream, for type on the leather.
+const CREAM = "#F2EDE6";
+const CREAM_SOFT = "rgba(242,237,230,0.74)";
+const CREAM_RULE = "rgba(242,237,230,0.42)";
 
 const PAGE_CSS = `
 .e11-cta { transition: background 0.18s, border-color 0.18s, opacity 0.18s; }
 .e11-cta:hover { background: #5E1414; border-color: #5E1414; }
 .e11-link { transition: opacity 0.18s; }
 .e11-link:hover { opacity: 0.6; }
+/* The walk: two copies of the same strip, sliding one full copy then resetting. */
+@keyframes e11-walk { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+.e11-walk { animation: e11-walk 64s linear infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .e11-walk { animation: none; } }
 `;
 
 const MAX = 1320;
@@ -36,7 +49,7 @@ const cta = (mobile: boolean): React.CSSProperties => ({
   background: C.burgundy,
   border: `1px solid ${C.burgundy}`,
   borderRadius: RADIUS,
-  padding: mobile ? "16px 24px" : "18px 32px",
+  padding: mobile ? "16px 28px" : "18px 40px",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -63,126 +76,41 @@ const rise = {
   viewport: { once: true, margin: "-60px" },
 };
 
-/** An eyebrow, a rule, and an oversized Anton headline. Opens every section. */
-function SectionHead({ eyebrow, lines, isMobile, onDark = false }: {
-  eyebrow: string;
-  lines: string[];
-  isMobile: boolean;
-  onDark?: boolean;
-}) {
-  const rule = onDark ? "rgba(247,244,239,0.22)" : C.rule;
+/** Section label and the long rule that runs off beside it. */
+function Head({ label, onDark, isMobile }: { label: string; onDark: boolean; isMobile: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 16 : 28 }}>
+      <p style={{ ...display(isMobile ? 20 : 26, onDark ? CREAM : C.ink), whiteSpace: "nowrap" }}>{label}</p>
+      <div style={{ flex: 1, height: 1, background: onDark ? CREAM_RULE : C.rule }} />
+    </div>
+  );
+}
+
+/** A statement set on leather: Anton, intentional line breaks, room around it. */
+function Statement({ lines, isMobile }: { lines: string[][]; isMobile: boolean }) {
   return (
     <motion.div {...rise} transition={{ duration: 0.6 }}>
-      <p style={meta(11, onDark ? "rgba(247,244,239,0.62)" : C.ink)}>{eyebrow}</p>
-      <div style={{ height: 1, background: rule, margin: isMobile ? "16px 0 22px" : "20px 0 30px" }} />
-      <h2 style={display(isMobile ? 34 : "clamp(42px, 5.6vw, 78px)", onDark ? C.paper : C.ink)}>
-        {lines.map((l, i) => (
-          <span key={i} style={{ display: "block" }}>{l}</span>
-        ))}
-      </h2>
+      {lines.map((block, bi) => (
+        <p key={bi} style={{ ...display(isMobile ? "clamp(26px, 7.4vw, 34px)" : "clamp(34px, 3.6vw, 54px)", CREAM), lineHeight: 1.08, marginTop: bi === 0 ? 0 : isMobile ? 28 : 44 }}>
+          {block.map((l, i) => <span key={i} style={{ display: "block" }}>{l}</span>)}
+        </p>
+      ))}
     </motion.div>
   );
 }
 
-/** One item in a section: a number, a short Anton title, and what it means.
- *  Separated from its neighbours by a rule, never boxed. */
-function Item({ n, title, lead, note, isMobile, index }: {
-  n: string;
-  title: string;
-  lead: string;
-  note: string;
-  isMobile: boolean;
-  index: number;
-}) {
-  return (
-    <motion.div
-      {...rise}
-      transition={{ duration: 0.5, delay: Math.min(index, 3) * 0.08 }}
-      style={{
-        minWidth: 0,
-        paddingTop: isMobile ? 20 : 0,
-        paddingBottom: isMobile ? 20 : 0,
-        paddingLeft: isMobile ? 0 : index === 0 ? 0 : 28,
-        paddingRight: isMobile ? 0 : 28,
-        borderTop: isMobile ? `1px solid ${C.rule}` : "none",
-        borderLeft: isMobile || index === 0 ? "none" : `1px solid ${C.rule}`,
-      }}
-    >
-      <p style={meta(11, C.muted)}>{n}</p>
-      <h3 style={{ ...display(isMobile ? 24 : "clamp(22px, 2.2vw, 30px)"), marginTop: 12 }}>{title}</h3>
-      <p style={{ ...body(isMobile ? 15 : 15.5, C.ink), marginTop: 14, maxWidth: "38ch" }}>{lead}</p>
-      <p style={{ ...body(isMobile ? 13.5 : 14, C.muted), marginTop: 8, maxWidth: "38ch" }}>{note}</p>
-    </motion.div>
-  );
-}
+const PROBLEM_WORDS = ["Reviews", "Size charts", "Models"];
 
-const PROBLEM = [
-  {
-    n: "01",
-    title: "Reviews",
-    lead: "Written by strangers with different bodies and different standards.",
-    note: "Volume is not relevance. Thousands of reviews and none of them are from someone like you.",
-  },
-  {
-    n: "02",
-    title: "Size charts",
-    lead: "Static measurements with no context for how things actually fit.",
-    note: "Numbers without nuance. Your body does not live in a chart.",
-  },
-  {
-    n: "03",
-    title: "Model imagery",
-    lead: "One body, styled to sell, not to inform.",
-    note: "You were never the reference point. The model was.",
-  },
+const PROBLEM_NOTES = [
+  ["01", "Thousands of opinions.", "Which ones matter to you?"],
+  ["02", "Brand to brand.", "Style to style. Nothing is standard."],
+  ["03", "One product. One body.", "One frame of reference."],
 ];
 
 const STEPS = [
-  {
-    n: "01",
-    title: "Build your profile",
-    lead: "Tell us your fit, your style preferences, and what you are looking for.",
-    note: "Your silhouette, sizing, fit preferences, and style sensibility. This is how we find your mirrors.",
-  },
-  {
-    n: "02",
-    title: "Post what you are considering",
-    lead: "Share the pieces you are thinking about and we will take it from there.",
-    note: "Link a product. Set your confidence score. Tell us exactly what is making you hesitate.",
-  },
-  {
-    n: "03",
-    title: "Get tailored feedback",
-    lead: "Real feedback from women who match your profile and your style.",
-    note: "Matched input from women who share your shape, taste, and fit reality, before you commit.",
-  },
-];
-
-const WHY = [
-  {
-    n: "Signal",
-    title: "Trusted human input",
-    lead: "You are not plugging numbers into an algorithm.",
-    note: "You are seeing what actually happened (what fit, what did not, and why) from women who match your profile.",
-  },
-  {
-    n: "Clarity",
-    title: "Save time",
-    lead: "Stop scrolling through hundreds of irrelevant reviews.",
-    note: "ELEVENELEVEN surfaces what matters to you, fast.",
-  },
-  {
-    n: "Confidence",
-    title: "Decide with certainty",
-    lead: "Real outcomes from women who share your shape and your standards.",
-    note: "That is what turns a hesitation into a clear answer.",
-  },
-  {
-    n: "Community",
-    title: "You are not deciding alone",
-    lead: "Shopping is a solo decision. ELEVENELEVEN makes it a shared one.",
-    note: "Real women, matched to you, who understand your body and your preferences.",
-  },
+  ["01", "Post", "Share what you're considering and what you're unsure about."],
+  ["02", "Get matched", "We find women with the experience and context most relevant to your decision."],
+  ["03", "Decide", "Get their input, decide confidently, close the loop."],
 ];
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -249,57 +177,26 @@ const Index = () => {
     </button>
   );
 
-  // The cover line is deliberately not animated in. It is the first thing an
-  // invited woman sees, so it must never depend on JavaScript having run: a
-  // throttled or slow tab was leaving it faded to nothing. The scroll reveals
-  // further down are a different matter, since the page is already legible by
-  // the time she gets to them.
-  const heroType = (
-    <div style={{ maxWidth: 620 }}>
-      <h1 style={display(isMobile ? 40 : "clamp(52px, 6.2vw, 92px)")}>
-        <span style={{ display: "block" }}>Stop guessing.</span>
-        <span style={{ display: "block" }}>Shop with context.</span>
-      </h1>
+  const leather = (src: string): React.CSSProperties => ({
+    backgroundImage: `url(${src})`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  });
 
-      <p style={{ ...body(isMobile ? 15.5 : 17, C.inkSoft), marginTop: isMobile ? 20 : 26, maxWidth: "40ch" }}>
-        Get input from women who share your fit, style, and preferences, before you buy.
-      </p>
-
-      <button
-        onClick={() => navigate("/signin?mode=signup")}
-        className="e11-cta"
-        style={{ ...cta(isMobile), marginTop: isMobile ? 26 : 34 }}
-      >
-        Get matched <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
-      </button>
-    </div>
-  );
-
-  const heroPhoto = (
-    <img
-      src={heroImage}
-      alt=""
-      aria-hidden
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        objectPosition: "62% center",
-        display: "block",
-        background: C.well,
-      }}
-    />
-  );
+  const pad = isMobile ? "56px 18px 64px" : "110px 40px 120px";
+  const inner: React.CSSProperties = { maxWidth: MAX, margin: "0 auto", boxSizing: "border-box", padding: pad };
 
   return (
     <div style={{ minHeight: "100vh", background: C.paper, color: C.ink, fontFamily: SANS, overflowX: "hidden" }}>
       <style>{PAGE_CSS}</style>
 
-      {/* ═══ MASTHEAD ═══════════════════════════════════════════════════════ */}
-      <header style={{ background: C.paper, borderBottom: `1px solid ${C.rule}` }}>
+      {/* ═══ 01 HERO ════════════════════════════════════════════════════════ */}
+      <section style={{ position: "relative", background: C.paper, overflow: "hidden" }}>
         <div style={{
+          position: "relative", zIndex: 2,
           maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
-          padding: isMobile ? "14px 18px" : "20px 40px",
+          padding: isMobile ? "16px 18px 0" : "26px 40px 0",
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
         }}>
           <span
@@ -315,7 +212,7 @@ const Index = () => {
 
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 16 : 28 }}>
             <button onClick={() => navigate("/feed")} className="e11-link" style={navLink(C.ink)}>
-              Feed
+              Feed <ArrowRight style={{ width: 13, height: 13 }} strokeWidth={2} />
             </button>
             {user ? avatarChip(isMobile ? 30 : 34) : (
               <button onClick={() => navigate("/signin")} className="e11-link" style={navLink(C.ink)}>
@@ -324,155 +221,228 @@ const Index = () => {
             )}
           </div>
         </div>
-      </header>
 
-      {/* ═══ HERO ═══════════════════════════════════════════════════════════ */}
-      {isMobile ? (
-        <section>
-          <div style={{ padding: "34px 18px 32px" }}>{heroType}</div>
-          <div style={{ width: "100%", aspectRatio: "4 / 5", overflow: "hidden" }}>{heroPhoto}</div>
-        </section>
-      ) : (
-        <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 0.92fr) minmax(0, 1fr)", alignItems: "stretch", minHeight: "min(88svh, 820px)" }}>
-          <div style={{ display: "flex", alignItems: "center", padding: "72px 40px 72px max(40px, calc((100vw - 1320px) / 2 + 40px))" }}>
-            {heroType}
-          </div>
-          <div style={{ overflow: "hidden" }}>{heroPhoto}</div>
-        </section>
-      )}
-
-      {/* ═══ THE PROBLEM ════════════════════════════════════════════════════ */}
-      <section style={{ background: C.paper, borderTop: `1px solid ${C.rule}` }}>
-        <div style={{ maxWidth: MAX, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "48px 18px 52px" : "100px 40px 110px" }}>
-          <SectionHead eyebrow="The problem" lines={["Finding it is easy.", "Trusting it is hard."]} isMobile={isMobile} />
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
-            marginTop: isMobile ? 26 : 56,
-          }}>
-            {PROBLEM.map((it, i) => (
-              <Item key={it.n} n={it.n} title={it.title} lead={it.lead} note={it.note} isMobile={isMobile} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ HOW IT WORKS ═══════════════════════════════════════════════════ */}
-      <section style={{ background: C.well, borderTop: `1px solid ${C.rule}` }}>
-        <div style={{ maxWidth: MAX, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "48px 18px 52px" : "100px 40px 110px" }}>
-          <SectionHead eyebrow="How it works" lines={["From uncertainty", "to confidence."]} isMobile={isMobile} />
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
-            marginTop: isMobile ? 26 : 56,
-          }}>
-            {STEPS.map((it, i) => (
-              <Item key={it.n} n={it.n} title={it.title} lead={it.lead} note={it.note} isMobile={isMobile} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ WHY IT WORKS ═══════════════════════════════════════════════════ */}
-      <section style={{ background: C.paper, borderTop: `1px solid ${C.rule}` }}>
-        <div style={{ maxWidth: MAX, margin: "0 auto", boxSizing: "border-box", padding: isMobile ? "48px 18px 52px" : "100px 40px 110px" }}>
-          <SectionHead eyebrow="Why it works" lines={["No measurements.", "No body scans.", "No guessing."]} isMobile={isMobile} />
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
-            rowGap: isMobile ? 0 : 44,
-            marginTop: isMobile ? 26 : 56,
-          }}>
-            {WHY.map((it, i) => (
-              <Item
-                key={it.n}
-                n={it.n}
-                title={it.title}
-                lead={it.lead}
-                note={it.note}
-                isMobile={isMobile}
-                index={i % 2}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ CLOSING ════════════════════════════════════════════════════════ */}
-      <section style={{ position: "relative", background: C.ink, overflow: "hidden" }}>
-        {/* Faint watermark */}
-        <img
-          src={logoSymbol}
-          alt=""
-          aria-hidden
-          style={{
-            position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)",
-            height: "130%", width: "auto", maxWidth: "none",
-            opacity: 0.05, filter: "invert(1)", pointerEvents: "none", userSelect: "none",
-          }}
-        />
+        {/* The wordmark, and the women walking across it. The type never waits on
+            JavaScript: it is the first thing she sees. */}
         <div style={{
-          position: "relative", zIndex: 1,
-          maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
-          padding: isMobile ? "56px 18px 60px" : "120px 40px 130px",
+          position: "relative",
+          height: isMobile ? "min(62svh, 520px)" : "min(74svh, 760px)",
+          marginTop: isMobile ? 18 : 10,
         }}>
-          <motion.div {...rise} transition={{ duration: 0.7 }}>
-            <p style={meta(11, "rgba(247,244,239,0.62)")}>Start now</p>
-            <div style={{ height: 1, background: "rgba(247,244,239,0.22)", margin: isMobile ? "16px 0 22px" : "20px 0 30px" }} />
-            <h2 style={display(isMobile ? 40 : "clamp(48px, 6.4vw, 96px)", C.paper)}>
-              <span style={{ display: "block" }}>Cart full.</span>
-              <span style={{ display: "block" }}>Confidence low?</span>
-            </h2>
-            <p style={{ ...body(isMobile ? 15 : 16.5, "rgba(247,244,239,0.62)"), marginTop: isMobile ? 20 : 26, maxWidth: "38ch" }}>
-              Shop smarter. Powered by people like you.
+          <h1 aria-label="ElevenEleven" style={{
+            position: "absolute", left: 0, right: 0, top: isMobile ? "16%" : "10%",
+            margin: 0, textAlign: "center", whiteSpace: "nowrap", pointerEvents: "none",
+            ...display(isMobile ? "19.9vw" : "19.8vw", C.ink),
+            letterSpacing: "-0.02em",
+            lineHeight: 1,
+            transform: `scaleY(${isMobile ? 1.5 : 1.7})`,
+            transformOrigin: "top center",
+          }}>
+            ELEVENELEVEN
+          </h1>
+
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
+            <div className="e11-walk" style={{ display: "flex", width: "max-content" }}>
+              {[0, 1].map((i) => (
+                <img
+                  key={i}
+                  src={MODELS_STRIP}
+                  alt={i === 0 ? "Women walking" : ""}
+                  aria-hidden={i === 1}
+                  style={{
+                    height: isMobile ? "min(44svh, 380px)" : "min(58svh, 600px)",
+                    width: "auto", maxWidth: "none", display: "block", flexShrink: 0,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 02 THE PROBLEM ═════════════════════════════════════════════════ */}
+      <section style={{ ...leather(BURGUNDY_LEATHER), color: CREAM }}>
+        <div style={inner}>
+          <Head label="The problem" onDark isMobile={isMobile} />
+
+          {isMobile ? (
+            <div style={{ marginTop: 34 }}>
+              <motion.div {...rise} transition={{ duration: 0.6 }}>
+                {PROBLEM_WORDS.map((w) => (
+                  <p key={w} style={{ ...display("clamp(42px, 13.5vw, 62px)", CREAM), lineHeight: 1.02 }}>{w}</p>
+                ))}
+              </motion.div>
+              <div style={{ marginTop: 34, display: "flex", flexDirection: "column", gap: 22 }}>
+                {PROBLEM_NOTES.map(([n, a, b]) => (
+                  <div key={n} style={{ display: "grid", gridTemplateColumns: "42px 1fr", gap: 10 }}>
+                    <span style={{ ...display(20, CREAM_SOFT) }}>{n} /</span>
+                    <span style={{ ...meta(12, CREAM), lineHeight: 1.6, letterSpacing: "0.06em" }}>
+                      <span style={{ display: "block" }}>{a}</span>
+                      <span style={{ display: "block" }}>{b}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.05fr)", columnGap: 48, marginTop: 64, minHeight: 440 }}>
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 30, paddingBottom: 12 }}>
+                {PROBLEM_NOTES.map(([n, a, b], i) => (
+                  <motion.div key={n} {...rise} transition={{ duration: 0.5, delay: i * 0.08 }} style={{ display: "grid", gridTemplateColumns: "66px 1fr", gap: 16, alignItems: "baseline" }}>
+                    <span style={{ ...display(30, CREAM_SOFT) }}>{n} /</span>
+                    <span style={{ ...meta(13, CREAM), lineHeight: 1.7, letterSpacing: "0.06em" }}>
+                      <span style={{ display: "block" }}>{a}</span>
+                      <span style={{ display: "block" }}>{b}</span>
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div {...rise} transition={{ duration: 0.6 }} style={{ textAlign: "right" }}>
+                {PROBLEM_WORDS.map((w) => (
+                  <p key={w} style={{ ...display("clamp(60px, 7.6vw, 122px)", CREAM), lineHeight: 0.98, letterSpacing: "-0.01em" }}>{w}</p>
+                ))}
+              </motion.div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ═══ 03 THE IDEA ════════════════════════════════════════════════════ */}
+      <section style={{ ...leather(BURGUNDY_LEATHER), color: CREAM, borderTop: `1px solid ${CREAM_RULE}` }}>
+        <div style={{ ...inner, padding: isMobile ? "56px 18px 72px" : "110px 40px 140px" }}>
+          <Head label="The idea" onDark isMobile={isMobile} />
+          <div style={{ marginTop: isMobile ? 46 : 96, maxWidth: isMobile ? "100%" : "44ch" }}>
+            <Statement
+              isMobile={isMobile}
+              lines={[
+                ["Somewhere, someone already", "has the experience that could", "help you decide confidently."],
+                ["ElevenEleven finds her."],
+              ]}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 04 HOW IT WORKS ════════════════════════════════════════════════ */}
+      <section style={{ background: "#FFFFFF", color: C.ink }}>
+        <div style={inner}>
+          <Head label="How it works" onDark={false} isMobile={isMobile} />
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 0.9fr) minmax(0, 1fr)",
+            columnGap: 72, rowGap: isMobile ? 40 : 0,
+            marginTop: isMobile ? 36 : 72,
+            alignItems: "center",
+          }}>
+            {/* The photograph, outlined rather than boxed. */}
+            <motion.div {...rise} transition={{ duration: 0.6 }} style={{ order: isMobile ? 1 : 0 }}>
+              <div style={{ border: `1px solid ${C.burgundy}`, borderRadius: RADIUS, padding: isMobile ? 12 : 18 }}>
+                <img
+                  src={MODEL_PORTRAIT}
+                  alt=""
+                  aria-hidden
+                  style={{ width: "100%", height: "auto", display: "block", aspectRatio: "2 / 3", objectFit: "contain" }}
+                />
+              </div>
+            </motion.div>
+
+            <div style={{ order: isMobile ? 2 : 1, display: "flex", flexDirection: "column", gap: isMobile ? 40 : 64 }}>
+              {STEPS.map(([n, title, copy], i) => (
+                <motion.div key={n} {...rise} transition={{ duration: 0.5, delay: i * 0.08 }} style={{ display: "grid", gridTemplateColumns: isMobile ? "56px 1fr" : "82px 1fr", columnGap: isMobile ? 14 : 22, alignItems: "start" }}>
+                  <span style={{ ...display(isMobile ? 34 : 52, C.burgundy), lineHeight: 0.9 }}>{n}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ ...display(isMobile ? 26 : 36, C.ink), lineHeight: 1 }}>{title}</p>
+                    <p style={{ ...body(isMobile ? 14.5 : 16, C.inkSoft), marginTop: 12, maxWidth: "34ch" }}>{copy}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 05 WHY IT WORKS ════════════════════════════════════════════════ */}
+      <section style={{ ...leather(BURGUNDY_LEATHER), color: CREAM }}>
+        <div style={{ ...inner, padding: isMobile ? "56px 18px 72px" : "110px 40px 140px" }}>
+          <Head label="Why it works" onDark isMobile={isMobile} />
+          <div style={{ marginTop: isMobile ? 46 : 96, maxWidth: isMobile ? "100%" : "44ch" }}>
+            <Statement
+              isMobile={isMobile}
+              lines={[[
+                "Someone else's experience",
+                "helped you decide.",
+                "Yours helps",
+                "whoever comes next.",
+              ]]}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 06 SIGN UP ═════════════════════════════════════════════════════ */}
+      <section style={{ ...leather(WHITE_LEATHER), color: C.ink }}>
+        <div style={{
+          maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
+          padding: isMobile ? "44px 18px 26px" : "56px 40px 40px",
+        }}>
+          <div style={{ maxWidth: isMobile ? 200 : 240 }}>
+            <p style={{ ...meta(isMobile ? 10.5 : 11.5, C.ink), lineHeight: 1.7 }}>
+              <span style={{ display: "block" }}>The next decision</span>
+              <span style={{ display: "block" }}>is yours</span>
             </p>
+            <div style={{ height: 1, background: C.burgundy, marginTop: 14 }} />
+          </div>
+
+          <motion.div {...rise} transition={{ duration: 0.6 }} style={{ textAlign: "center", padding: isMobile ? "44px 0 0" : "64px 0 0" }}>
+            <h2 style={{ ...display(isMobile ? "clamp(46px, 15vw, 72px)" : "clamp(72px, 9.4vw, 148px)", C.burgundy), lineHeight: 0.92 }}>
+              <span style={{ display: "block" }}>What are you</span>
+              <span style={{ display: "block" }}>deciding on?</span>
+            </h2>
             <button
               onClick={() => navigate("/signin?mode=signup")}
               className="e11-cta"
-              style={{ ...cta(isMobile), marginTop: isMobile ? 26 : 34 }}
+              style={{ ...cta(isMobile), marginTop: isMobile ? 30 : 42 }}
             >
-              Sign up, it's free <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
+              Sign up <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
             </button>
           </motion.div>
+
+          {/* The footer sits on the same leather, kept to what it always was. */}
+          <div style={{
+            marginTop: isMobile ? 56 : 92,
+            display: isMobile ? "flex" : "grid",
+            flexDirection: "column",
+            gridTemplateColumns: isMobile ? undefined : "1fr auto 1fr",
+            alignItems: isMobile ? "flex-start" : "center",
+            gap: isMobile ? 14 : 16,
+          }}>
+            <span style={{
+              fontFamily: SANS, textTransform: "uppercase", whiteSpace: "nowrap",
+              fontSize: 11, letterSpacing: "0.22em", color: C.ink, justifySelf: "start",
+            }}>
+              <span style={{ fontWeight: 700 }}>ELEVEN</span>
+              <span style={{ fontWeight: 300 }}>ELEVEN</span>
+            </span>
+
+            <a
+              href="mailto:hello@geteleveneleven.com"
+              className="e11-link"
+              style={{ ...strong(13, C.inkSoft), textDecoration: "none", justifySelf: "center", textAlign: isMobile ? "left" : "center" }}
+            >
+              Questions? hello@geteleveneleven.com
+            </a>
+
+            <span style={{
+              ...meta(10, C.muted),
+              letterSpacing: "0.16em", fontWeight: 500, justifySelf: "end", textAlign: isMobile ? "left" : "right",
+            }}>
+              © 2026 ELEVENELEVEN. All rights reserved.
+            </span>
+          </div>
         </div>
       </section>
-
-      {/* ═══ FOOTER ═════════════════════════════════════════════════════════ */}
-      <footer style={{ background: C.ink, borderTop: "1px solid rgba(247,244,239,0.14)" }}>
-        <div style={{
-          maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
-          padding: isMobile ? "26px 18px 34px" : "34px 40px",
-          display: isMobile ? "flex" : "grid",
-          flexDirection: "column",
-          gridTemplateColumns: isMobile ? undefined : "1fr auto 1fr",
-          alignItems: isMobile ? "flex-start" : "center",
-          gap: isMobile ? 14 : 16,
-        }}>
-          <span style={{
-            fontFamily: SANS, textTransform: "uppercase", whiteSpace: "nowrap",
-            fontSize: 11, letterSpacing: "0.22em", color: "rgba(247,244,239,0.42)",
-            justifySelf: "start",
-          }}>
-            <span style={{ fontWeight: 700 }}>ELEVEN</span>
-            <span style={{ fontWeight: 300 }}>ELEVEN</span>
-          </span>
-
-          <a
-            href="mailto:hello@geteleveneleven.com"
-            className="e11-link"
-            style={{ ...strong(13, "rgba(247,244,239,0.72)"), textDecoration: "none", justifySelf: "center", textAlign: isMobile ? "left" : "center" }}
-          >
-            Questions? hello@geteleveneleven.com
-          </a>
-
-          <span style={{
-            ...meta(10, "rgba(247,244,239,0.34)"),
-            letterSpacing: "0.16em", fontWeight: 500, justifySelf: "end", textAlign: isMobile ? "left" : "right",
-          }}>
-            © 2026 ELEVENELEVEN. All rights reserved.
-          </span>
-        </div>
-      </footer>
     </div>
   );
 };

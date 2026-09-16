@@ -405,7 +405,8 @@ const Onboarding = () => {
         const res = await ensureReferral(user.id);
         if (res?.inviterName) { setCircleInviter(res.inviterName); return; }
       }
-      navigate("/feed");
+      // She lands on her own profile, where a small nudge asks for photos.
+      navigate("/profile?welcome=1");
     }
   };
 
@@ -453,8 +454,8 @@ const Onboarding = () => {
               Your take now helps {circleInviter} (and every woman like you) shop with more confidence.
             </p>
             <div style={{ ...hairline(), margin: isMobile ? "28px 0" : "36px 0" }} />
-            <button onClick={() => navigate("/feed")} style={primaryBtn(true)}>
-              Continue to feed <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
+            <button onClick={() => navigate("/profile?welcome=1")} style={primaryBtn(true)}>
+              See my profile <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
             </button>
           </motion.div>
         </main>
@@ -799,7 +800,7 @@ const Onboarding = () => {
 
               {/* CTA */}
               <button onClick={next} style={primaryBtn(true)}>
-                Go to my feed
+                See my profile
                 <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
               </button>
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Bookmark, Camera, Check, ChevronDown, LogOut, MoreHorizontal, Plus, X } from "lucide-react";
 import Cropper from "react-easy-crop";
@@ -943,6 +943,46 @@ export function MirrorCard({ m, isMobile, onOpen }: { m: Mirror; isMobile: boole
   );
 }
 
+/**
+ * First run. She lands on her own profile from the last onboarding step, and
+ * this is the whole nudge: a headline, a line of copy, and a close box. No CTA,
+ * because she is already standing on the page one would send her to. Her city
+ * comes from onboarding, so photos are the only thing it asks for.
+ */
+export function WelcomeNudge({ isMobile, onDismiss }: {
+  isMobile: boolean; onDismiss: () => void;
+}) {
+  return (
+    <div role="status" style={{
+      // Above the page and the fixed header (40), below every sheet (60) and the
+      // crop and lightbox overlays (70), so it never covers a modal she opened.
+      position: "fixed", zIndex: 55,
+      bottom: isMobile ? 12 : 24, right: isMobile ? 12 : 24, left: isMobile ? 12 : "auto",
+      width: isMobile ? "auto" : 372,
+      background: "#FFFFFF", border: `1px solid ${C.ink}`, borderRadius: RADIUS,
+      boxShadow: "0 18px 44px rgba(20,18,16,0.20)",
+      padding: isMobile ? "34px 22px 26px" : "36px 26px 28px",
+      textAlign: "center",
+    }}>
+      <button onClick={onDismiss} aria-label="Close" style={{
+        position: "absolute", top: 9, right: 9, background: "none", border: "none",
+        padding: 6, cursor: "pointer", color: C.ink, lineHeight: 0,
+      }}>
+        <X style={{ width: 18, height: 18 }} strokeWidth={2} />
+      </button>
+
+      <h2 style={{ ...display(isMobile ? 32 : 34), textWrap: "balance" } as React.CSSProperties}>
+        Your mirrors want to see you.
+      </h2>
+      {/* Broken by hand after the first sentence: text-wrap: balance is not on
+          older iOS, and a lone trailing word looks wrong centred. */}
+      <p style={{ ...body(isMobile ? 14 : 14.5, C.inkSoft), marginTop: 13 }}>
+        Put a face to the name.<br />Add photos and finish your profile.
+      </p>
+    </div>
+  );
+}
+
 const Profile = () => {
   const navigate = useNavigate();
   const { isMobile, isWide } = useViewport();
@@ -1056,6 +1096,32 @@ const Profile = () => {
     };
     fetchMirrors();
   }, [profile, user]);
+
+  // First run. She lands here straight from onboarding (?welcome=1). If she
+  // skips, it comes back once on a later visit, then never again.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showWelcome, setShowWelcome] = useState(false);
+  const welcomeSettled = useRef(false);
+
+  useEffect(() => {
+    if (!user || !profile || welcomeSettled.current) return;
+    const invited  = searchParams.get("welcome") === "1";
+    // Onboarding already collects her city, so the nudge only ever asks for photos.
+    const complete = Boolean(profile.avatar_url) && fitPhotosFor(profile).length > 0;
+    if (complete && !invited) return;
+
+    const key = `ee_welcome_shown_${user.id}`;
+    let seen = 0;
+    try { seen = Number(localStorage.getItem(key) ?? 0) || 0; } catch { seen = 0; }
+    if (!invited && seen >= 2) return;
+
+    welcomeSettled.current = true;
+    setShowWelcome(true);
+    try { localStorage.setItem(key, String(seen + 1)); } catch { /* private mode */ }
+    // Drop ?welcome=1 so a refresh does not show it again and burn the second
+    // showing. The ref above stops this re-entering the effect.
+    if (invited) setSearchParams({}, { replace: true });
+  }, [user, profile, searchParams, setSearchParams]);
 
   // ─── Data fetching ───────────────────────────────────────────────────────────
   const fetchProfile = async () => {
@@ -1592,6 +1658,11 @@ const Profile = () => {
         <div style={{ marginTop: isMobile ? 16 : 44 }}>
           <Hero isMobile={isMobile} isWide={isWide} portrait={portrait} identity={identity} irl={irl} />
         </div>
+
+        {/* ── First run ────────────────────────────────────────────────────── */}
+        {showWelcome && (
+          <WelcomeNudge isMobile={isMobile} onDismiss={() => setShowWelcome(false)} />
+        )}
 
         {/* ── Stats and standing ───────────────────────────────────────────── */}
         <div style={{ marginTop: isMobile ? 36 : 56 }}>

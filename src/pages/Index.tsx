@@ -18,6 +18,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/format";
 import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
+import logoSymbol from "@/assets/logo-symbol.png";
 
 const BURGUNDY_LEATHER = "/home/leather-burgundy.png";
 const WHITE_LEATHER    = "/home/leather-white.png";
@@ -117,6 +118,15 @@ const Index = () => {
   // The wordmark sends { home: true } — she asked for the landing page, so the
   // redirect below has to stay out of the way.
   const wantsHome = (location.state as { home?: boolean } | null)?.home;
+
+  // Browsers restore the scroll position they remember for this URL, which was
+  // dropping people at the footer of the cover page with the walk out of sight.
+  // The homepage always opens at the top.
+  useEffect(() => {
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
+    return () => { if ("scrollRestoration" in history) history.scrollRestoration = "auto"; };
+  }, []);
 
   // Someone already signed in landing here was being shown a "Sign in" button and
   // typing her password again, session intact. Send her straight to the feed.
@@ -410,13 +420,11 @@ const Index = () => {
             alignItems: isMobile ? "flex-start" : "center",
             gap: isMobile ? 14 : 16,
           }}>
-            <span style={{
-              fontFamily: SANS, textTransform: "uppercase", whiteSpace: "nowrap",
-              fontSize: 11, letterSpacing: "0.22em", color: C.ink, justifySelf: "start",
-            }}>
-              <span style={{ fontWeight: 700 }}>ELEVEN</span>
-              <span style={{ fontWeight: 300 }}>ELEVEN</span>
-            </span>
+            <img
+              src={logoSymbol}
+              alt="ElevenEleven"
+              style={{ height: isMobile ? 30 : 36, width: "auto", display: "block", justifySelf: "start" }}
+            />
 
             <a
               href="mailto:hello@geteleveneleven.com"

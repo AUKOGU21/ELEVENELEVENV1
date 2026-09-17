@@ -57,33 +57,76 @@ function Mark({ children }: { children: React.ReactNode }) {
   return <mark style={{ background: HIGHLIGHT, color: C.ink, padding: "1px 5px" }}>{children}</mark>;
 }
 
-const STEPS: { label: string; title: React.ReactNode; note?: string; items: React.ReactNode[] }[] = [
-  {
+type Step = { label: string; title: React.ReactNode; note?: string; items: React.ReactNode[] };
+
+/**
+ * Every browser on iPhone is WebKit underneath and says "iPhone" in its user
+ * agent, so the install path has to be read off the browser itself. Safari and
+ * Chrome both can do it, by different routes; Firefox and Edge cannot at all.
+ */
+type IosBrowser = "safari" | "chrome" | "other";
+
+function iosBrowser(): IosBrowser {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  if (/CriOS/i.test(ua)) return "chrome";
+  if (/FxiOS|EdgiOS|OPiOS|YaBrowser/i.test(ua)) return "other";
+  return "safari";
+}
+
+function stepOne(browser: IosBrowser): Step {
+  if (browser === "chrome") {
+    return {
+      label: "Step one",
+      title: <>Add <Mark>ElevenEleven</Mark> to your home screen</>,
+      note: "These are the Chrome steps. Safari keeps Share at the bottom of the screen instead.",
+      items: [
+        <>Tap <ShareGlyph /> <b>Share</b>, to the <b>right of the address bar</b>.</>,
+        <>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</>,
+        <>Not there? Update Chrome. This needs iOS 16.4 or later.</>,
+      ],
+    };
+  }
+  if (browser === "other") {
+    return {
+      label: "Step one",
+      title: <>Open this page in <Mark>Safari</Mark></>,
+      note: "Firefox and Edge on iPhone cannot add a site to your home screen. Safari and Chrome can.",
+      items: [
+        <>Copy the link, then open it in <b>Safari</b>.</>,
+        <>Tap <ShareGlyph /> <b>Share</b> at the bottom, then <b>Add to Home Screen</b>.</>,
+        <>Tap <b>Add</b>.</>,
+      ],
+    };
+  }
+  return {
     label: "Step one",
     title: <>Add <Mark>ElevenEleven</Mark> to your home screen</>,
+    note: "These are the Safari steps. In Chrome, Share sits to the right of the address bar.",
     items: [
       <>
-        Tap <DotsGlyph /> in the bar at the <b>bottom</b> of Safari. On Android it is the
-        <b> ⋮</b> menu, top right.
+        Tap <ShareGlyph /> <b>Share</b> in the bar at the <b>bottom</b> of Safari. On newer
+        iPhones it lives in the <DotsGlyph /> menu beside the address bar.
       </>,
+      <>Scroll down, tap <b>Add to Home Screen</b>, then <b>Add</b>.</>,
       <>
-        In that menu, tap <ShareGlyph /> <b>Share</b>.
+        Don't see it? At the bottom of that list tap <b>Edit Actions</b>, then switch on
+        <b> Add to Home Screen</b>.
       </>,
-      <>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</>,
     ],
-  },
-  {
-    label: "Step two",
-    title: <>Turn notifications on</>,
-    note: "Do this from the icon you just added, not from your browser.",
-    items: [
-      <>Open <Mark>ElevenEleven</Mark> from your <b>home screen</b>.</>,
-      <>Tap the <b>bell</b> in the top right.</>,
-      <>Tap <b>Turn on push notifications</b>.</>,
-      <>Tap <b>Allow</b> when your phone asks.</>,
-    ],
-  },
-];
+  };
+}
+
+const STEP_TWO: Step = {
+  label: "Step two",
+  title: <>Turn notifications on</>,
+  note: "Do this from the icon you just added, not from your browser.",
+  items: [
+    <>Open <Mark>ElevenEleven</Mark> from your <b>home screen</b>.</>,
+    <>Tap the <b>bell</b> in the top right.</>,
+    <>Tap <b>Turn on push notifications</b>.</>,
+    <>Tap <b>Allow</b> when your phone asks.</>,
+  ],
+};
 
 export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () => void }) {
   useEffect(() => {
@@ -91,6 +134,8 @@ export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () =>
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const steps = [stepOne(iosBrowser()), STEP_TWO];
 
   return createPortal(
     <div
@@ -130,7 +175,7 @@ export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () =>
           Two minutes, and we can reach you.
         </p>
 
-        {STEPS.map((s) => (
+        {steps.map((s) => (
           <section key={s.label} style={{ marginTop: 30 }}>
             <p style={{ ...meta(11, C.muted), fontWeight: 700 }}>{s.label}</p>
             <p style={{ ...body(isMobile ? 16 : 17, C.ink), fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.01em", marginTop: 8 }}>{s.title}</p>

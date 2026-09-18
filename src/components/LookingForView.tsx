@@ -135,18 +135,9 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{rec.reasoning}</p>
 
-          {(rec.product_url || rec.brand_name || rec.product_name) && (
-            <a
-              href={rec.product_url ?? undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: "grid", gridTemplateColumns: "64px 1fr", gap: 14, alignItems: "center", marginTop: 14, textDecoration: "none", color: "inherit", maxWidth: 460 }}
-            >
-              <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                {rec.product_image_url
-                  ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
-                  : <span style={meta(9, C.faint)}>Link</span>}
-              </div>
+          {(rec.product_url || rec.brand_name || rec.product_name) && (() => {
+            const hasImage = !!rec.product_image_url;
+            const details = (
               <div style={{ minWidth: 0 }}>
                 {rec.brand_name && <p style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.04em" }}>{rec.brand_name}</p>}
                 {rec.product_name && <p style={{ ...body(12.5, C.inkSoft), textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.product_name}</p>}
@@ -155,8 +146,31 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
                   {rec.product_url && <><ExternalLink style={{ width: 11, height: 11 }} /> {prettyHost(rec.product_url)}</>}
                 </p>
               </div>
-            </a>
-          )}
+            );
+            // A brand on its own has no photograph, so it reads as a line rather
+            // than a name sitting beside an empty grey box.
+            const inner = hasImage ? (
+              <>
+                <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  <img src={rec.product_image_url ?? ""} alt="" loading="lazy" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
+                </div>
+                {details}
+              </>
+            ) : details;
+            const cols = hasImage ? "64px 1fr" : "1fr";
+            // Only a link when there is somewhere to go: a brand-only pick used to
+            // look tappable and lead nowhere.
+            return rec.product_url ? (
+              <a href={rec.product_url} target="_blank" rel="noopener noreferrer"
+                style={{ display: "grid", gridTemplateColumns: cols, gap: 14, alignItems: "center", marginTop: 14, maxWidth: 460, textDecoration: "none", color: "inherit" }}>
+                {inner}
+              </a>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: cols, gap: 14, alignItems: "center", marginTop: 14, maxWidth: 460 }}>
+                {inner}
+              </div>
+            );
+          })()}
 
           {(rec.fit_note || rec.who_for) && (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -570,7 +584,7 @@ export default function LookingForView({
   const recommendCta = !isOwn && !isClosed && (
     <div style={{ paddingTop: 22 }}>
       <button onClick={() => (user ? onAddRecommendation() : onSignIn())} style={{ ...squareBtn(true, C.burgundy), width: "100%" }}>
-        {user ? "Recommend a product" : "Sign in to recommend"} <ArrowRight style={{ width: 16, height: 16 }} />
+        {user ? "Recommend" : "Sign in to recommend"} <ArrowRight style={{ width: 16, height: 16 }} />
       </button>
     </div>
   );

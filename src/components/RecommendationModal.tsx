@@ -33,6 +33,11 @@ interface Props {
 }
 
 export default function RecommendationModal({ open, lookingForTitle, submitting, onClose, onSubmit }: Props) {
+  // Not everyone has a specific piece in mind. Plenty of good answers are just
+  // "try this label", so a brand on its own is a real recommendation here.
+  const [mode, setMode] = useState<"product" | "brand">("product");
+  const [brandName, setBrandName] = useState("");
+  const [brandUrl, setBrandUrl] = useState("");
   const [url, setUrl] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -42,7 +47,7 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
   const [fitNote, setFitNote] = useState("");
   const [whoFor, setWhoFor] = useState("");
 
-  const reset = () => { setUrl(""); setExtracting(false); setUrlError(null); setProduct(null); setReasoning(""); setRecommendation("buy"); setFitNote(""); setWhoFor(""); };
+  const reset = () => { setMode("product"); setBrandName(""); setBrandUrl(""); setUrl(""); setExtracting(false); setUrlError(null); setProduct(null); setReasoning(""); setRecommendation("buy"); setFitNote(""); setWhoFor(""); };
   const close = () => { reset(); onClose(); };
 
   const extract = async () => {
@@ -63,21 +68,46 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
     setExtracting(false);
   };
 
-  const canSubmit = !!product && reasoning.trim().length > 2 && !submitting;
+  // Either a pulled product, or a brand she can name.
+  const ready = mode === "product" ? !!product : brandName.trim().length > 1;
+  const canSubmit = ready && reasoning.trim().length > 2 && !submitting;
+
+  /** A bare domain is fine here, so make it a real URL before storing it. */
+  const tidyUrl = (raw: string): string | null => {
+    const t = raw.trim();
+    if (!t) return null;
+    try { return new URL(t.startsWith("http") ? t : `https://${t}`).href; }
+    catch { return null; }
+  };
 
   const doSubmit = () => {
-    if (!canSubmit || !product) return;
-    onSubmit({
-      product_url: product.source_url,
-      product_name: product.name || null,
-      brand_name: product.brand || null,
-      price_note: product.price ? `$${product.price.replace(/^\$/, "")}` : null,
-      product_image_url: product.image_url,
+    if (!canSubmit) return;
+    const common = {
       reasoning: reasoning.trim(),
       recommendation,
       fit_note: fitNote.trim() || null,
       who_for: whoFor.trim() || null,
-    });
+    };
+    if (mode === "brand") {
+      onSubmit({
+        ...common,
+        product_url: tidyUrl(brandUrl),
+        product_name: null,
+        brand_name: brandName.trim(),
+        price_note: null,
+        product_image_url: null,
+      });
+    } else {
+      if (!product) return;
+      onSubmit({
+        ...common,
+        product_url: product.source_url,
+        product_name: product.name || null,
+        brand_name: product.brand || null,
+        price_note: product.price ? `$${product.price.replace(/^\$/, "")}` : null,
+        product_image_url: product.image_url,
+      });
+    }
     reset();
   };
 
@@ -98,31 +128,60 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
           >
             <div style={{ padding: "24px 26px 28px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>Recommend a product</span>
+                <span style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>
+                  {mode === "brand" ? "Recommend a brand" : "Recommend a product"}
+                </span>
                 <button onClick={close} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: C.ink, lineHeight: 0, padding: 4 }}>
                   <X style={{ width: 20, height: 20 }} strokeWidth={1.5} />
                 </button>
               </div>
               {lookingForTitle && <p style={{ ...display(30), lineHeight: 0.95, margin: "14px 0 22px" }}>For: {lookingForTitle}</p>}
 
-              {/* The link */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={label}>Paste the product link</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ flex: 1, position: "relative" }}>
-                    <LinkIcon style={{ width: 15, height: 15, color: C.muted, position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                    <input value={url} onChange={(e) => { setUrl(e.target.value); setUrlError(null); }} onKeyDown={(e) => e.key === "Enter" && extract()} placeholder="Paste product URL" style={{ ...field, paddingLeft: 36 }} />
-                  </div>
-                  <button onClick={extract} disabled={extracting || !url.trim()}
-                    style={{ ...meta(11, "#FFFFFF"), fontWeight: 700, background: C.ink, border: `1px solid ${C.ink}`, borderRadius: 2, padding: "0 18px", cursor: extracting || !url.trim() ? "default" : "pointer", opacity: extracting || !url.trim() ? 0.4 : 1 }}>
-                    {extracting ? "…" : "Pull"}
-                  </button>
-                </div>
-                {urlError && <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.burgundy, margin: "8px 0 0" }}>{urlError}</p>}
+              {/* A specific piece, or just the label worth looking at. */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
+                {([["product", "A product"], ["brand", "A brand"]] as const).map(([val, lab]) => {
+                  const on = mode === val;
+                  return (
+                    <button key={val} onClick={() => setMode(val)}
+                      style={{ ...meta(11.5, on ? "#FFFFFF" : C.ink), fontWeight: 700, padding: "13px 0", borderRadius: 2, cursor: "pointer", background: on ? C.ink : "transparent", border: `1px solid ${C.ink}` }}>
+                      {lab}
+                    </button>
+                  );
+                })}
               </div>
 
+              {/* The brand */}
+              {mode === "brand" && (
+                <div style={{ marginBottom: 18 }}>
+                  <label style={label}>Which brand?</label>
+                  <input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Reformation" style={field} />
+                  <div style={{ marginTop: 14 }}>
+                    <label style={label}>Link{optional}</label>
+                    <input value={brandUrl} onChange={(e) => setBrandUrl(e.target.value)} placeholder="Their site, or the page worth seeing" style={field} />
+                  </div>
+                </div>
+              )}
+
+              {/* The link */}
+              {mode === "product" && (
+                <div style={{ marginBottom: 18 }}>
+                  <label style={label}>Paste the product link</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ flex: 1, position: "relative" }}>
+                      <LinkIcon style={{ width: 15, height: 15, color: C.muted, position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                      <input value={url} onChange={(e) => { setUrl(e.target.value); setUrlError(null); }} onKeyDown={(e) => e.key === "Enter" && extract()} placeholder="Paste product URL" style={{ ...field, paddingLeft: 36 }} />
+                    </div>
+                    <button onClick={extract} disabled={extracting || !url.trim()}
+                      style={{ ...meta(11, "#FFFFFF"), fontWeight: 700, background: C.ink, border: `1px solid ${C.ink}`, borderRadius: 2, padding: "0 18px", cursor: extracting || !url.trim() ? "default" : "pointer", opacity: extracting || !url.trim() ? 0.4 : 1 }}>
+                      {extracting ? "…" : "Pull"}
+                    </button>
+                  </div>
+                  {urlError && <p style={{ fontFamily: SANS, fontSize: 12.5, color: C.burgundy, margin: "8px 0 0" }}>{urlError}</p>}
+                </div>
+              )}
+
               {/* What she's recommending */}
-              {product && (
+              {mode === "product" && product && (
                 <div style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: 14, alignItems: "center", paddingBottom: 18, marginBottom: 18, borderBottom: `1px solid ${C.rule}` }}>
                   <div style={{ aspectRatio: "4 / 5", background: C.well, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <ProductImage url={product.image_url} fallback={<LinkIcon style={{ width: 18, height: 18, color: C.muted }} />} />
@@ -134,8 +193,8 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
                 </div>
               )}
 
-              {/* The rest only once a product is attached */}
-              {product && (
+              {/* The rest, once there is something to talk about */}
+              {ready && (
                 <>
                   <div style={{ marginBottom: 18 }}>
                     <label style={label}>Your take</label>

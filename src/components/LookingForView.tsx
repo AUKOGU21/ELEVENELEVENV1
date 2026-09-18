@@ -507,13 +507,15 @@ export default function LookingForView({
     <div style={{ padding: "26px 0 24px", borderBottom: `1px solid ${C.rule}` }}>
       <p style={{ ...meta(11, C.ink), marginBottom: 12 }}>My decision</p>
       <p style={display(isMobile ? 54 : 72)}>{STATE_WORD.found}</p>
+      {/* No photograph when she bought a brand rather than a piece, so the well
+          is dropped entirely and the name carries it. */}
       {(outcome?.alt_brand_name || outcome?.alt_product_name || outcome?.alt_product_image_url) && (
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "104px 1fr" : "140px 1fr", gap: 18, alignItems: "center", marginTop: 20 }}>
-          <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            {outcome?.alt_product_image_url
-              ? <img src={outcome.alt_product_image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
-              : <span style={meta(9, C.faint)}>No image</span>}
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: outcome?.alt_product_image_url ? (isMobile ? "104px 1fr" : "140px 1fr") : "1fr", gap: 18, alignItems: "center", marginTop: 20 }}>
+          {outcome?.alt_product_image_url && (
+            <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <img src={outcome.alt_product_image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
+            </div>
+          )}
           <div style={{ minWidth: 0 }}>
             <p style={{ ...meta(10, C.muted), marginBottom: 6 }}>She bought</p>
             {outcome?.alt_brand_name && <p style={{ ...strong(isMobile ? 15 : 17), textTransform: "uppercase", letterSpacing: "0.04em" }}>{outcome.alt_brand_name}</p>}
@@ -568,7 +570,16 @@ export default function LookingForView({
         <div style={{ position: "relative", background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {rec.product_image_url
             ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain", mixBlendMode: "multiply" }} />
-            : <span style={meta(9.5, C.faint)}>No image</span>}
+            : (
+              // A brand has no product shot. Rather than an empty square saying
+              // "no image", the name becomes the tile.
+              <span style={{
+                ...display(isMobile ? "clamp(20px, 7vw, 30px)" : 30, C.ink),
+                textAlign: "center", padding: "0 14px", lineHeight: 0.92, overflowWrap: "anywhere",
+              }}>
+                {rec.brand_name || rec.product_name || "Recommended"}
+              </span>
+            )}
           {isWinner && (
             <span style={{ position: "absolute", top: 10, left: 10, ...meta(9.5, "#FFFFFF"), fontWeight: 700, background: C.burgundy, padding: "5px 8px" }}>She bought this</span>
           )}

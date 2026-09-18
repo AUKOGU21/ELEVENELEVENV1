@@ -9,8 +9,9 @@
 import { useEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { C, RADIUS, SANS, body, meta, strong } from "@/lib/design";
-import { formatName, timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/format";
 import { Avatar } from "./DecisionTile";
+import { PersonName } from "./PersonLink";
 
 export interface CommentData {
   id: string;
@@ -123,12 +124,10 @@ export default function CommentThread({
         const edited = !!c.updated_at && new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 1000;
         return (
           <div key={c.id} style={{ display: "flex", gap: 14, padding: "20px 0", borderBottom: `1px solid ${C.rule}` }}>
-            <Avatar url={c.profiles?.avatar_url ?? null} name={c.profiles?.display_name ?? null} tier={c.profiles?.badge_tier} size={34} />
+            <Avatar url={c.profiles?.avatar_url ?? null} name={c.profiles?.display_name ?? null} tier={c.profiles?.badge_tier} size={34} userId={c.user_id} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 12, rowGap: 4 }}>
-                <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {formatName(c.profiles?.display_name)}
-                </span>
+                <PersonName userId={c.user_id} name={c.profiles?.display_name} />
                 {isPoster && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>Original poster</span>}
                 <span style={body(12, C.muted)}>{timeAgo(c.created_at)}{edited ? "  ·  edited" : ""}</span>
                 {isMine && !editing && (

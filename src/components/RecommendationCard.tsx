@@ -6,6 +6,7 @@ import { Check, ExternalLink, ThumbsUp } from "lucide-react";
 import { C, body, meta, strong } from "@/lib/design";
 import { formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { Avatar } from "./DecisionTile";
+import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
 
 export interface RecommendationData {
@@ -78,11 +79,11 @@ export default function RecommendationCard({ rec, counts, myVote, canVote, onHel
   return (
     <div style={{ paddingTop: 20, paddingBottom: 20, borderBottom: `1px solid ${C.rule}` }}>
       <div style={{ display: "flex", gap: 12 }}>
-        <Avatar url={rec.profiles?.avatar_url ?? null} name={rec.profiles?.display_name ?? null} tier={rec.profiles?.badge_tier} size={34} />
+        <Avatar url={rec.profiles?.avatar_url ?? null} name={rec.profiles?.display_name ?? null} tier={rec.profiles?.badge_tier} size={34} userId={rec.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
-              <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(rec.profiles?.display_name ?? null)}</span>
+              <PersonName userId={rec.user_id} name={rec.profiles?.display_name} />
               {rec.match_score != null && <MatchSeal score={rec.match_score} size={28} />}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
             </div>

@@ -12,6 +12,7 @@ import { C, RADIUS, SANS, STATE_WORD, body, display, meta, strong } from "@/lib/
 import { formatBudget, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { pullProduct, type PulledProduct } from "@/lib/productPull";
 import { Avatar, isResolved } from "./DecisionTile";
+import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
 import type { RecommendationData } from "./RecommendationCard";
 import type { LookingForDecision, LookingForFoundPayload } from "./LookingForCard";
@@ -121,11 +122,11 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
   return (
     <div ref={innerRef} style={{ paddingTop: isMobile ? 20 : 24, paddingBottom: isMobile ? 20 : 24, borderBottom: `1px solid ${C.rule}`, scrollMarginTop: 96 }}>
       <div style={{ display: "flex", gap: isMobile ? 12 : 16 }}>
-        <Avatar url={rec.profiles?.avatar_url ?? null} name={rec.profiles?.display_name ?? null} tier={rec.profiles?.badge_tier} size={isMobile ? 36 : 42} />
+        <Avatar url={rec.profiles?.avatar_url ?? null} name={rec.profiles?.display_name ?? null} tier={rec.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={rec.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
-              <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(rec.profiles?.display_name)}</span>
+              <PersonName userId={rec.user_id} name={rec.profiles?.display_name} />
               {rec.match_score != null && <MatchSeal score={rec.match_score} size={isMobile ? 28 : 30} />}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
               {isWinner && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>She bought this</span>}

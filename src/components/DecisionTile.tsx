@@ -4,6 +4,7 @@
 // conversation live in the decision view, one tap in. Nothing here is a box
 // inside a box, a pill or a badge. The one exception is the gold match seal.
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { C, RADIUS, STATE_WORD, body, display, meta, stateColor, strong, type DecisionState } from "@/lib/design";
 import { ringStyle } from "@/lib/tiers";
@@ -75,8 +76,8 @@ function footnote(d: TileDecision, state: DecisionState): string {
   return n === 0 ? (state === "weigh_in" ? "Be the first" : "No responses yet") : `${n} ${n === 1 ? "response" : "responses"}`;
 }
 
-export function Avatar({ url, name, tier, size }: { url: string | null; name: string | null; tier?: string | null; size: number }) {
-  return (
+export function Avatar({ url, name, tier, size, userId }: { url: string | null; name: string | null; tier?: string | null; size: number; userId?: string | null }) {
+  const face = (
     <div style={{
       width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
       background: "#3A3530", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
@@ -85,6 +86,18 @@ export function Avatar({ url, name, tier, size }: { url: string | null; name: st
     }}>
       {url ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : getInitials(name)}
     </div>
+  );
+
+  // Inside the feed tile the face has to stay inert: a link within a clickable
+  // tile swallows the tile's own tap. Only the views that pass a userId get one.
+  if (!userId) return face;
+
+  const label = `See ${formatName(name)}'s profile`;
+  return (
+    <Link to={`/profile/${userId}`} title={label} aria-label={label}
+      style={{ display: "inline-flex", flexShrink: 0, borderRadius: "50%", textDecoration: "none" }}>
+      {face}
+    </Link>
   );
 }
 

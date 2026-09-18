@@ -17,6 +17,7 @@ import { track } from "@/lib/track";
 import FollowButton from "./FollowButton";
 import MatchSeal from "./MatchSeal";
 import { Avatar, decisionState, isResolved, type TileDecision } from "./DecisionTile";
+import { PersonName } from "./PersonLink";
 import ResponseItem, { type ResponseItemData } from "./ResponseItem";
 import CommentThread, { type CommentData } from "./CommentThread";
 import {
@@ -348,9 +349,9 @@ export default function DecisionView(props: Props) {
 
   const identity = (
     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 12 : 16, flexWrap: "wrap" }}>
-      <Avatar url={p?.avatar_url ?? null} name={p?.display_name ?? null} tier={p?.badge_tier} size={isMobile ? 44 : 54} />
+      <Avatar url={p?.avatar_url ?? null} name={p?.display_name ?? null} tier={p?.badge_tier} size={isMobile ? 44 : 54} userId={d.user_id} />
       <div style={{ minWidth: 0 }}>
-        <p style={{ ...strong(isMobile ? 13 : 14), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(p?.display_name)}</p>
+        <PersonName userId={d.user_id} name={p?.display_name} size={isMobile ? 13 : 14} />
         <p style={{ ...body(12.5, C.muted), marginTop: 2 }}>{[city, timeAgo(d.created_at)].filter(Boolean).join("  ·  ")}</p>
       </div>
       {match != null && <span style={{ marginLeft: isMobile ? 0 : 6 }}><MatchSeal score={match} size={isMobile ? 40 : 48} withLabel /></span>}

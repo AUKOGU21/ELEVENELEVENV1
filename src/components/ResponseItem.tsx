@@ -11,6 +11,7 @@ import { Check, ExternalLink, MoreHorizontal, ThumbsUp } from "lucide-react";
 import { C, RADIUS, SANS, body, meta, strong } from "@/lib/design";
 import { experienceLabel, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { Avatar } from "./DecisionTile";
+import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
 import type { ReplyData } from "./ResponseCard";
 
@@ -143,13 +144,11 @@ export default function ResponseItem({
       }}
     >
       <div style={{ display: "flex", gap: isMobile ? 12 : 16 }}>
-        <Avatar url={resp.profiles?.avatar_url ?? null} name={resp.profiles?.display_name ?? null} tier={resp.profiles?.badge_tier} size={isMobile ? 36 : 42} />
+        <Avatar url={resp.profiles?.avatar_url ?? null} name={resp.profiles?.display_name ?? null} tier={resp.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={resp.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
-              <span style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {formatName(resp.profiles?.display_name)}
-              </span>
+              <PersonName userId={resp.user_id} name={resp.profiles?.display_name} />
               {resp.match_score != null && <MatchSeal score={resp.match_score} size={isMobile ? 28 : 30} />}
               {facts.map((f) => <span key={f} style={meta(10, C.muted)}>{f}</span>)}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(resp.recommendation)}</span>
@@ -197,7 +196,7 @@ export default function ResponseItem({
                 const editing = editingReplyId === rp.id;
                 return (
                   <div key={rp.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <Avatar url={rp.profiles?.avatar_url ?? null} name={rp.profiles?.display_name ?? null} tier={rp.profiles?.badge_tier} size={26} />
+                    <Avatar url={rp.profiles?.avatar_url ?? null} name={rp.profiles?.display_name ?? null} tier={rp.profiles?.badge_tier} size={26} userId={rp.user_id} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                         <span style={{ ...strong(11.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(rp.profiles?.display_name)}</span>

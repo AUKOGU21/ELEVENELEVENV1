@@ -1,7 +1,7 @@
 // ── LookingFor (creation) ─────────────────────────────────────────────────────
 // Posting flow for a "Looking For" — an earlier decision stage. Not a forum post:
 // it always leads toward a shopping decision, so the community answers with
-// product recommendations (see RecommendationsDrawer / RecommendationCard).
+// product recommendations (see LookingForView).
 //
 // Set in the editorial system (src/lib/design.ts): type, rules and square
 // edges. Selected priorities are ink-filled with paper text, as in Post a

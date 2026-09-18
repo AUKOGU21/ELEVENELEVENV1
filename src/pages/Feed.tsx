@@ -23,8 +23,7 @@ import FeedBanner from "@/components/FeedBanner";
 import NotificationBanner from "@/components/NotificationBanner";
 import NotificationPrompt from "@/components/NotificationPrompt";
 import NotificationBell from "@/components/NotificationBell";
-import { type LookingForFoundPayload } from "@/components/LookingForCard";
-import RecommendationsDrawer from "@/components/RecommendationsDrawer";
+import { type LookingForFoundPayload } from "@/lib/lookingFor";
 import RecommendationModal, { RecommendationDraft } from "@/components/RecommendationModal";
 import ReferralPopup from "@/components/ReferralPopup";
 import { ensureInviteCode, ensureReferral } from "@/lib/referral";
@@ -471,7 +470,6 @@ const Feed = () => {
     })();
   }, [location.state, loading]);
   // Looking For: which post's recommendations drawer is open, and the recommend modal.
-  const [recsOpenId, setRecsOpenId] = useState<string | null>(null);
   const [recModalFor, setRecModalFor] = useState<string | null>(null);
   const [submittingRec, setSubmittingRec] = useState(false);
   // Referral / Shopping Circle: one-time invite prompt.
@@ -2210,18 +2208,7 @@ const Feed = () => {
         })()}
       </AnimatePresence>
 
-      {/* ── Looking For: recommendations drawer + recommend modal ──────────────── */}
-      <RecommendationsDrawer
-        open={!!recsOpenId}
-        onClose={() => setRecsOpenId(null)}
-        lookingFor={[...decisions, ...myDecisions].find((d) => d.id === recsOpenId) as any ?? null}
-        user={user}
-        voteCounts={voteCounts}
-        userVotes={userVotes}
-        onHelpful={handleRecHelpfulVote}
-        onAddRecommendation={(id) => (user ? setRecModalFor(id) : navigate("/signin?mode=signup"))}
-        onSignIn={() => navigate("/signin?mode=signup")}
-      />
+      {/* ── Looking For: recommend modal ───────────────────────────────────────── */}
       <RecommendationModal
         open={!!recModalFor}
         lookingForTitle={([...decisions, ...myDecisions].find((d) => d.id === recModalFor)?.lf_title) ?? null}

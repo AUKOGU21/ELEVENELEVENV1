@@ -14,8 +14,7 @@ import { pullProduct, type PulledProduct } from "@/lib/productPull";
 import { Avatar, isResolved } from "./DecisionTile";
 import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
-import type { RecommendationData } from "./RecommendationCard";
-import type { LookingForDecision, LookingForFoundPayload } from "./LookingForCard";
+import type { RecommendationData, LookingForDecision, LookingForFoundPayload } from "@/lib/lookingFor";
 
 type FoundStep = "idle" | "pick" | "same_or_diff" | "link" | "why" | "confidence" | "thanks" | "snoozed";
 type FuStage = "gate" | "returned" | "detail" | "keep" | "recommend" | "take";

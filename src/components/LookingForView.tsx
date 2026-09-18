@@ -554,19 +554,14 @@ export default function LookingForView({
     const choosing = step === "pick";
     const isWinner = winnerId === rec.id;
     const price = money(rec.price_note);
-    return (
-      <button
-        key={rec.id}
-        onClick={() => {
-          if (choosing) { setPicked(rec); setStep("same_or_diff"); return; }
-          recRefs.current[rec.id]?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }}
-        style={{
-          display: "block", textAlign: "left", background: "none", cursor: "pointer", minWidth: 0,
-          border: `1px solid ${choosing ? C.burgundy : "transparent"}`, padding: choosing ? 8 : 0,
-          borderRadius: RADIUS, transition: "border-color .2s",
-        }}
-      >
+    const box: React.CSSProperties = {
+      display: "block", textAlign: "left", background: "none", cursor: "pointer", minWidth: 0,
+      border: `1px solid ${choosing ? C.burgundy : "transparent"}`, padding: choosing ? 8 : 0,
+      borderRadius: RADIUS, transition: "border-color .2s", textDecoration: "none", color: "inherit",
+    };
+
+    const inner = (
+      <>
         <div style={{ position: "relative", background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {rec.product_image_url
             ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain", mixBlendMode: "multiply" }} />
@@ -587,7 +582,36 @@ export default function LookingForView({
         <p style={{ ...strong(12), textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.brand_name || "Recommended"}</p>
         {rec.product_name && <p style={{ ...body(12, C.inkSoft), textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rec.product_name}</p>}
         {price && <p style={{ ...body(12.5, C.ink), marginTop: 4 }}>{price}</p>}
+        {!choosing && rec.product_url && (
+          <p style={{ ...meta(9.5, C.ink), marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <ExternalLink style={{ width: 11, height: 11 }} /> {prettyHost(rec.product_url)}
+          </p>
+        )}
         <p style={{ ...meta(9.5, C.muted), marginTop: 6 }}>Rec. by {formatName(rec.profiles?.display_name)}</p>
+      </>
+    );
+
+    // The tile goes where the pick goes. The exception is the moment she is
+    // choosing what she bought: then it has to stay a picker, not walk her out
+    // to a shop mid-flow. A pick with no link falls back to her note below.
+    if (!choosing && rec.product_url) {
+      return (
+        <a key={rec.id} href={rec.product_url} target="_blank" rel="noopener noreferrer" style={box}>
+          {inner}
+        </a>
+      );
+    }
+
+    return (
+      <button
+        key={rec.id}
+        onClick={() => {
+          if (choosing) { setPicked(rec); setStep("same_or_diff"); return; }
+          recRefs.current[rec.id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+        style={box}
+      >
+        {inner}
       </button>
     );
   };

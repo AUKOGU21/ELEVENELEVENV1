@@ -114,10 +114,17 @@ const SignIn = () => {
   const [searchParams] = useSearchParams();
   const { signInWithPassword, user, loading: authLoading } = useAuth();
 
+  // Where to go afterwards. A member who opened a shared decision in a browser
+  // with no session (every in-app browser, so most shared links) needs to land
+  // back on that decision, not in the feed with her place lost. Only our own
+  // paths are honoured, so this can never be pointed at another site.
+  const nextRaw = searchParams.get("next") ?? "";
+  const next = /^\/[A-Za-z0-9\-._~/?=&%]*$/.test(nextRaw) && !nextRaw.startsWith("//") ? nextRaw : null;
+
   // Already signed in? Don't make her type it again.
   useEffect(() => {
-    if (!authLoading && user) navigate("/feed", { replace: true });
-  }, [authLoading, user, navigate]);
+    if (!authLoading && user) navigate(next ?? "/feed", { replace: true });
+  }, [authLoading, user, navigate, next]);
 
   const [mode, setMode] = useState<"signin" | "signup">(
     searchParams.get("mode") === "signup" ? "signup" : "signin"
@@ -153,7 +160,7 @@ const SignIn = () => {
         : error);
       setLoading(false);
     } else {
-      navigate("/feed");
+      navigate(next ?? "/feed");
     }
   };
 

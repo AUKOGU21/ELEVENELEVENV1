@@ -36,9 +36,11 @@ interface Props {
   error?: string | null;
   onClose: () => void;
   onSubmit: (draft: RecommendationDraft) => void;
+  /** Offered to a guest who turns out to already have an account. */
+  onSignIn?: () => void;
 }
 
-export default function RecommendationModal({ open, lookingForTitle, submitting, guest = false, error, onClose, onSubmit }: Props) {
+export default function RecommendationModal({ open, lookingForTitle, submitting, guest = false, error, onClose, onSubmit, onSignIn }: Props) {
   const [step, setStep] = useState<"form" | "who">("form");
   const [firstName, setFirstName] = useState("");
   const [lastInitial, setLastInitial] = useState("");
@@ -250,6 +252,16 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
                       <label style={{ ...label, marginTop: 14 }}>Last initial</label>
                       <input value={lastInitial} onChange={(e) => setLastInitial(e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 1))} placeholder="M" maxLength={1} style={{ ...field, fontSize: 16, width: 90 }} />
                       {error && <p style={{ fontFamily: SANS, fontSize: 13, color: C.burgundy, margin: "14px 0 0" }}>{error}</p>}
+                      {/* A member opening this from a message has no session in
+                          that browser. This is the way back to her own account. */}
+                      {onSignIn && (
+                        <p style={{ fontFamily: SANS, fontSize: 13.5, color: C.muted, margin: "16px 0 0" }}>
+                          Already on ElevenEleven?{" "}
+                          <button onClick={onSignIn} style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: C.ink, background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}>
+                            Sign in
+                          </button>
+                        </p>
+                      )}
                     </div>
                   )}
 

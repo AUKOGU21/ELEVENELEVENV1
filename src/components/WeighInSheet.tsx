@@ -35,7 +35,7 @@ type Step = "context" | "vote" | "take" | "who";
 
 export default function WeighInSheet({
   open, isMobile, decisionId, decision, mode, submitting, error, submitted, doneSlot,
-  onCancel, onDismiss, onSubmit, resetKey = 0,
+  onCancel, onDismiss, onSubmit, onSignIn, resetKey = 0,
 }: {
   open: boolean;
   isMobile: boolean;
@@ -54,6 +54,8 @@ export default function WeighInSheet({
   onCancel: () => void;
   onDismiss: () => void;
   onSubmit: (payload: WeighInPayload) => void;
+  /** Offered to a guest who turns out to already have an account. */
+  onSignIn?: () => void;
 }) {
   const [step, setStep] = useState<Step>("context");
   const [context, setContext] = useState<string | null>(null);
@@ -272,6 +274,17 @@ export default function WeighInSheet({
                   style={{ ...field, padding: "13px 14px", fontSize: 16, width: 90 }}
                 />
                 {error && <p style={{ ...body(13, C.burgundy), marginTop: 14 }}>{error}</p>}
+                {/* A member opening this from a message has no session in that
+                    browser, and would otherwise answer as a guest beside her own
+                    account. This is the way back to herself. */}
+                {onSignIn && (
+                  <p style={{ ...body(13.5, C.muted), marginTop: 16 }}>
+                    Already on ElevenEleven?{" "}
+                    <button onClick={onSignIn} style={{ ...body(13.5, C.ink), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}>
+                      Sign in
+                    </button>
+                  </p>
+                )}
                 <button
                   onClick={send}
                   disabled={firstName.trim().length === 0 || lastInitial.trim().length === 0 || submitting}

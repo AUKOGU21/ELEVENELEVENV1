@@ -458,6 +458,7 @@ export default function SharedDecision() {
         submitted={submitted}
         onCancel={() => { setSheetOpen(false); setResetKey((k) => k + 1); }}
         onDismiss={() => setSheetOpen(false)}
+        onSignIn={() => navigate(`/signin?next=${encodeURIComponent(`/d/${d.id}`)}`)}
         onSubmit={submit}
         doneSlot={
           <div style={{ padding: "6px 0 2px" }}>
@@ -501,6 +502,7 @@ export default function SharedDecision() {
         error={recError}
         onClose={() => setRecOpen(false)}
         onSubmit={submitRecommendation}
+        onSignIn={() => navigate(`/signin?next=${encodeURIComponent(`/d/${d.id}`)}`)}
       />
     </div>
   );

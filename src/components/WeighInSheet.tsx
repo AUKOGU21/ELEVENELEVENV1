@@ -264,7 +264,7 @@ export default function WeighInSheet({
                   style={{ ...field, padding: "13px 14px", fontSize: 16 }}
                 />
                 <label style={{ ...meta(10.5, C.ink), fontWeight: 700, display: "block", margin: "16px 0 8px" }}>
-                  Last initial <span style={{ ...meta(10, C.muted), fontWeight: 600 }}>(optional)</span>
+                  Last initial
                 </label>
                 <input
                   value={lastInitial} onChange={(e) => setLastInitial(e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 1))}
@@ -274,8 +274,8 @@ export default function WeighInSheet({
                 {error && <p style={{ ...body(13, C.burgundy), marginTop: 14 }}>{error}</p>}
                 <button
                   onClick={send}
-                  disabled={firstName.trim().length === 0 || submitting}
-                  style={{ ...primary(firstName.trim().length > 0 && !submitting), marginTop: 22 }}
+                  disabled={firstName.trim().length === 0 || lastInitial.trim().length === 0 || submitting}
+                  style={{ ...primary(firstName.trim().length > 0 && lastInitial.trim().length > 0 && !submitting), marginTop: 22 }}
                 >
                   {submitting ? "Submitting..." : "Submit response"}
                 </button>

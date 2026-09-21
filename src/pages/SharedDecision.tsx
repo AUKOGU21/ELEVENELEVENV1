@@ -352,7 +352,7 @@ export default function SharedDecision() {
                 <div style={{ borderTop: `1px solid ${C.rule}`, margin: "24px 0 20px" }} />
                 <p style={{ ...strong(15.5) }}>You clearly have opinions. We like that.</p>
                 <p style={{ ...body(14.5, C.inkSoft), marginTop: 8 }}>
-                  Make a profile to keep your responses and get matched to decisions you can actually help with.
+                  Set up your profile and never second guess again.
                 </p>
                 <button
                   onClick={() => {

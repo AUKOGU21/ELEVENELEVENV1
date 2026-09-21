@@ -10,7 +10,7 @@
 // a decision from months ago stays useful.
 import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ExternalLink, MoreHorizontal, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, Check, ExternalLink, MoreHorizontal, Share, X } from "lucide-react";
 import { C, RADIUS, SANS, STATE_WORD, body, display, meta, stateColor, strong } from "@/lib/design";
 import { formatName, prettyHost, timeAgo } from "@/lib/format";
 import { track } from "@/lib/track";
@@ -238,6 +238,23 @@ export default function DecisionView(props: Props) {
   const concerns = useMemo(() => parseConcerns(d), [d.uncertainty_text, d.context_note, d.sizes_note]);
   const confidence = d.confidence_score ?? 0;
   const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Sharing a decision out of the app: the phone's own share sheet, so it can go
+  // wherever she already talks to people. Copying the link is the fallback on a
+  // desktop, which has no share sheet.
+  const [shareCopied, setShareCopied] = useState(false);
+  const shareDecision = async () => {
+    const url = `${window.location.origin}/d/${d.id}`;
+    const who = (d.profiles?.display_name ?? "").trim().split(/\s+/)[0] || "Someone";
+    track("decision_share_clicked", { decisionId: d.id, userId: viewer?.id ?? null });
+    const text = isOwn ? "I want your take on this" : `${who} wants your take`;
+    try {
+      if (navigator.share) { await navigator.share({ title: text, text, url }); return; }
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2200);
+    } catch { /* she closed the share sheet, which is not a failure */ }
+  };
   const convoRef = useRef<HTMLElement>(null);
 
   // Escape closes; focus lands on the close control so the keyboard has a way out.
@@ -972,6 +989,17 @@ export default function DecisionView(props: Props) {
         }}>
           {identity}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, alignSelf: "flex-start" }}>
+            <button
+              onClick={shareDecision}
+              aria-label="Share"
+              data-tip={shareCopied ? "Link copied" : "Share"}
+              className="e11-tip"
+              style={{ background: "none", border: "none", padding: 6, cursor: "pointer", color: C.ink, lineHeight: 0 }}
+            >
+              {shareCopied
+                ? <Check style={{ width: 20, height: 20 }} strokeWidth={1.8} />
+                : <Share style={{ width: 20, height: 20 }} strokeWidth={1.6} />}
+            </button>
             <button
               onClick={() => (viewer ? onSave() : onSignIn())}
               aria-label={isSaved ? "Saved" : "Save"}

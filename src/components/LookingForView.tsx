@@ -36,6 +36,8 @@ interface Props {
   submitReturned: (id: string, data: { note: string | null; photoFile: File | null }) => void;
   /** The decision view's follow-up prompt. Once she's closed it, it takes the recommend button's place. */
   followUp?: React.ReactNode;
+  /** True on a shared link, where someone with no account can still recommend. */
+  guestsWelcome?: boolean;
 }
 
 // ── Small parts ───────────────────────────────────────────────────────────────
@@ -118,14 +120,21 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
   innerRef: (el: HTMLDivElement | null) => void;
 }) {
   const price = money(rec.price_note);
+  // Who sent it. A guest stands behind her pick with her own name.
+  const recGuest = rec.guests ?? null;
+  const recAuthor = recGuest
+    ? [recGuest.first_name, recGuest.last_initial ? `${recGuest.last_initial}.` : null].filter(Boolean).join(" ")
+    : rec.profiles?.display_name ?? null;
   return (
     <div ref={innerRef} style={{ paddingTop: isMobile ? 20 : 24, paddingBottom: isMobile ? 20 : 24, borderBottom: `1px solid ${C.rule}`, scrollMarginTop: 96 }}>
       <div style={{ display: "flex", gap: isMobile ? 12 : 16 }}>
-        <Avatar url={rec.profiles?.avatar_url ?? null} name={rec.profiles?.display_name ?? null} tier={rec.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={rec.user_id} />
+        <Avatar url={recGuest ? null : rec.profiles?.avatar_url ?? null} name={recAuthor} tier={recGuest ? null : rec.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={rec.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
-              <PersonName userId={rec.user_id} name={rec.profiles?.display_name} />
+              {/* A guest has no profile to open, so her name is not a link. */}
+              <PersonName userId={rec.user_id} name={recAuthor} />
+              {recGuest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
               {rec.match_score != null && <MatchSeal score={rec.match_score} size={isMobile ? 28 : 30} />}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
               {isWinner && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>She bought this</span>}
@@ -198,7 +207,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
 export default function LookingForView({
   decision, user, isMobile, voteCounts, userVotes, onRecHelpful,
   onAddRecommendation, onSignIn, onFound, onProductPulled, onStillLooking,
-  updateOutcome, submitReceived, submitReturned, followUp,
+  updateOutcome, submitReceived, submitReturned, followUp, guestsWelcome = false,
 }: Props) {
   const isOwn = !!user && user.id === decision.user_id;
   const isClosed = isResolved({ status: decision.status ?? "" });
@@ -587,7 +596,11 @@ export default function LookingForView({
             <ExternalLink style={{ width: 11, height: 11 }} /> {prettyHost(rec.product_url)}
           </p>
         )}
-        <p style={{ ...meta(9.5, C.muted), marginTop: 6 }}>Rec. by {formatName(rec.profiles?.display_name)}</p>
+        <p style={{ ...meta(9.5, C.muted), marginTop: 6 }}>
+          Rec. by {rec.guests
+            ? [rec.guests.first_name, rec.guests.last_initial ? `${rec.guests.last_initial}.` : null].filter(Boolean).join(" ")
+            : formatName(rec.profiles?.display_name)}
+        </p>
       </>
     );
 
@@ -616,10 +629,12 @@ export default function LookingForView({
     );
   };
 
+  // On a shared link a stranger can recommend without an account, so asking her
+  // to sign in first would be a lie about what happens next.
   const recommendCta = !isOwn && !isClosed && (
     <div style={{ paddingTop: 22 }}>
-      <button onClick={() => (user ? onAddRecommendation() : onSignIn())} style={{ ...squareBtn(true, C.burgundy), width: "100%" }}>
-        {user ? "Recommend" : "Sign in to recommend"} <ArrowRight style={{ width: 16, height: 16 }} />
+      <button onClick={() => (user || guestsWelcome ? onAddRecommendation() : onSignIn())} style={{ ...squareBtn(true, C.burgundy), width: "100%" }}>
+        {user || guestsWelcome ? "Recommend" : "Sign in to recommend"} <ArrowRight style={{ width: 16, height: 16 }} />
       </button>
     </div>
   );

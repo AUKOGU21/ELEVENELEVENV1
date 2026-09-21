@@ -20,6 +20,9 @@ import { imageToJpeg } from "@/lib/image";
 import { track } from "@/lib/track";
 import WeighInSheet, { type WeighInPayload } from "@/components/WeighInSheet";
 import ResponseItem, { type ResponseItemData } from "@/components/ResponseItem";
+import LookingForView from "@/components/LookingForView";
+import RecommendationModal, { type RecommendationDraft } from "@/components/RecommendationModal";
+import type { LookingForDecision, RecommendationData } from "@/lib/lookingFor";
 
 type SharedDecisionRow = {
   id: string;
@@ -38,6 +41,10 @@ type SharedDecisionRow = {
   context_note: string | null;
   sizes_note: string | null;
   lf_title: string | null;
+  lf_budget: string | null;
+  lf_occasion: string | null;
+  lf_priorities: string[] | null;
+  lf_context: string | null;
   profiles: { display_name: string | null; avatar_url: string | null; city: string | null; badge_tier?: string | null } | null;
   responses: ResponseItemData[] | null;
 };
@@ -45,7 +52,8 @@ type SharedDecisionRow = {
 const SELECT = `
   id, user_id, created_at, status, post_type,
   product_name, brand_name, product_url, product_image_url, product_price, price_note,
-  confidence_score, uncertainty_text, context_note, sizes_note, lf_title,
+  confidence_score, uncertainty_text, context_note, sizes_note,
+  lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
   profiles ( display_name, avatar_url, city, badge_tier ),
   responses ( id, recommendation, reasoning, photo_url, product_url, match_score,
               personal_experience, helpfulness_votes, user_id, guest_id, created_at,
@@ -86,6 +94,11 @@ export default function SharedDecision() {
   const [copied, setCopied] = useState(false);
   // The sheet holds her draft while dismissed; bumping this throws it away.
   const [resetKey, setResetKey] = useState(0);
+  // Looking For posts take picks rather than verdicts.
+  const [recs, setRecs] = useState<RecommendationData[]>([]);
+  const [recOpen, setRecOpen] = useState(false);
+  const [recSubmitting, setRecSubmitting] = useState(false);
+  const [recError, setRecError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -95,7 +108,35 @@ export default function SharedDecision() {
       .eq("is_public", true)
       .is("deleted_at", null)
       .maybeSingle();
-    setD((data as SharedDecisionRow) ?? null);
+    const row = (data as SharedDecisionRow) ?? null;
+    setD(row);
+
+    // Picks live in their own table with no FK to profiles, so they are fetched
+    // separately and their authors attached by hand, the way the feed does it.
+    if (row?.post_type === "looking_for") {
+      const { data: raw } = await supabase
+        .from("recommendations")
+        .select("id, recommendation, reasoning, fit_note, who_for, product_url, product_name, brand_name, price_note, product_image_url, match_score, user_id, guest_id, created_at")
+        .eq("looking_for_id", row.id)
+        .order("created_at", { ascending: false });
+      const list = (raw ?? []) as RecommendationData[];
+
+      const userIds = [...new Set(list.map((r) => r.user_id))].filter(Boolean) as string[];
+      if (userIds.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url, badge_tier").in("id", userIds);
+        const map: Record<string, any> = {};
+        (profs ?? []).forEach((p: any) => { map[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url, badge_tier: p.badge_tier }; });
+        list.forEach((r) => { r.profiles = r.user_id ? map[r.user_id] ?? null : null; });
+      }
+      const guestIds = [...new Set(list.map((r) => r.guest_id))].filter(Boolean) as string[];
+      if (guestIds.length) {
+        const { data: gs } = await supabase.from("guests").select("id, first_name, last_initial").in("id", guestIds);
+        const map: Record<string, any> = {};
+        (gs ?? []).forEach((g: any) => { map[g.id] = { first_name: g.first_name, last_initial: g.last_initial }; });
+        list.forEach((r) => { r.guests = r.guest_id ? map[r.guest_id] ?? null : null; });
+      }
+      setRecs(list);
+    }
     setLoading(false);
   }, [id]);
 
@@ -142,7 +183,8 @@ export default function SharedDecision() {
   const responses = (d.responses ?? []).filter((r) => r);
   const alreadyIn = !!user && responses.some((r) => r.user_id === user.id);
   const price = d.price_note ?? (d.product_price != null ? `$${d.product_price}` : null);
-  const canWeighIn = !decided && !isOwn && !alreadyIn;
+  // A Looking For post takes picks, not verdicts, and carries its own button.
+  const canWeighIn = !decided && !isOwn && !alreadyIn && !isLF;
 
   const share = async () => {
     const url = `${window.location.origin}/d/${d.id}`;
@@ -219,6 +261,56 @@ export default function SharedDecision() {
     }
   };
 
+  // The shape LookingForView expects, built from what this page already loaded.
+  const lfDecision: LookingForDecision = {
+    id: d.id, user_id: d.user_id, created_at: d.created_at, status: d.status ?? "open",
+    confidence_score: d.confidence_score,
+    lf_title: d.lf_title, lf_budget: d.lf_budget, lf_occasion: d.lf_occasion,
+    lf_priorities: d.lf_priorities, lf_context: d.lf_context,
+    matchScore: null, recommendations: recs, outcomes: null,
+    profiles: d.profiles ? { ...d.profiles, city: d.profiles.city } : null,
+  };
+
+  const submitRecommendation = async (draft: RecommendationDraft) => {
+    setRecSubmitting(true);
+    setRecError(null);
+    try {
+      if (user) {
+        const { error: e } = await supabase.from("recommendations").insert({
+          looking_for_id: d.id, user_id: user.id,
+          recommendation: draft.recommendation, reasoning: draft.reasoning,
+          fit_note: draft.fit_note, who_for: draft.who_for,
+          product_url: draft.product_url, product_name: draft.product_name,
+          brand_name: draft.brand_name, price_note: draft.price_note,
+          product_image_url: draft.product_image_url,
+        });
+        if (e) throw new Error(e.message);
+      } else {
+        const { data, error: e } = await supabase.functions.invoke("guest-weigh-in", {
+          body: {
+            kind: "recommendation", decision_id: d.id,
+            first_name: draft.firstName, last_initial: draft.lastInitial,
+            recommendation: draft.recommendation, reasoning: draft.reasoning,
+            fit_note: draft.fit_note, who_for: draft.who_for,
+            brand_name: draft.brand_name, product_name: draft.product_name,
+            product_url: draft.product_url, price_note: draft.price_note,
+            product_image_url: draft.product_image_url, source: "share",
+          },
+        });
+        if (e) throw new Error(e.message);
+        const gid = (data as { guest_id?: string } | null)?.guest_id ?? null;
+        if (gid) { try { localStorage.setItem("ee_guest_id", gid); } catch { /* private mode */ } }
+        track("guest_response_submitted", { decisionId: d.id, guestId: gid });
+      }
+      setRecOpen(false);
+      await load();
+    } catch (err) {
+      setRecError((err as Error).message || "That didn't send. Try again.");
+    } finally {
+      setRecSubmitting(false);
+    }
+  };
+
   const label = (t: string) => <p style={{ ...meta(10.5, C.muted), marginBottom: 8 }}>{t}</p>;
 
   return (
@@ -236,20 +328,18 @@ export default function SharedDecision() {
           </div>
         )}
 
-        <div style={{ marginTop: 20 }}>
-          {isLF ? (
-            <h2 style={{ ...display(isMobile ? 26 : 30) }}>{d.lf_title}</h2>
-          ) : (
-            <>
-              {d.brand_name && <p style={{ ...strong(isMobile ? 14 : 15), textTransform: "uppercase", letterSpacing: "0.05em" }}>{d.brand_name}</p>}
-              {d.product_name && <p style={{ ...body(isMobile ? 15 : 16, C.inkSoft), marginTop: 4 }}>{d.product_name}</p>}
-            </>
-          )}
-          {price && <p style={{ ...body(15, C.ink), marginTop: 8 }}>{price}</p>}
-        </div>
+        {/* A Looking For post states all of this itself, just below. */}
+        {!isLF && (
+          <div style={{ marginTop: 20 }}>
+            {d.brand_name && <p style={{ ...strong(isMobile ? 14 : 15), textTransform: "uppercase", letterSpacing: "0.05em" }}>{d.brand_name}</p>}
+            {d.product_name && <p style={{ ...body(isMobile ? 15 : 16, C.inkSoft), marginTop: 4 }}>{d.product_name}</p>}
+            {price && <p style={{ ...body(15, C.ink), marginTop: 8 }}>{price}</p>}
+          </div>
+        )}
 
-        {/* What she is unsure about, with whatever she added underneath it. */}
-        {concerns.length > 0 && (
+        {/* What she is unsure about, with whatever she added underneath it.
+            A Looking For post states its own ask, so this is only for decisions. */}
+        {!isLF && concerns.length > 0 && (
           <div style={{ marginTop: 28, borderTop: `1px solid ${C.rule}` }}>
             {concerns.map((c) => (
               <div key={c.label} style={{ padding: "16px 0", borderBottom: `1px solid ${C.rule}` }}>
@@ -261,7 +351,7 @@ export default function SharedDecision() {
           </div>
         )}
 
-        {d.confidence_score != null && (
+        {!isLF && d.confidence_score != null && (
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 22 }}>
             {label("How sure she is")}
             <p style={{ ...display(isMobile ? 26 : 30), marginTop: -8 }}>{d.confidence_score}/10</p>
@@ -269,7 +359,7 @@ export default function SharedDecision() {
         )}
 
         {/* Answers so far, drawn exactly as they are inside the app. */}
-        {responses.length > 0 && (
+        {!isLF && responses.length > 0 && (
           <div style={{ marginTop: 34 }}>
             <p style={{ ...meta(11, C.ink), fontWeight: 700, borderBottom: `2px solid ${C.burgundy}`, display: "inline-block", paddingBottom: 6 }}>
               Responses ({responses.length})
@@ -294,6 +384,34 @@ export default function SharedDecision() {
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* A Looking For post is the same view the app uses, so the ask, the
+            picks and the recommend button all behave as they do inside. */}
+        {isLF && (
+          <div style={{ marginTop: 26 }}>
+            <LookingForView
+              decision={lfDecision}
+              user={user ? { id: user.id } : null}
+              isMobile={isMobile}
+              voteCounts={{}}
+              userVotes={{}}
+              guestsWelcome
+              onRecHelpful={() => {}}
+              onAddRecommendation={() => {
+                setRecError(null);
+                setRecOpen(true);
+                track(user ? "weigh_in_start" : "guest_weigh_in_started", { decisionId: d.id, userId: user?.id ?? null });
+              }}
+              onSignIn={() => { setRecError(null); setRecOpen(true); }}
+              onFound={() => {}}
+              onProductPulled={() => {}}
+              onStillLooking={() => {}}
+              updateOutcome={() => {}}
+              submitReceived={() => {}}
+              submitReturned={() => {}}
+            />
           </div>
         )}
 
@@ -373,6 +491,16 @@ export default function SharedDecision() {
             </button>
           </div>
         }
+      />
+
+      <RecommendationModal
+        open={recOpen}
+        lookingForTitle={d.lf_title}
+        submitting={recSubmitting}
+        guest={!user}
+        error={recError}
+        onClose={() => setRecOpen(false)}
+        onSubmit={submitRecommendation}
       />
     </div>
   );

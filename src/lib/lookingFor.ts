@@ -16,9 +16,13 @@ export interface RecommendationData {
   price_note: string | null;
   product_image_url: string | null;
   match_score: number | null;
-  user_id: string;
+  /** Null when a guest sent it. Exactly one of these two is set. */
+  user_id: string | null;
   created_at: string;
   profiles: { display_name: string | null; avatar_url?: string | null; badge_tier?: string | null } | null;
+  /** Someone who answered from a shared link without an account. */
+  guest_id?: string | null;
+  guests?: { first_name: string; last_initial: string | null } | null;
 }
 
 /** What she ended up buying, once she's logged it. */

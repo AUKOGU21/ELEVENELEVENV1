@@ -586,18 +586,27 @@ const Feed = () => {
       try {
         const { data: recsRaw } = await supabase
           .from("recommendations")
-          .select("id, looking_for_id, recommendation, reasoning, fit_note, who_for, product_url, product_name, brand_name, price_note, product_image_url, match_score, user_id, created_at")
+          .select("id, looking_for_id, recommendation, reasoning, fit_note, who_for, product_url, product_name, brand_name, price_note, product_image_url, match_score, user_id, guest_id, created_at")
           .in("looking_for_id", lfIds)
           .order("created_at", { ascending: false });
         const recs = recsRaw ?? [];
         // Attach recommender profiles separately — recommendations has no PostgREST
         // FK to profiles, so an embed would 400 the whole select.
-        const recUserIds = [...new Set(recs.map((r: any) => r.user_id))];
+        const recUserIds = [...new Set(recs.map((r: any) => r.user_id))].filter(Boolean);
         if (recUserIds.length > 0) {
           const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url, badge_tier").in("id", recUserIds);
           const profMap: Record<string, any> = {};
           (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url }; });
           recs.forEach((r: any) => { r.profiles = profMap[r.user_id] ?? null; });
+        }
+        // Guests the same way: only the display columns are readable, which is
+        // all a name needs.
+        const recGuestIds = [...new Set(recs.map((r: any) => r.guest_id))].filter(Boolean);
+        if (recGuestIds.length > 0) {
+          const { data: gs } = await supabase.from("guests").select("id, first_name, last_initial").in("id", recGuestIds);
+          const gMap: Record<string, any> = {};
+          (gs ?? []).forEach((g: any) => { gMap[g.id] = { first_name: g.first_name, last_initial: g.last_initial }; });
+          recs.forEach((r: any) => { r.guests = r.guest_id ? gMap[r.guest_id] ?? null : null; });
         }
         const byLf: Record<string, any[]> = {};
         recs.forEach((rec: any) => { (byLf[rec.looking_for_id] ??= []).push(rec); });

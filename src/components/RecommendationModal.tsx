@@ -20,6 +20,9 @@ export interface RecommendationDraft {
   recommendation: "buy" | "do_not_buy";
   fit_note: string | null;
   who_for: string | null;
+  /** Guest mode only: who is sending it. */
+  firstName?: string;
+  lastInitial?: string;
 }
 
 interface Product { brand: string; name: string; image_url: string | null; price: string | null; source_url: string; }
@@ -28,11 +31,17 @@ interface Props {
   open: boolean;
   lookingForTitle: string | null;
   submitting: boolean;
+  /** A guest is asked who she is after writing, never before. */
+  guest?: boolean;
+  error?: string | null;
   onClose: () => void;
   onSubmit: (draft: RecommendationDraft) => void;
 }
 
-export default function RecommendationModal({ open, lookingForTitle, submitting, onClose, onSubmit }: Props) {
+export default function RecommendationModal({ open, lookingForTitle, submitting, guest = false, error, onClose, onSubmit }: Props) {
+  const [step, setStep] = useState<"form" | "who">("form");
+  const [firstName, setFirstName] = useState("");
+  const [lastInitial, setLastInitial] = useState("");
   // Not everyone has a specific piece in mind. Plenty of good answers are just
   // "try this label", so a brand on its own is a real recommendation here.
   const [mode, setMode] = useState<"product" | "brand">("product");
@@ -47,7 +56,7 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
   const [fitNote, setFitNote] = useState("");
   const [whoFor, setWhoFor] = useState("");
 
-  const reset = () => { setMode("product"); setBrandName(""); setBrandUrl(""); setUrl(""); setExtracting(false); setUrlError(null); setProduct(null); setReasoning(""); setRecommendation("buy"); setFitNote(""); setWhoFor(""); };
+  const reset = () => { setStep("form"); setFirstName(""); setLastInitial(""); setMode("product"); setBrandName(""); setBrandUrl(""); setUrl(""); setExtracting(false); setUrlError(null); setProduct(null); setReasoning(""); setRecommendation("buy"); setFitNote(""); setWhoFor(""); };
   const close = () => { reset(); onClose(); };
 
   const extract = async () => {
@@ -82,11 +91,14 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
 
   const doSubmit = () => {
     if (!canSubmit) return;
+    // A guest writes the whole thing first, then says who she is.
+    if (guest && step === "form") { setStep("who"); return; }
     const common = {
       reasoning: reasoning.trim(),
       recommendation,
       fit_note: fitNote.trim() || null,
       who_for: whoFor.trim() || null,
+      ...(guest ? { firstName: firstName.trim(), lastInitial: lastInitial.trim() } : {}),
     };
     if (mode === "brand") {
       onSubmit({
@@ -226,9 +238,26 @@ export default function RecommendationModal({ open, lookingForTitle, submitting,
                     <input value={whoFor} onChange={(e) => setWhoFor(e.target.value)} placeholder="e.g. Tall, long torso, smaller bust" style={field} />
                   </div>
 
-                  <button onClick={doSubmit} disabled={!canSubmit}
-                    style={{ width: "100%", ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", padding: "17px 0", borderRadius: 2, border: `1px solid ${C.burgundy}`, background: C.burgundy, cursor: canSubmit ? "pointer" : "default", opacity: canSubmit ? 1 : 0.4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    {submitting ? "Sharing…" : <><Check style={{ width: 15, height: 15 }} /> Share recommendation</>}
+                  {/* A guest says who she is last, once the pick is written. */}
+                  {guest && step === "who" && (
+                    <div style={{ paddingTop: 4, marginBottom: 22, borderTop: `1px solid ${C.rule}` }}>
+                      <p style={{ ...display(26), margin: "18px 0 6px" }}>Who's recommending?</p>
+                      <p style={{ fontFamily: SANS, fontSize: 14, color: C.inkSoft, margin: "0 0 16px" }}>
+                        Your pick will appear on her post.
+                      </p>
+                      <label style={label}>First name</label>
+                      <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Rachel" autoComplete="given-name" maxLength={40} style={{ ...field, fontSize: 16 }} />
+                      <label style={{ ...label, marginTop: 14 }}>Last initial</label>
+                      <input value={lastInitial} onChange={(e) => setLastInitial(e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 1))} placeholder="M" maxLength={1} style={{ ...field, fontSize: 16, width: 90 }} />
+                      {error && <p style={{ fontFamily: SANS, fontSize: 13, color: C.burgundy, margin: "14px 0 0" }}>{error}</p>}
+                    </div>
+                  )}
+
+                  <button onClick={doSubmit} disabled={!canSubmit || (guest && step === "who" && (!firstName.trim() || !lastInitial.trim()))}
+                    style={{ width: "100%", ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", padding: "17px 0", borderRadius: 2, border: `1px solid ${C.burgundy}`, background: C.burgundy, cursor: canSubmit ? "pointer" : "default", opacity: canSubmit && !(guest && step === "who" && (!firstName.trim() || !lastInitial.trim())) ? 1 : 0.4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    {submitting ? "Sharing…"
+                      : guest && step === "form" ? "Continue"
+                      : <><Check style={{ width: 15, height: 15 }} /> Share recommendation</>}
                   </button>
                 </>
               )}

@@ -429,6 +429,19 @@ export default function SharedDecision() {
           background: C.paper, borderTop: `1px solid ${C.rule}`,
           padding: isMobile ? "12px 18px 18px" : "14px 24px 20px",
         }}>
+          {/* Offered before she starts, not only at the end. A member who says
+              so now answers as herself and never retypes anything. */}
+          {!user && (
+            <p style={{ ...body(12.5, C.muted), maxWidth: 680, margin: "0 auto 10px", textAlign: "center" }}>
+              Already on ElevenEleven?{" "}
+              <button
+                onClick={() => navigate(`/signin?next=${encodeURIComponent(`/d/${d.id}`)}`)}
+                style={{ ...body(12.5, C.ink), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
+              >
+                Sign in
+              </button>
+            </p>
+          )}
           <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", gap: 10 }}>
             {canWeighIn ? (
               <button onClick={openSheet} style={{ ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", flex: 1, background: C.burgundy, border: `1px solid ${C.burgundy}`, borderRadius: RADIUS, padding: "16px 0", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>

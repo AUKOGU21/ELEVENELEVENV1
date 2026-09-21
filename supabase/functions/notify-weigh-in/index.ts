@@ -28,7 +28,9 @@ async function sb(path: string): Promise<any> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { decision_id, responder_id } = await req.json().catch(() => ({}));
+    // guest_name arrives when someone without an account answered: she has no
+    // profile to look a name up from, so she sends hers.
+    const { decision_id, responder_id, guest_name } = await req.json().catch(() => ({}));
     if (!decision_id) return json({ error: "decision_id required" }, 400);
 
     const d = (await sb(`decisions?id=eq.${decision_id}&select=user_id,brand_name,product_name,lf_title`))?.[0];
@@ -46,7 +48,7 @@ Deno.serve(async (req) => {
         type: "weigh_in",
         user_id: ownerId,
         decision_id,
-        data: { actor_id: responder_id ?? null, item },
+        data: { actor_id: responder_id ?? null, actor_name: guest_name ?? null, item },
       }),
     });
     return json({ ok: true, forwarded: r.ok });

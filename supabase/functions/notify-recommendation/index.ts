@@ -28,7 +28,8 @@ async function sb(path: string): Promise<any> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { looking_for_id, recommender_id } = await req.json().catch(() => ({}));
+    // guest_name arrives when someone without an account sent the pick.
+    const { looking_for_id, recommender_id, guest_name } = await req.json().catch(() => ({}));
     if (!looking_for_id) return json({ error: "looking_for_id required" }, 400);
 
     const post = (await sb(`decisions?id=eq.${looking_for_id}&select=user_id,lf_title`))?.[0];
@@ -44,7 +45,7 @@ Deno.serve(async (req) => {
         type: "recommendation",
         user_id: ownerId,
         decision_id: looking_for_id,
-        data: { actor_id: recommender_id ?? null, item: post.lf_title || "your request" },
+        data: { actor_id: recommender_id ?? null, actor_name: guest_name ?? null, item: post.lf_title || "your request" },
       }),
     });
     return json({ ok: true, forwarded: r.ok });

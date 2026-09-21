@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { recordHomeScreenUse, syncPushSubscription } from '@/lib/push'
+import { track } from '@/lib/track'
 
 interface AuthContextType {
   user: User | null
@@ -66,6 +67,26 @@ async function syncLocalProfileToDb(userId: string) {
   localStorage.removeItem('eleven_profile')
   localStorage.removeItem('eleven_first_name')
   localStorage.removeItem('eleven_email')
+}
+
+// She answered someone's decision before she had an account. The id of that
+// guest is the only thing her browser kept, and this hands it in: the server
+// moves the response onto her new account and marks the guest claimed.
+//
+// Runs on every sign-in, and is harmless when there is nothing to claim.
+async function claimGuestContributions(userId: string) {
+  let guestId: string | null = null
+  try { guestId = localStorage.getItem('ee_guest_id') } catch { return }
+  if (!guestId) return
+
+  try {
+    const { data, error } = await supabase.functions.invoke('claim-guest', { body: { guest_id: guestId } })
+    if (error) return   // keep the id and try again next sign-in
+    const moved = ((data as { responses?: number; recommendations?: number } | null)?.responses ?? 0)
+      + ((data as { recommendations?: number } | null)?.recommendations ?? 0)
+    track('guest_signup_completed', { userId, guestId, meta: { claimed: moved } })
+    try { localStorage.removeItem('ee_guest_id') } catch { /* private mode */ }
+  } catch { /* a failed claim never blocks a sign-in */ }
 }
 
 // Sync any locally saved decisions to Supabase on auth
@@ -140,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           recordHomeScreenUse(id).catch(() => {})
           syncPushSubscription(id).catch(() => {})
           syncLocalProfileToDb(id).catch((e) => console.error('profile sync failed:', e))
+          claimGuestContributions(id).catch(() => { /* never blocks a sign-in */ })
           // Decisions are never synced from localStorage. They must be posted
           // while signed in so they always carry the right user_id.
           try { localStorage.removeItem('eleven_decisions') } catch { /* storage blocked */ }

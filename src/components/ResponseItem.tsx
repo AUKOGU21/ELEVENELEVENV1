@@ -23,10 +23,14 @@ export interface ResponseItemData {
   product_url: string | null;
   match_score: number | null;
   helpfulness_votes?: number;
-  user_id: string;
+  /** Null when a guest wrote it. Exactly one of these two is set. */
+  user_id: string | null;
   created_at: string;
   personal_experience?: string | null;
   profiles: { display_name: string | null; avatar_url?: string | null; badge_tier?: string | null } | null;
+  /** Someone who answered from a shared link without an account. */
+  guest_id?: string | null;
+  guests?: { first_name: string; last_initial: string | null } | null;
   replies?: ReplyData[];
 }
 
@@ -129,6 +133,13 @@ export default function ResponseItem({
 
   const facts = [experienceLabel(resp.personal_experience)].filter(Boolean) as string[];
 
+  // Who wrote it. A guest carries her own name rather than a profile, and stands
+  // behind it the same way: "Rachel M.", never anonymous.
+  const guest = resp.guests ?? null;
+  const authorName = guest
+    ? [guest.first_name, guest.last_initial ? `${guest.last_initial}.` : null].filter(Boolean).join(" ")
+    : resp.profiles?.display_name ?? null;
+
   return (
     <div
       ref={wrapRef}
@@ -144,11 +155,14 @@ export default function ResponseItem({
       }}
     >
       <div style={{ display: "flex", gap: isMobile ? 12 : 16 }}>
-        <Avatar url={resp.profiles?.avatar_url ?? null} name={resp.profiles?.display_name ?? null} tier={resp.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={resp.user_id} />
+        <Avatar url={guest ? null : resp.profiles?.avatar_url ?? null} name={authorName} tier={guest ? null : resp.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={resp.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
-              <PersonName userId={resp.user_id} name={resp.profiles?.display_name} />
+              {/* A guest has no profile to open, so her name is not a link. */}
+              <PersonName userId={resp.user_id} name={authorName} />
+              {/* Quiet: it explains the account, it does not rank the take. */}
+              {guest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
               {resp.match_score != null && <MatchSeal score={resp.match_score} size={isMobile ? 28 : 30} />}
               {facts.map((f) => <span key={f} style={meta(10, C.muted)}>{f}</span>)}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(resp.recommendation)}</span>

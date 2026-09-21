@@ -28,24 +28,12 @@ import RecommendationModal, { RecommendationDraft } from "@/components/Recommend
 import ReferralPopup from "@/components/ReferralPopup";
 import { ensureInviteCode, ensureReferral } from "@/lib/referral";
 import { toast } from "sonner";
+import { normalizeProductUrl } from "@/lib/url";
+import WeighInSheet, { CONTEXT_OPTIONS, type WeighInPayload } from "@/components/WeighInSheet";
 
 // ─── Product-link helpers ───────────────────────────────────────────────────
-// Normalize a user-pasted URL (add https:// if the scheme is missing) and
-// validate it's a real http(s) link. Returns null for anything unusable, so
-// callers can treat "no valid link" and "empty" the same way.
-function normalizeProductUrl(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    const u = new URL(withScheme);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    if (!u.hostname.includes(".")) return null;
-    return u.toString();
-  } catch {
-    return null;
-  }
-}
+// normalizeProductUrl moved to lib/url so the extracted weigh-in sheet can use
+// the same one.
 
 // Clean label for a product link chip — the bare domain, e.g. "skims.com".
 function prettyHost(url: string): string {
@@ -160,12 +148,8 @@ interface DecisionRow {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CONTEXT_OPTIONS = [
-  "I own this exact item",
-  "I've bought from this brand before",
-  "I haven't bought, but I'm familiar with the brand",
-  "No experience with this brand",
-];
+// CONTEXT_OPTIONS now lives with the weigh-in sheet, so both the feed and a
+// shared decision ask the question the same way.
 
 const CATEGORY_OPTIONS = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Shoes", "Accessories", "Bags"];
 
@@ -404,6 +388,10 @@ const Feed = () => {
   // ── Weigh-in flow
   const [weighingIn, setWeighingIn] = useState<string | null>(null);
   const [weighInStep, setWeighInStep] = useState<"context" | "vote" | "take" | "done">("context");
+  // The sheet keeps her draft while it is merely dismissed, so finishing or
+  // cancelling has to say so explicitly. Without this, reopening the same
+  // decision would hand her back the take she already sent.
+  const [weighInResetKey, setWeighInResetKey] = useState(0);
   const [showFitModal, setShowFitModal] = useState(false);
   const [fitModalVariant, setFitModalVariant] = useState<"weigh_in" | "post_decision">("weigh_in");
   const [context, setContext] = useState<string | null>(null);
@@ -456,7 +444,7 @@ const Feed = () => {
           price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, resolved_at, user_id, created_at,
           post_type, lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
           profiles ( display_name, avatar_url, badge_tier, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
-          responses ( id, recommendation, reasoning, photo_url, product_url, match_score, personal_experience, helpfulness_votes, user_id, created_at, profiles ( display_name, avatar_url, badge_tier ) ),
+          responses ( id, recommendation, reasoning, photo_url, product_url, match_score, personal_experience, helpfulness_votes, user_id, guest_id, created_at, profiles ( display_name, avatar_url, badge_tier ), guests ( first_name, last_initial ) ),
           decision_comments ( id, user_id, body, created_at, updated_at, profiles ( display_name, avatar_url, badge_tier ) )
         `)
         .eq("id", want)
@@ -672,8 +660,9 @@ const Feed = () => {
       profiles ( display_name, avatar_url, badge_tier, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
         id, recommendation, reasoning, photo_url, product_url, match_score, personal_experience,
-        helpfulness_votes, user_id, created_at,
-        profiles ( display_name, avatar_url, badge_tier )
+        helpfulness_votes, user_id, guest_id, created_at,
+        profiles ( display_name, avatar_url, badge_tier ),
+        guests ( first_name, last_initial )
       ),
       decision_comments (
         id, user_id, body, created_at, updated_at,
@@ -862,7 +851,8 @@ const Feed = () => {
 
   // Explicit Cancel discards the draft (confirm first if there's unsaved text).
   const cancelWeighIn = () => {
-    if (take.trim() && !confirm("Discard your draft?")) return;
+    // The sheet already asked before calling this, since it holds the draft.
+    setWeighInResetKey((k) => k + 1);
     weighInDraftIdRef.current = null;
     setWeighingIn(null);
     setWeighInStep("context");
@@ -1090,6 +1080,7 @@ const Feed = () => {
   const closeWeighIn = () => {
     const wasCompleted = weighInCompletedRef.current;
     weighInCompletedRef.current = false;
+    setWeighInResetKey((k) => k + 1);
     weighInDraftIdRef.current = null;
     setWeighingIn(null);
     setWeighInStep("context");
@@ -1108,8 +1099,10 @@ const Feed = () => {
     }
   };
 
-  const submitWeighIn = async () => {
-    if (!user || !weighingIn || !vote || !take.trim()) return;
+  // The draft now lives in the shared sheet, so it arrives as a payload rather
+  // than being read back out of this component's state.
+  const submitWeighIn = async (p: WeighInPayload) => {
+    if (!user || !weighingIn || !p.vote || !p.take.trim()) return;
     setSubmitting(true);
 
     const decision = decisions.find((d) => d.id === weighingIn);
@@ -1131,9 +1124,9 @@ const Feed = () => {
 
     // Upload response photo if attached
     let responsePhotoUrl: string | null = null;
-    if (takePhoto) {
-      let photoBody: Blob = takePhoto;
-      try { photoBody = await imageToJpeg(takePhoto); } catch (e) { console.warn("response photo convert failed, uploading raw:", e); }
+    if (p.photo) {
+      let photoBody: Blob = p.photo;
+      try { photoBody = await imageToJpeg(p.photo); } catch (e) { console.warn("response photo convert failed, uploading raw:", e); }
       const path = `response-photos/${user.id}/${Date.now()}.jpg`;
       const { data: upData } = await supabase.storage.from("product-images").upload(path, photoBody, { upsert: true, contentType: "image/jpeg" });
       if (upData) {
@@ -1142,18 +1135,16 @@ const Feed = () => {
       }
     }
 
-    const responseProductUrl = normalizeProductUrl(takeLink);
-
     await supabase.from("responses").insert({
       decision_id: weighingIn,
       user_id: user.id,
-      recommendation: vote,
-      reasoning: take.trim(),
-      personal_experience: context,
+      recommendation: p.vote,
+      reasoning: p.take,
+      personal_experience: p.context,
       match_score: matchScore,
       match_breakdown: matchBreakdown,
       ...(responsePhotoUrl ? { photo_url: responsePhotoUrl } : {}),
-      ...(responseProductUrl ? { product_url: responseProductUrl } : {}),
+      ...(p.link ? { product_url: p.link } : {}),
     });
 
     // Email the post owner that someone weighed in (fire-and-forget; the
@@ -1165,9 +1156,6 @@ const Feed = () => {
     await fetchDecisions();
     setHasWeighedIn(true); // dismiss the activation nudge — they've now acted
     setSubmitting(false);
-    setTakePhoto(null);
-    setTakePhotoPreview(null);
-    setTakeLink("");
     weighInCompletedRef.current = true;
     setWeighInStep("done");
   };
@@ -1836,190 +1824,31 @@ const Feed = () => {
 
       {/* ── Weigh-in sheet ────────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {weighingIn && (() => {
-          const stepN = weighInStep === "context" ? 1 : weighInStep === "vote" ? 2 : 3;
-          const heading = (t: string) => <h3 style={e11Display(isMobile ? 30 : 38)}>{t}</h3>;
-          const sub = (t: string) => <p style={{ ...e11Body(15, E11.inkSoft), marginTop: 8, marginBottom: 20 }}>{t}</p>;
-          const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", borderRadius: 2, border: `1px solid ${E11.rule}`, background: "#FFFFFF", fontFamily: E11_SANS, color: E11.ink, outline: "none" };
-          return (
-            <>
-              {/* Tapping outside hides the sheet and keeps the draft. */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[80]"
-                style={{ background: E11.scrim }}
-                onClick={dismissWeighIn}
-              />
-              <motion.div
-                initial={{ y: 360 }}
-                animate={{ y: 0 }}
-                exit={{ y: 360 }}
-                transition={{ type: "spring", damping: 28, stiffness: 260 }}
-                className="fixed bottom-0 left-0 right-0"
-                style={{
-                  zIndex: 81, margin: "0 auto", width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto", boxSizing: "border-box",
-                  background: E11.paper, borderRadius: "2px 2px 0 0", borderTop: `1px solid ${E11.rule}`,
-                  padding: isMobile ? "20px 18px 32px" : "28px 36px 40px",
-                }}
-                onClick={(e) => e.stopPropagation()}
+        <WeighInSheet
+          open={!!weighingIn}
+          isMobile={isMobile}
+          decisionId={weighingIn}
+          resetKey={weighInResetKey}
+          decision={[...decisions, ...myDecisions].find((d) => d.id === weighingIn) ?? null}
+          mode="member"
+          submitting={submitting}
+          submitted={weighInStep === "done"}
+          onCancel={cancelWeighIn}
+          onDismiss={dismissWeighIn}
+          onSubmit={submitWeighIn}
+          doneSlot={
+            <div style={{ padding: "6px 0 2px" }}>
+              <h3 style={e11Display(isMobile ? 40 : 52)}>You've weighed in.</h3>
+              <p style={{ ...e11Body(15, E11.inkSoft), marginTop: 12 }}>Your take has been added to the conversation.</p>
+              <button
+                onClick={closeWeighIn}
+                style={{ marginTop: 22, width: "100%", ...e11Meta(12, E11.ink), fontWeight: 700, letterSpacing: "0.16em", padding: "16px 0", borderRadius: 2, border: `1px solid ${E11.ink}`, background: "transparent", cursor: "pointer" }}
               >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <p style={{ ...e11Meta(11, E11.burgundy), fontWeight: 700 }}>Weigh in</p>
-                  {weighInStep !== "done" && (
-                    <button onClick={cancelWeighIn} style={{ ...e11Meta(11, E11.muted), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                      Cancel
-                    </button>
-                  )}
-                </div>
-                {weighInStep !== "done" && (
-                  <div style={{ display: "flex", gap: 4, marginBottom: 24 }} aria-hidden>
-                    {[1, 2, 3].map((i) => <span key={i} style={{ flex: 1, height: 2, background: i <= stepN ? E11.burgundy : E11.rule }} />)}
-                  </div>
-                )}
-
-                {/* What she's asking, pinned so you can answer it while you write */}
-                {(weighInStep === "vote" || weighInStep === "take") && (() => {
-                  const wd = [...decisions, ...myDecisions].find((d) => d.id === weighingIn);
-                  if (!wd) return null;
-                  const asks = (wd.uncertainty_text ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-                  if (!asks.length && !wd.brand_name && !wd.product_name) return null;
-                  return (
-                    <div style={{ paddingBottom: 18, marginBottom: 22, borderBottom: `1px solid ${E11.rule}` }}>
-                      <p style={{ ...e11Meta(10, E11.muted), marginBottom: 8 }}>They're deciding about</p>
-                      {(wd.brand_name || wd.product_name) && (
-                        <p style={{ ...e11Strong(13), textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                          {[wd.brand_name, wd.product_name].filter(Boolean).join(" · ")}
-                        </p>
-                      )}
-                      {asks.length > 0 && <p style={{ ...e11Meta(10.5, E11.ink), marginTop: 8, lineHeight: 1.7 }}>{asks.join("  /  ")}</p>}
-                    </div>
-                  );
-                })()}
-
-                {weighInStep === "context" && (
-                  <div>
-                    {heading("Your context")}
-                    {sub("What's your relationship with this item or brand?")}
-                    <div style={{ borderTop: `1px solid ${E11.rule}` }}>
-                      {CONTEXT_OPTIONS.map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => { setContext(opt); setWeighInStep("vote"); }}
-                          style={{ ...e11Body(15.5, E11.ink), width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${E11.rule}`, padding: "17px 2px", cursor: "pointer" }}
-                        >
-                          {opt}
-                          <ArrowRight style={{ width: 16, height: 16, flexShrink: 0, color: E11.muted }} strokeWidth={1.5} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {weighInStep === "vote" && (
-                  <div>
-                    {heading("Your verdict")}
-                    {sub("Would you buy this?")}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                      {(["buy", "do_not_buy", "need_more_info"] as const).map((v) => (
-                        <button
-                          key={v}
-                          onClick={() => { setVote(v); setWeighInStep("take"); }}
-                          style={{ ...e11Meta(12, vote === v ? "#FFFFFF" : E11.ink), fontWeight: 700, letterSpacing: "0.16em", padding: "18px 0", borderRadius: 2, cursor: "pointer", background: vote === v ? E11.ink : "transparent", border: `1px solid ${E11.ink}` }}
-                        >
-                          {v === "buy" ? "Yes" : v === "do_not_buy" ? "No" : "Depends"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {weighInStep === "take" && (
-                  <div>
-                    {heading("Your take")}
-                    {sub("be the friend who tells her the truth.")}
-                    <textarea
-                      value={take}
-                      onChange={(e) => setTake(e.target.value)}
-                      placeholder="no bs…"
-                      rows={4}
-                      style={{ ...field, padding: "13px 14px", fontSize: 15, lineHeight: 1.5, resize: "none" }}
-                    />
-                    <div style={{ position: "relative", marginTop: 10 }}>
-                      <ExternalLink style={{ width: 14, height: 14, color: E11.muted, position: "absolute", left: 13, top: 14, pointerEvents: "none" }} />
-                      <input
-                        value={takeLink}
-                        onChange={(e) => setTakeLink(e.target.value)}
-                        placeholder="Link a product (optional)"
-                        type="url"
-                        inputMode="url"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        style={{ ...field, padding: "11px 14px 11px 36px", fontSize: 14 }}
-                      />
-                      {takeLink.trim().length > 0 && !normalizeProductUrl(takeLink) && (
-                        <p style={{ ...e11Body(12.5, E11.burgundy), marginTop: 6 }}>That doesn't look like a valid link.</p>
-                      )}
-                    </div>
-
-                    <div style={{ marginTop: 14, marginBottom: 20 }}>
-                      <input ref={takePhotoInputRef} type="file" accept="image/*" style={{ display: "none" }}
-                        onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          setTakePhoto(file);
-                          const reader = new FileReader();
-                          reader.onload = () => setTakePhotoPreview(reader.result as string);
-                          reader.readAsDataURL(file);
-                          e.target.value = "";
-                        }} />
-                      {takePhotoPreview ? (
-                        <div style={{ position: "relative", display: "inline-block" }}>
-                          <img src={takePhotoPreview} alt="attachment" style={{ height: 96, width: 76, objectFit: "cover", borderRadius: 2, display: "block" }} />
-                          <button
-                            onClick={() => { setTakePhoto(null); setTakePhotoPreview(null); }}
-                            aria-label="Remove photo"
-                            style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 2, background: E11.ink, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                          >
-                            <X style={{ width: 11, height: 11, color: "#FFFFFF" }} />
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => takePhotoInputRef.current?.click()}
-                          style={{ ...e11Meta(11, E11.ink), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                          <Camera style={{ width: 14, height: 14 }} strokeWidth={1.75} /> Add a photo
-                        </button>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={submitWeighIn}
-                      disabled={take.trim().length === 0 || submitting}
-                      style={{ width: "100%", ...e11Meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", padding: "17px 0", borderRadius: 2, border: `1px solid ${E11.burgundy}`, background: E11.burgundy, cursor: take.trim() && !submitting ? "pointer" : "default", opacity: take.trim() && !submitting ? 1 : 0.4 }}
-                    >
-                      {submitting ? "Submitting..." : "Submit"}
-                    </button>
-                  </div>
-                )}
-
-                {weighInStep === "done" && (
-                  <div style={{ padding: "6px 0 2px" }}>
-                    <h3 style={e11Display(isMobile ? 40 : 52)}>You've weighed in.</h3>
-                    <p style={{ ...e11Body(15, E11.inkSoft), marginTop: 12 }}>Your take has been added to the conversation.</p>
-                    <button
-                      onClick={closeWeighIn}
-                      style={{ marginTop: 22, width: "100%", ...e11Meta(12, E11.ink), fontWeight: 700, letterSpacing: "0.16em", padding: "16px 0", borderRadius: 2, border: `1px solid ${E11.ink}`, background: "transparent", cursor: "pointer" }}
-                    >
-                      Done
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            </>
-          );
-        })()}
+                Done
+              </button>
+            </div>
+          }
+        />
       </AnimatePresence>
 
       <OutcomeModal

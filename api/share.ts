@@ -119,13 +119,31 @@ export default async function handler(req: { url?: string }, res: {
   const url = new URL(req.url ?? "/", SITE);
   const id = url.searchParams.get("id") ?? "";
 
-  // The app itself is the source of truth for markup: fetch the built shell
-  // rather than keeping a second copy of it in here that can drift.
-  const origin = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : SITE;
+  // The app itself is the source of truth for markup, so the shell is fetched
+  // rather than copied in here where it would drift.
+  //
+  // Not from VERCEL_URL, though it is tempting: that deployment hostname stays
+  // behind Deployment Protection even when the custom domain is public, so it
+  // answers with Vercel's own login page. Meta tags were being injected into
+  // that, and the app never booted. Whatever comes back is checked for the root
+  // element before it is served, and the canonical domain is the fallback.
+  const looksLikeApp = (h: string) => h.includes('id="root"');
+
+  const candidates = [
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    SITE,
+  ].filter(Boolean) as string[];
+
   let html = "";
-  try {
-    html = await (await fetch(`${origin}/index.html`)).text();
-  } catch {
+  for (const origin of candidates) {
+    try {
+      const got = await (await fetch(`${origin}/index.html`)).text();
+      if (looksLikeApp(got)) { html = got; break; }
+    } catch { /* try the next one */ }
+  }
+
+  if (!html) {
+    // Never serve a shell we can't vouch for: send her to the app instead.
     res.setHeader("Location", `${SITE}/feed`);
     res.status(302).send("");
     return;

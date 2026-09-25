@@ -7,18 +7,14 @@
 //
 // Secrets (set with `supabase secrets set ...`, never hard-coded):
 //   RESEND_API_KEY    - Resend API key (re_...)
-//   HERO_IMAGE_URL    - public https URL of the hero graphic
 //   WEBHOOK_SECRET    - shared secret; must match the webhook's Authorization header
-//   SITE_URL          - optional, defaults to https://geteleveneleven.com
 //   EMAIL_FROM        - optional, defaults to "ElevenEleven <hello@geteleveneleven.com>"
 //
 // Source of truth for the design is emails/welcome.html — keep TEMPLATE in sync.
 // -----------------------------------------------------------------------------
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const HERO_IMAGE_URL = Deno.env.get("HERO_IMAGE_URL") ?? "";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "";
-const SITE_URL = Deno.env.get("SITE_URL") ?? "https://geteleveneleven.com";
 const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
 const UNSUBSCRIBE_URL = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
 
@@ -34,96 +30,123 @@ function renderEmail(): string {
   <meta name="x-apple-disable-message-reformatting">
   <meta name="color-scheme" content="light only">
   <meta name="supported-color-schemes" content="light only">
-  <title>${SUBJECT}</title>
-  <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Spline+Sans+Mono:wght@500&display=swap" rel="stylesheet">
+  <title>welcome to the no-guess list</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <![endif]-->
   <style>
-    html,body{margin:0!important;padding:0!important;width:100%!important;background:#ffffff;}
+    /* ============================================================
+       Sent automatically by supabase/functions/send-welcome when an
+       account is confirmed. That function embeds a copy of this file:
+       keep the two in sync.
+       Type: Helvetica only. No webfonts, no monospace.
+       ============================================================ */
+    html,body{margin:0!important;padding:0!important;width:100%!important;background:#EFEFED;}
     *{-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%;}
     table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse!important;}
     img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline:none;text-decoration:none;display:block;}
     a{text-decoration:none;}
-    body,td,div,p,a{font-family:'Hanken Grotesk',Helvetica,Arial,sans-serif;}
-    .display{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;}
-    .mono{font-family:'Spline Sans Mono','Courier New',monospace;}
-    .btn:hover{background:#9A3F26!important;}
+    body,td,div,p,a,span{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;}
     @media only screen and (max-width:620px){
       .container{width:100%!important;}
-      .px{padding-left:24px!important;padding-right:24px!important;}
-      .h1{font-size:30px!important;line-height:1.12!important;}
+      .px{padding-left:22px!important;padding-right:22px!important;}
+      .mark{font-size:24px!important;letter-spacing:5px!important;}
+      .h2{font-size:19px!important;letter-spacing:1.5px!important;}
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background:#ffffff;">
+<body style="margin:0;padding:0;background:#EFEFED;">
+  <!-- Preheader -->
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;opacity:0;color:transparent;height:0;width:0;">
-    welcome to the no-guess list. you're one of the first here.
+    you're one of the first here.
   </div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EFEFED;">
     <tr>
-      <td align="center" style="padding:40px 16px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="width:600px;max-width:600px;background:#ffffff;">
+      <td align="center" style="padding:34px 14px;">
+
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="width:600px;max-width:600px;background:#FFFFFF;">
+
+          <!-- ===== WORDMARK ===== -->
           <tr>
-            <td align="center" class="px" style="padding:8px 48px 36px;">
-              <span class="mono" style="font-size:13px;letter-spacing:6px;color:#100E0C;text-transform:uppercase;">ELEVENELEVEN</span>
+            <td align="center" class="px" style="padding:46px 40px 6px;">
+              <span class="mark" style="font-size:28px;line-height:1;font-weight:700;letter-spacing:7px;color:#0A0A0A;text-transform:uppercase;">ELEVENELEVEN</span>
             </td>
           </tr>
           <tr>
-            <td align="center" class="px h1 display" style="padding:8px 48px 8px;font-size:38px;line-height:1.08;font-weight:700;letter-spacing:-1px;color:#100E0C;">
-              welcome to the<br>no&#8209;guess&nbsp;list
+            <td style="font-size:0;line-height:0;height:22px;">&nbsp;</td>
+          </tr>
+
+          <!-- ===== CAPTION ===== -->
+          <tr>
+            <td align="center" class="px" style="padding:0 58px 28px;font-size:10px;line-height:1.9;font-weight:500;letter-spacing:1.4px;color:#0A0A0A;text-transform:uppercase;">
+              You're one of the first here
             </td>
           </tr>
+
+          <!-- ===== HERO ===== -->
           <tr>
-            <td align="center" style="padding:30px 0 30px;">
-              <a href="${SITE_URL}" target="_blank" style="text-decoration:none;">
-                <img src="${HERO_IMAGE_URL}" width="600" alt="ElevenEleven — Stop guessing. Start shopping with confidence." style="width:100%;max-width:600px;height:auto;display:block;background:#e9e6e0;">
+            <td align="center" class="px" style="padding:0 40px;">
+              <a href="https://geteleveneleven.com" target="_blank">
+                <img src="https://geteleveneleven.com/email/legs-faded.jpg"
+                     width="440" alt="ElevenEleven"
+                     style="width:100%;max-width:440px;height:auto;display:block;background:#FFFFFF;">
               </a>
             </td>
           </tr>
-          <!-- (shop CTA removed — email focuses on the one founding-circle action) -->
+
+          <!-- ===== WELCOME ===== -->
           <tr>
-            <td align="center" class="px display" style="padding:34px 48px 6px;font-size:21px;line-height:1.2;font-weight:700;letter-spacing:-0.4px;color:#100E0C;">
-              you're one of the first.
+            <td align="center" class="px h2" style="padding:52px 48px 0;font-size:22px;line-height:1.25;font-weight:700;letter-spacing:2px;color:#0A0A0A;text-transform:uppercase;">
+              Welcome to the no&#8209;guess list
             </td>
           </tr>
           <tr>
-            <td align="center" class="px" style="padding:0 56px 22px;font-size:15px;line-height:1.6;color:#6F665A;">
-              a small circle of women is shaping ElevenEleven from the inside. they trade honest takes, call out what's broken, and help decide what we build next.
+            <td align="center" class="px" style="padding:24px 62px 0;font-size:12px;line-height:2;font-weight:500;letter-spacing:1.2px;color:#0A0A0A;text-transform:uppercase;">
+              Where you never have to decide alone again.
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding:0 48px 4px;">
-              <!--[if mso]>
-              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://chat.whatsapp.com/FJfXeZQ5LOPFLNkrFe5hsf" style="height:48px;v-text-anchor:middle;width:300px;" arcsize="0%" stroke="f" fillcolor="#CB5A3C">
-                <w:anchorlock/>
-                <center style="color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:2px;">JOIN THE FOUNDING CIRCLE</center>
-              </v:roundrect>
-              <![endif]-->
-              <!--[if !mso]><!-- -->
-              <a class="btn mono" href="https://chat.whatsapp.com/FJfXeZQ5LOPFLNkrFe5hsf" target="_blank"
-                 style="display:inline-block;background:#CB5A3C;color:#ffffff;font-size:13px;letter-spacing:2px;text-transform:uppercase;padding:15px 32px;border-radius:0;">
-                Join the founding circle&nbsp;&rarr;
-              </a>
-              <!--<![endif]-->
+            <td align="center" style="padding:36px 40px 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+                <tr>
+                  <td align="center" bgcolor="#FFFFFF" style="border:2px solid #0A0A0A;">
+                    <a href="https://chat.whatsapp.com/FJfXeZQ5LOPFLNkrFe5hsf" target="_blank"
+                       style="display:block;padding:20px 44px;font-size:15px;font-weight:700;letter-spacing:3px;color:#0A0A0A;text-transform:uppercase;text-decoration:none;">
+                      Join the founding circle&nbsp;&nbsp;&rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <tr>
-            <td class="px" style="padding:42px 48px 0;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-                <td style="border-top:1px solid #ECE7DD;font-size:0;line-height:0;">&nbsp;</td>
-              </tr></table>
+            <td align="center" class="px" style="padding:22px 48px 54px;font-size:11px;line-height:1.8;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">
+              <a href="https://geteleveneleven.com/feed" target="_blank" style="color:#0A0A0A;text-decoration:underline;">Or go straight to the feed</a>
             </td>
+          </tr>
+
+          <!-- ===== SIGN OFF ===== -->
+          <tr>
+            <td style="border-top:1px solid #E4E4E1;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
           <tr>
-            <td align="center" class="px mono" style="padding:22px 48px 8px;font-size:10px;letter-spacing:2px;color:#9c9488;text-transform:uppercase;line-height:1.8;">
-              The Trust Layer For Online Decision Making
+            <td align="center" class="px" style="padding:44px 48px 46px;font-size:15px;line-height:1.6;color:#0A0A0A;">
+              see you in the no-guess room ;)
             </td>
+          </tr>
+
+          <!-- ===== FOOTER ===== -->
+          <tr>
+            <td style="border-top:1px solid #E4E4E1;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
           <tr>
-            <td align="center" class="px" style="padding:0 48px 36px;font-size:11px;line-height:1.7;color:#b3ab9e;">
-              you're receiving this because you signed up for ElevenEleven.<br>
-              questions? <a href="mailto:hello@geteleveneleven.com" style="color:#b3ab9e;text-decoration:underline;">hello@geteleveneleven.com</a>
+            <td align="center" class="px" style="padding:26px 48px 40px;font-size:10px;line-height:2;letter-spacing:0.8px;color:#8E8E88;text-transform:uppercase;">
+              You're receiving this because you signed up for ElevenEleven<br>
+              <a href="mailto:hello@geteleveneleven.com" style="color:#8E8E88;text-decoration:underline;">hello@geteleveneleven.com</a>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>

@@ -1,3 +1,4 @@
+import sys
 from PIL import Image
 
 W, H = 440, 510          # email hero box
@@ -22,7 +23,8 @@ def fit(path):
     canvas.paste(im, ((W - im.width) // 2, (H - im.height) // 2))
     return canvas
 
-slides = [fit(p) for p in ("a.jpg", "b.png", "c.png")]
+# Usage: python3 build_email_carousel.py first.jpg second.jpg third.jpg
+slides = [fit(p) for p in (sys.argv[1:] or ("a.jpg", "b.png", "c.png"))]
 
 def ease(t):
     # ease-in-out cubic, so the swipe starts and lands softly
@@ -43,7 +45,7 @@ for i, cur in enumerate(slides):
 
 # One shared adaptive palette keeps the file small and stops colours shifting
 # between frames.
-palette_src = Image.new("RGB", (W * 3, H), BG)
+palette_src = Image.new("RGB", (W * len(slides), H), BG)
 for i, s in enumerate(slides):
     palette_src.paste(s, (i * W, 0))
 pal = palette_src.quantize(colors=96, method=Image.MEDIANCUT)

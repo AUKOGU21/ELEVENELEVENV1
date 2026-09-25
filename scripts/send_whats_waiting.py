@@ -16,11 +16,15 @@ Usage:
   test:  WW_TEST_TO=alexiskukogu@gmail.com SUPABASE_ACCESS_TOKEN=sbp_x RESEND_API_KEY=re_x python3 scripts/send_whats_waiting.py
   dry:   WW_DRY_RUN=1 SUPABASE_ACCESS_TOKEN=sbp_x python3 scripts/send_whats_waiting.py
   send:  SUPABASE_ACCESS_TOKEN=sbp_x RESEND_API_KEY=re_x python3 scripts/send_whats_waiting.py
+
+A new round with fresh decisions gets its own template and campaign, so the
+dedup is per round:
+  WW_TEMPLATE=whats-waiting-sep23.html WW_CAMPAIGN=whats_waiting_2026_09_23
 """
 import os, sys, json, time, subprocess
 
 REF = "bmiquikoxxukfujnpizp"
-CAMPAIGN = "whats_waiting_2026_09"
+CAMPAIGN = os.environ.get("WW_CAMPAIGN", "whats_waiting_2026_09")
 SB = os.environ.get("SUPABASE_ACCESS_TOKEN")
 KEY = os.environ.get("RESEND_API_KEY")
 DRY = os.environ.get("WW_DRY_RUN") == "1"
@@ -32,9 +36,10 @@ SITE = "https://geteleveneleven.com"
 EXCLUDE = {"jean.pinatel@essec.edu", "sergeysbelov1@gmail.com", "ahkalex88@gmail.com",
            "jud.asiruwa@hotmail.com",
            "styagi@mba2026.hbs"}
-TEMPLATE = os.path.join(os.path.dirname(__file__), "..", "emails", "whats-waiting.html")
+TEMPLATE = os.path.join(os.path.dirname(__file__), "..", "emails",
+                        os.environ.get("WW_TEMPLATE", "whats-waiting.html"))
 
-if not SB:
+if not SB and not TEST_TO:
     sys.exit("✗ Set SUPABASE_ACCESS_TOKEN. Both old tokens are dead as of 2026-09-09; "
              "generate a fresh one at supabase.com/dashboard/account/tokens")
 if not KEY and not DRY:

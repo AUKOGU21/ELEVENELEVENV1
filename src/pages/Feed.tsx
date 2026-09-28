@@ -359,7 +359,7 @@ function useIsMobile() {
 const Feed = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
   // Follow-up banner: jump to Mine and scroll straight to that card.
   const [scrollTargetId, setScrollTargetId] = useState<string | null>(null);
@@ -435,13 +435,32 @@ const Feed = () => {
   const closeDecision = () => { setOpenDecisionId(null); setFocusResponseId(null); };
   // Handed a decision by another page (a tile on a profile): open it here. If it's
   // older than the newest 50 the feed loads, fetch it on its own first.
+  // Also handed one by a link: /feed?open=<id>&close=bought|passed|deciding|found,
+  // which is what the check-in emails and pushes send. The close answer only
+  // acts for the post's owner while it's still open; anyone else just sees it.
   const openFromStateRef = useRef<string | null>(null);
+  const applyCloseAnswer = (id: string, ownerId: string | undefined, status: string | null | undefined, close: string | null) => {
+    if (!close || !user || ownerId !== user.id || (status && status !== "open")) return;
+    track("checkin_answer", { decisionId: id, userId: user.id, meta: { answer: close } });
+    if (close === "bought") { setOutcomeInitial("bought_it"); setOutcomeChosen(null); setTrackingId(id); }
+    else if (close === "passed") { setOutcomeInitial("didnt_buy"); setOutcomeChosen(null); setTrackingId(id); }
+    else if (close === "deciding") { quickStillDeciding(id); toast("Got it. We'll check back in a bit."); }
+  };
   useEffect(() => {
-    const want = (location.state as any)?.openDecisionId as string | undefined;
+    const params = new URLSearchParams(location.search);
+    const linked = params.get("open");
+    const want = ((location.state as any)?.openDecisionId as string | undefined) ?? linked ?? undefined;
     if (!want || loading || openFromStateRef.current === want) return;
+    const close = linked ? params.get("close") : null;
+    // Answering needs her account; send her to sign in and straight back here.
+    if (close && close !== "found") {
+      if (authLoading) return;
+      if (!user) { navigate(`/signin?next=${encodeURIComponent(`/feed?open=${want}&close=${close}`)}`, { replace: true }); return; }
+    }
     openFromStateRef.current = want;
-    window.history.replaceState({}, "");
-    if ([...decisions, ...myDecisions].some((x) => x.id === want)) { openDecision(want); return; }
+    window.history.replaceState({}, "", linked ? "/feed" : undefined);
+    const known = [...decisions, ...myDecisions].find((x) => x.id === want);
+    if (known) { openDecision(want); applyCloseAnswer(want, known.user_id, known.status, close); return; }
     (async () => {
       const { data: row } = await supabase
         .from("decisions")
@@ -461,8 +480,9 @@ const Feed = () => {
       const full = { ...(row as any), outcomes: outs ?? [], recommendations: (row as any).recommendations ?? [] } as DecisionRow;
       setDecisions((prev) => (prev.some((x) => x.id === want) ? prev : [...prev, full]));
       openDecision(want);
+      applyCloseAnswer(want, full.user_id, full.status, close);
     })();
-  }, [location.state, loading]);
+  }, [location.state, location.search, loading, authLoading, user]);
   // Looking For: which post's recommendations drawer is open, and the recommend modal.
   const [recModalFor, setRecModalFor] = useState<string | null>(null);
   const [submittingRec, setSubmittingRec] = useState(false);

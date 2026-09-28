@@ -1,0 +1,319 @@
+// Supabase Edge Function: check-in
+// -----------------------------------------------------------------------------
+// Keeps asking, kindly, until she closes the loop. Replaces outcome-reminder,
+// which emailed once at five days and never again.
+//
+// Daily (pg_cron). For every open post that has advice (a weigh-in, or a rec on
+// a Looking For), counted from when the first advice arrived:
+//   step 1 at  3 days  "Ayan and Kimia weighed in on your Salomons"
+//   step 2 at 10 days  "Still thinking about your Salomons?"
+//   step 3 at 21 days  "Ayan and Kimia want to know how it went"
+//   step 4 at 30 days  "Still deciding?"  (the last ask, then silence)
+// A post that is already past several steps gets only the latest one, so the
+// backlog doesn't arrive as a burst. One check-in per person per day, the post
+// with the most advice first. Push when she has a working device, email when not.
+// Every ask names the women who helped and carries one-tap answers:
+//   /feed?open=<id>&close=bought|passed|deciding|found
+//
+// Test: POST { "test_decision_id": "<uuid>", "step": 1-4, "channels": ["push","email"] }
+// sends that step to the post's owner now and records nothing.
+// Dry run: POST { "dry_run": true } lists what today's run would send.
+//
+// Secrets: RESEND_API_KEY, REMINDER_SECRET (the cron's bearer), PUSH_HOOK_SECRET,
+// SITE_URL (optional), EMAIL_FROM (optional). SUPABASE_URL and
+// SUPABASE_SERVICE_ROLE_KEY are injected. The email template lives in this file.
+// -----------------------------------------------------------------------------
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
+const SECRET = Deno.env.get("REMINDER_SECRET") ?? "";
+const PUSH_SECRET = Deno.env.get("PUSH_HOOK_SECRET") ?? "";
+const SITE = Deno.env.get("SITE_URL") ?? "https://geteleveneleven.com";
+const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
+const UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
+
+const STEP_DAYS = [3, 10, 21, 30];
+const MIN_GAP_DAYS = 4; // never two check-ins on one post closer than this
+const DAY = 86_400_000;
+
+type Candidate = {
+  decision_id: string; owner_id: string; owner_email: string; owner_first: string | null;
+  post_type: string | null; product_name: string | null; brand_name: string | null;
+  lf_title: string | null; product_image_url: string | null;
+  first_advice_at: string; advice_count: number; helper_names: string[];
+  last_step: number | null; last_sent_at: string | null; has_push: boolean;
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function esc(s: string): string {
+  return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+async function rest(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+}
+
+// ── Words ────────────────────────────────────────────────────────────────────
+
+function titleCase(s: string): string {
+  return s.toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+}
+
+function cleanBrand(b: string): string {
+  const spaced = b.replace(/[-_]+/g, " ").trim();
+  return spaced === spaced.toLowerCase() || spaced === spaced.toUpperCase() ? titleCase(spaced) : spaced;
+}
+
+function clip(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max).replace(/\s+\S*$/, "");
+  return cut.replace(/\s+(in|and|&|from|with|for|of|the|-)$/i, "");
+}
+
+// "JENDI TORTOISE CROCODILE" + "STEVEMADDEN" -> "Stevemadden Jendi Tortoise Crocodile"
+// "Asics Gel-1130 in Black & Cream from Revolve.com" -> "Asics Gel-1130 in Black & Cream"
+function itemName(c: Candidate): string {
+  if (c.post_type === "looking_for") return `“${clip((c.lf_title ?? "").replace(/[.\s]+$/, ""), 40)}”`;
+  let name = (c.product_name ?? "").replace(/\([^)]*\)/g, "").replace(/\s+from\s+\S+$/i, "").replace(/\s*-{2,}\s*/g, " ").trim();
+  if (name && name === name.toUpperCase()) name = titleCase(name);
+  const brand = c.brand_name ? cleanBrand(c.brand_name) : "";
+  if (brand && name.split(/\s+/).length <= 3 && !name.toLowerCase().startsWith(brand.toLowerCase().split(" ")[0])) {
+    name = `${brand} ${name.replace(/^the\s+/i, "")}`;
+  }
+  return clip(name || brand || "post", 36);
+}
+
+function whoList(names: string[]): { text: string; plural: boolean } {
+  const n = names.filter(Boolean);
+  if (n.length === 0) return { text: "The women who weighed in", plural: true };
+  if (n.length === 1) return { text: n[0], plural: false };
+  if (n.length === 2) return { text: `${n[0]} and ${n[1]}`, plural: true };
+  if (n.length === 3) return { text: `${n[0]}, ${n[1]} and ${n[2]}`, plural: true };
+  return { text: `${n[0]}, ${n[1]} and ${n.length - 2} others`, plural: true };
+}
+
+type Copy = { title: string; body: string; headline: string; lines: string[] };
+
+function copyFor(c: Candidate, step: number): Copy {
+  const lf = c.post_type === "looking_for";
+  const item = itemName(c);
+  const who = whoList(c.helper_names);
+  const did = lf ? `sent you picks for ${item}` : `weighed in on your ${item}`;
+  const said = `${who.text} ${did}.`;
+  switch (step) {
+    case 1:
+      return {
+        title: `${who.text} ${did}`,
+        body: lf ? "Find anything you love? One tap tells them." : "So, did you get it? One tap tells them what you did.",
+        headline: lf ? "Did you find it?" : "So, did you buy it?",
+        lines: [said, "Tell them what you did."],
+      };
+    case 2:
+      return {
+        title: lf ? `Still looking for ${item}?` : `Still thinking about your ${item}?`,
+        body: `${said} Let them know where you landed.`,
+        headline: lf ? "Still looking?" : "Still thinking it over?",
+        lines: [said, "Let them know where you landed."],
+      };
+    case 3:
+      return {
+        title: `${who.text} ${who.plural ? "want" : "wants"} to know how it went`,
+        body: lf ? "Found it, or still looking? One tap." : "Bought it, passed, or still deciding? One tap.",
+        headline: "They want to know how it went",
+        lines: [said, "One tap tells them."],
+      };
+    default:
+      return {
+        title: lf ? `Still looking for ${item}?` : `Still deciding on your ${item}?`,
+        body: "It's been a month. Close it out, or say you're still deciding and we'll stop asking.",
+        headline: lf ? "Still looking?" : "Still deciding?",
+        lines: [said, "It's been a month. Close it out, or say you're still deciding and we'll stop asking."],
+      };
+  }
+}
+
+function link(c: Candidate, close?: string): string {
+  return `${SITE}/feed?open=${c.decision_id}${close ? `&close=${close}` : ""}`;
+}
+
+// ── Email ────────────────────────────────────────────────────────────────────────────────────────────
+
+function button(label: string, href: string): string {
+  return `<tr><td align="center" style="padding:0 0 12px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:320px;">
+              <tr><td align="center" bgcolor="#FFFFFF" style="border:2px solid #0A0A0A;">
+                <a href="${href}" target="_blank" style="display:block;padding:17px 0;font-size:14px;font-weight:700;letter-spacing:3px;color:#0A0A0A;text-transform:uppercase;text-decoration:none;">${label}</a>
+              </td></tr>
+            </table>
+          </td></tr>`;
+}
+
+function renderEmail(c: Candidate, copy: Copy): string {
+  const lf = c.post_type === "looking_for";
+  const buttons = lf
+    ? button("Found it", link(c, "found")) + button("Still looking", link(c, "deciding"))
+    : button("Bought it", link(c, "bought")) + button("Passed", link(c, "passed")) + button("Still deciding", link(c, "deciding"));
+  const image = c.product_image_url
+    ? `<tr><td align="center" class="px" style="padding:0 40px 40px;">
+              <a href="${link(c)}" target="_blank"><img src="${esc(c.product_image_url)}" width="300" alt="${esc(itemName(c))}" style="width:100%;max-width:300px;height:auto;display:block;background:#F4F4F2;"></a>
+            </td></tr>`
+    : "";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>${esc(copy.title)}</title>
+  <style>
+    html,body{margin:0!important;padding:0!important;width:100%!important;background:#EFEFED;}
+    table,td{border-collapse:collapse!important;}
+    img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none;display:block;}
+    a{text-decoration:none;}
+    body,td,div,p,a,span{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;}
+    @media only screen and (max-width:620px){
+      .container{width:100%!important;}
+      .px{padding-left:22px!important;padding-right:22px!important;}
+      .mark{font-size:24px!important;letter-spacing:5px!important;}
+      .h2{font-size:19px!important;letter-spacing:1.5px!important;}
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#EFEFED;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;height:0;width:0;">${esc(copy.body)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EFEFED;">
+    <tr><td align="center" style="padding:34px 14px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="width:600px;max-width:600px;background:#FFFFFF;">
+        <tr><td align="center" class="px" style="padding:46px 40px 34px;">
+          <span class="mark" style="font-size:28px;line-height:1;font-weight:700;letter-spacing:7px;color:#0A0A0A;text-transform:uppercase;">ELEVENELEVEN</span>
+        </td></tr>
+        ${image}
+        <tr><td align="center" class="px h2" style="padding:0 48px;font-size:22px;line-height:1.25;font-weight:700;letter-spacing:2px;color:#0A0A0A;text-transform:uppercase;">
+          ${esc(copy.headline)}
+        </td></tr>
+        <tr><td align="center" class="px" style="padding:22px 56px 34px;font-size:12px;line-height:2;font-weight:500;letter-spacing:1.2px;color:#0A0A0A;text-transform:uppercase;">
+          ${copy.lines.map(esc).join("<br>")}
+        </td></tr>
+        <tr><td class="px" style="padding:0 48px 42px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${buttons}</table>
+        </td></tr>
+        <tr><td style="border-top:1px solid #E4E4E1;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td align="center" class="px" style="padding:26px 48px 40px;font-size:10px;line-height:2;letter-spacing:0.8px;color:#8E8E88;text-transform:uppercase;">
+          You're receiving this because you posted on ElevenEleven<br>
+          <a href="mailto:hello@geteleveneleven.com" style="color:#8E8E88;text-decoration:underline;">hello@geteleveneleven.com</a>
+          &nbsp;&middot;&nbsp;
+          <a href="${UNSUB}" style="color:#8E8E88;text-decoration:underline;">Unsubscribe</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ── Sending ──────────────────────────────────────────────────────────────────
+
+async function sendPush(c: Candidate, copy: Copy): Promise<boolean> {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json", "x-push-secret": PUSH_SECRET },
+    body: JSON.stringify({ user_id: c.owner_id, title: copy.title, body: copy.body, url: link(c), notification_id: `checkin-${c.decision_id}` }),
+  });
+  const d = await r.json().catch(() => ({}));
+  return r.ok && (d?.sent ?? 0) > 0;
+}
+
+async function sendEmail(c: Candidate, copy: Copy): Promise<boolean> {
+  if (!RESEND_API_KEY || !c.owner_email) return false;
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: EMAIL_FROM, to: [c.owner_email], subject: copy.title, html: renderEmail(c, copy),
+      headers: { "List-Unsubscribe": `<${UNSUB}>` },
+    }),
+  });
+  if (!r.ok) console.error("check-in email failed:", c.decision_id, r.status, await r.text());
+  return r.ok;
+}
+
+// The latest step she's due, or null. Skips steps already past so an old post
+// gets one check-in, not a burst.
+function dueStep(c: Candidate, now: number): number | null {
+  const age = now - new Date(c.first_advice_at).getTime();
+  let due = 0;
+  STEP_DAYS.forEach((d, i) => { if (age >= d * DAY) due = i + 1; });
+  if (due === 0 || due <= (c.last_step ?? 0)) return null;
+  if (c.last_sent_at && now - new Date(c.last_sent_at).getTime() < MIN_GAP_DAYS * DAY) return null;
+  return due;
+}
+
+Deno.serve(async (req) => {
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+  const auth = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!SECRET || auth !== SECRET) return json({ error: "unauthorized" }, 401);
+
+  const payload = await req.json().catch(() => ({}));
+  const r = await rest("rpc/checkin_candidates", { method: "POST", body: "{}" });
+  if (!r.ok) return json({ error: "candidates failed", detail: await r.text() }, 500);
+  const all: Candidate[] = await r.json();
+
+  // Test: one post, a chosen step, straight to its owner, nothing recorded.
+  if (payload.test_decision_id) {
+    const c = all.find((x) => x.decision_id === payload.test_decision_id);
+    if (!c) return json({ error: "not an open post with advice" }, 404);
+    const step = Math.min(4, Math.max(1, Number(payload.step ?? 1)));
+    const copy = copyFor(c, step);
+    const channels: string[] = payload.channels ?? ["push", "email"];
+    const result: Record<string, boolean> = {};
+    if (channels.includes("push")) result.push = await sendPush(c, copy);
+    if (channels.includes("email")) result.email = await sendEmail(c, copy);
+    return json({ test: true, step, to: c.owner_email, copy, result });
+  }
+
+  const now = Date.now();
+  const due = all
+    .map((c) => ({ c, step: dueStep(c, now) }))
+    .filter((x): x is { c: Candidate; step: number } => x.step !== null)
+    .sort((a, b) => b.c.advice_count - a.c.advice_count);
+
+  // One per person per day; the rest wait for tomorrow.
+  const seen = new Set<string>();
+  const today = due.filter(({ c }) => (seen.has(c.owner_id) ? false : (seen.add(c.owner_id), true)));
+
+  if (payload.dry_run) {
+    return json({
+      dry_run: true,
+      sends: today.map(({ c, step }) => ({ to: c.owner_first, step, channel: c.has_push ? "push" : "email", title: copyFor(c, step).title })),
+      waiting: due.length - today.length,
+    });
+  }
+
+  const sent: unknown[] = [];
+  for (const { c, step } of today) {
+    const copy = copyFor(c, step);
+    let channel: "push" | "email" | null = null;
+    if (c.has_push && (await sendPush(c, copy))) channel = "push";
+    else if (await sendEmail(c, copy)) channel = "email";
+    if (!channel) continue;
+    // Record the step, and any skipped ones, so the cadence moves forward.
+    const rows = Array.from({ length: step - (c.last_step ?? 0) }, (_, i) => ({
+      decision_id: c.decision_id, step: (c.last_step ?? 0) + i + 1, channel,
+    }));
+    await rest("decision_checkins", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates" }, body: JSON.stringify(rows) });
+    sent.push({ decision_id: c.decision_id, step, channel });
+  }
+  return json({ sent: sent.length, details: sent, waiting: due.length - today.length });
+});

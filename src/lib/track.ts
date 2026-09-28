@@ -21,7 +21,9 @@ export type EventKind =
   | "guest_weigh_in_started"   // a logged-out visitor opened the weigh-in sheet
   | "guest_response_submitted" // a guest response was accepted
   | "guest_signup_started"     // a guest tapped Create my profile
-  | "guest_signup_completed";  // that guest became a member
+  | "guest_signup_completed"   // that guest became a member
+  // A one-tap answer from a check-in email or push (bought / passed / deciding).
+  | "checkin_answer";
 
 export function track(
   kind: EventKind,

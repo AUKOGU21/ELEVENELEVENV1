@@ -19,11 +19,27 @@ Usage:
 
 A new round with fresh decisions gets its own template and campaign, so the
 dedup is per round:
-  WW_TEMPLATE=whats-waiting-sep23.html WW_CAMPAIGN=whats_waiting_2026_09_23
+  WW_TEMPLATE=whats-waiting-sep28.html WW_CAMPAIGN=whats_waiting_2026_09_28
 """
 import os, sys, json, time, subprocess
 
 REF = "bmiquikoxxukfujnpizp"
+
+
+def load_env_local():
+    """Fill in keys from .env.local so they never have to be pasted into a command."""
+    path = os.path.join(os.path.dirname(__file__), "..", ".env.local")
+    if not os.path.exists(path):
+        return
+    for line in open(path):
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+load_env_local()
 CAMPAIGN = os.environ.get("WW_CAMPAIGN", "whats_waiting_2026_09")
 SB = os.environ.get("SUPABASE_ACCESS_TOKEN")
 KEY = os.environ.get("RESEND_API_KEY")

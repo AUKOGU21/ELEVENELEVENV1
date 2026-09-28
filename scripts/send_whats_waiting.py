@@ -20,6 +20,9 @@ Usage:
 A new round with fresh decisions gets its own template and campaign, so the
 dedup is per round:
   WW_TEMPLATE=whats-waiting-sep28.html WW_CAMPAIGN=whats_waiting_2026_09_28
+
+The waitlist (joined, never made an account) is WW_AUDIENCE=waitlist:
+  WW_AUDIENCE=waitlist WW_TEMPLATE=join-open-now.html WW_CAMPAIGN=join_open_now_2026_09_28
 """
 import os, sys, json, time, subprocess
 
@@ -49,9 +52,9 @@ TEST_SETUP = os.environ.get("WW_TEST_SETUP") == "1"
 SUBJECT = os.environ.get("WW_SUBJECT", "you're missing the good part")
 UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe"
 SITE = "https://geteleveneleven.com"
-EXCLUDE = {"jean.pinatel@essec.edu", "sergeysbelov1@gmail.com", "ahkalex88@gmail.com",
-           "jud.asiruwa@hotmail.com",
-           "styagi@mba2026.hbs"}
+# Who never gets these emails (the men, duplicate or dead addresses) lives in
+# admin.email_exclude, with a reason per row. Add people there, not here.
+AUDIENCE = os.environ.get("WW_AUDIENCE", "members")   # members | waitlist
 TEMPLATE = os.path.join(os.path.dirname(__file__), "..", "emails",
                         os.environ.get("WW_TEMPLATE", "whats-waiting.html"))
 
@@ -105,23 +108,46 @@ if TEST_TO:
     print((f"✓ {which} test sent to {TEST_TO} ({mid})") if mid else ("✗ " + raw))
     sys.exit(0)
 
-rows = query(f"""
-  select u.email, coalesce(split_part(p.display_name, ' ', 1), '') as first,
-         coalesce(p.onboarding_completed, false) as onboarded
-  from auth.users u
-  join public.profiles p on p.id = u.id
-  where u.email is not null
-    and not exists (select 1 from admin.email_sends e
-                    where e.user_id = u.id and e.campaign = '{CAMPAIGN}')
-  order by u.created_at
-""")
+if AUDIENCE == "waitlist":
+    # admin.waitlist_not_signed_up already drops account holders and the
+    # exclude list; sends are recorded by email since they have no user_id.
+    rows = query(f"""
+      select w.email, coalesce(w.first_name, '') as first, true as onboarded
+      from admin.waitlist_not_signed_up w
+      where not exists (select 1 from admin.waitlist_email_sends e
+                        where e.email = lower(w.email) and e.campaign = '{CAMPAIGN}')
+      order by w.created_at
+    """)
+else:
+    rows = query(f"""
+      select u.email, coalesce(split_part(p.display_name, ' ', 1), '') as first,
+             coalesce(p.onboarding_completed, false) as onboarded
+      from auth.users u
+      join public.profiles p on p.id = u.id
+      where u.email is not null
+        and not exists (select 1 from admin.email_exclude x where x.email = lower(u.email))
+        and not exists (select 1 from admin.email_sends e
+                        where e.user_id = u.id and e.campaign = '{CAMPAIGN}')
+      order by u.created_at
+    """)
 
-people = [r for r in rows if r["email"].lower() not in EXCLUDE]
-print(f"{len(people)} to email ({len(rows) - len(people)} excluded)")
+
+def record(email):
+    if AUDIENCE == "waitlist":
+        query(f"""insert into admin.waitlist_email_sends (email, campaign)
+                  values (lower('{email}'), '{CAMPAIGN}') on conflict do nothing""")
+    else:
+        query(f"""insert into admin.email_sends (user_id, campaign)
+                  select id, '{CAMPAIGN}' from auth.users where email = '{email}'
+                  on conflict do nothing""")
+
+
+people = rows
+print(f"{len(people)} to email ({AUDIENCE}, campaign {CAMPAIGN})")
 
 if DRY:
     for r in people:
-        cta = "Weigh in" if r["onboarded"] else "FINISH SETTING UP"
+        cta = "Join" if AUDIENCE == "waitlist" else ("Weigh in" if r["onboarded"] else "FINISH SETTING UP")
         print("  ", r["email"], "-", r["first"] or "(no name)", "|", cta)
     sys.exit(0)
 
@@ -129,9 +155,7 @@ sent = 0
 for r in people:
     mid, raw = send(r["email"], r["first"] or "there", bool(r["onboarded"]))
     if mid:
-        query(f"""insert into admin.email_sends (user_id, campaign)
-                  select id, '{CAMPAIGN}' from auth.users where email = '{r["email"]}'
-                  on conflict do nothing""")
+        record(r["email"])
         sent += 1
         print("  ✓", r["email"])
     else:

@@ -353,7 +353,7 @@ function completeMessage(outcome: OutcomeType, boughtAlternative?: boolean | nul
     if (boughtAlternative) return "Good to know what you went with instead. That's the useful part.";
     return "Makes sense. We're using this to get you more relevant input.";
   }
-  return "Sounds good. We'll circle back.";
+  return "Sounds good. Take your time.";
 }
 
 

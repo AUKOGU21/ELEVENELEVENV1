@@ -444,7 +444,7 @@ const Feed = () => {
     track("checkin_answer", { decisionId: id, userId: user.id, meta: { answer: close } });
     if (close === "bought") { setOutcomeInitial("bought_it"); setOutcomeChosen(null); setTrackingId(id); }
     else if (close === "passed") { setOutcomeInitial("didnt_buy"); setOutcomeChosen(null); setTrackingId(id); }
-    else if (close === "deciding") { quickStillDeciding(id); toast("Got it. We'll check back in a bit."); }
+    else if (close === "deciding") { quickStillDeciding(id); toast("Got it. Take your time."); }
   };
   useEffect(() => {
     const params = new URLSearchParams(location.search);

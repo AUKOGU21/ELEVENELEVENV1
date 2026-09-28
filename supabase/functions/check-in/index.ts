@@ -5,17 +5,18 @@
 //
 // Daily (pg_cron). For every open post that has advice (a weigh-in, or a rec on
 // a Looking For), counted from when the first advice arrived:
-//   step 1 at  3 days  "Ayan and Kimia weighed in on your Salomons"
-//   step 2 at 10 days  "Still thinking about your Salomons?"
-//   step 3 at 21 days  "Ayan and Kimia want to know how it went"
-//   step 4 at 30 days  "Still deciding?"  (the last ask, then silence)
+//   step 1 at  3 days  "Ayan + Kimia want the verdict"
+//   step 2 at 10 days  "Still deciding on the Salomons?"
+//   step 3 at 21 days  "So... what happened with the Salomons?"  (the last ask)
+// It stops the moment she answers: Bought and Passed close the post, and a
+// Still deciding tap (outcomes.still_deciding_at) ends the check-ins too.
 // A post that is already past several steps gets only the latest one, so the
 // backlog doesn't arrive as a burst. One check-in per person per day, the post
 // with the most advice first. Push when she has a working device, email when not.
 // Every ask names the women who helped and carries one-tap answers:
 //   /feed?open=<id>&close=bought|passed|deciding|found
 //
-// Test: POST { "test_decision_id": "<uuid>", "step": 1-4, "channels": ["push","email"] }
+// Test: POST { "test_decision_id": "<uuid>", "step": 1-3, "channels": ["push","email"] }
 // sends that step to the post's owner now and records nothing.
 // Dry run: POST { "dry_run": true } lists what today's run would send.
 //
@@ -33,7 +34,7 @@ const SITE = Deno.env.get("SITE_URL") ?? "https://geteleveneleven.com";
 const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
 const UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
 
-const STEP_DAYS = [3, 10, 21, 30];
+const STEP_DAYS = [3, 10, 21];
 const MIN_GAP_DAYS = 4; // never two check-ins on one post closer than this
 const DAY = 86_400_000;
 
@@ -83,7 +84,14 @@ function clip(s: string, max: number): string {
 // "JENDI TORTOISE CROCODILE" + "STEVEMADDEN" -> "Stevemadden Jendi Tortoise Crocodile"
 // "Asics Gel-1130 in Black & Cream from Revolve.com" -> "Asics Gel-1130 in Black & Cream"
 function itemName(c: Candidate): string {
-  if (c.post_type === "looking_for") return `“${clip((c.lf_title ?? "").replace(/[.\s]+$/, ""), 40)}”`;
+  if (c.post_type === "looking_for") {
+    // Her own words, read into a sentence: "Still looking for ballet style flats?"
+    let t = (c.lf_title ?? "").replace(/[.\s]+$/, "").trim();
+    const words = t.split(/\s+/);
+    const titled = words.filter((w) => /^\p{Lu}/u.test(w)).length > words.length / 2;
+    t = titled ? t.toLowerCase() : t.charAt(0).toLowerCase() + t.slice(1);
+    return clip(t, 40);
+  }
   let name = (c.product_name ?? "").replace(/\([^)]*\)/g, "").replace(/\s+from\s+\S+$/i, "").replace(/\s*-{2,}\s*/g, " ").trim();
   if (name && name === name.toUpperCase()) name = titleCase(name);
   const brand = c.brand_name ? cleanBrand(c.brand_name) : "";
@@ -93,52 +101,40 @@ function itemName(c: Candidate): string {
   return clip(name || brand || "post", 36);
 }
 
-function whoList(names: string[]): { text: string; plural: boolean } {
-  const n = names.filter(Boolean);
-  if (n.length === 0) return { text: "The women who weighed in", plural: true };
-  if (n.length === 1) return { text: n[0], plural: false };
-  if (n.length === 2) return { text: `${n[0]} and ${n[1]}`, plural: true };
-  if (n.length === 3) return { text: `${n[0]}, ${n[1]} and ${n[2]}`, plural: true };
-  return { text: `${n[0]}, ${n[1]} and ${n.length - 2} others`, plural: true };
+// "Mary Janes", "flats", "jeans" read as them; "cardigan", "XT-4 OG" as it.
+function pronoun(item: string): "it" | "them" {
+  const last = item.split(/\s+/).pop() ?? "";
+  return /[a-z]s$/i.test(last) && !/ss$/i.test(last) ? "them" : "it";
 }
 
-type Copy = { title: string; body: string; headline: string; lines: string[] };
+// Whoever weighed in or sent recs: "Ayan", "Ayan + Kimia", "Ayan, Ebony + Sarah".
+function whoList(names: string[]): { text: string; plural: boolean } {
+  const n = names.filter(Boolean);
+  if (n.length === 0) return { text: "Your mirrors", plural: true };
+  if (n.length === 1) return { text: n[0], plural: false };
+  if (n.length === 2) return { text: `${n[0]} + ${n[1]}`, plural: true };
+  if (n.length === 3) return { text: `${n[0]}, ${n[1]} + ${n[2]}`, plural: true };
+  return { text: `${n[0]}, ${n[1]} + ${n.length - 2} others`, plural: true };
+}
+
+type Copy = { title: string; body: string };
 
 function copyFor(c: Candidate, step: number): Copy {
   const lf = c.post_type === "looking_for";
   const item = itemName(c);
+  const it = pronoun(item);
   const who = whoList(c.helper_names);
-  const did = lf ? `sent you picks for ${item}` : `weighed in on your ${item}`;
-  const said = `${who.text} ${did}.`;
+  if (lf) {
+    switch (step) {
+      case 1: return { title: `${who.text} gave you some options`, body: "Did one make the cut?" };
+      case 2: return { title: `Still looking for ${item}?`, body: "Your mirrors want to know what you ended up choosing." };
+      default: return { title: `So... did you find the ${item}?`, body: `Found ${it}, still looking, or changed your mind? Last ask, promise.` };
+    }
+  }
   switch (step) {
-    case 1:
-      return {
-        title: `${who.text} ${did}`,
-        body: lf ? "Find anything you love? One tap tells them." : "So, did you get it? One tap tells them what you did.",
-        headline: lf ? "Did you find it?" : "So, did you buy it?",
-        lines: [said, "Tell them what you did."],
-      };
-    case 2:
-      return {
-        title: lf ? `Still looking for ${item}?` : `Still thinking about your ${item}?`,
-        body: `${said} Let them know where you landed.`,
-        headline: lf ? "Still looking?" : "Still thinking it over?",
-        lines: [said, "Let them know where you landed."],
-      };
-    case 3:
-      return {
-        title: `${who.text} ${who.plural ? "want" : "wants"} to know how it went`,
-        body: lf ? "Found it, or still looking? One tap." : "Bought it, passed, or still deciding? One tap.",
-        headline: "They want to know how it went",
-        lines: [said, "One tap tells them."],
-      };
-    default:
-      return {
-        title: lf ? `Still looking for ${item}?` : `Still deciding on your ${item}?`,
-        body: "It's been a month. Close it out, or say you're still deciding and we'll stop asking.",
-        headline: lf ? "Still looking?" : "Still deciding?",
-        lines: [said, "It's been a month. Close it out, or say you're still deciding and we'll stop asking."],
-      };
+    case 1: return { title: `${who.text} ${who.plural ? "want" : "wants"} the verdict`, body: `Did you buy the ${item}?` };
+    case 2: return { title: `Still deciding on the ${item}?`, body: "Your mirrors want to know what happened." };
+    default: return { title: `So... what happened with the ${item}?`, body: `Bought ${it}, passed, or still deciding? Last ask, promise.` };
   }
 }
 
@@ -201,10 +197,10 @@ function renderEmail(c: Candidate, copy: Copy): string {
         </td></tr>
         ${image}
         <tr><td align="center" class="px h2" style="padding:0 48px;font-size:22px;line-height:1.25;font-weight:700;letter-spacing:2px;color:#0A0A0A;text-transform:uppercase;">
-          ${esc(copy.headline)}
+          ${esc(copy.title)}
         </td></tr>
         <tr><td align="center" class="px" style="padding:22px 56px 34px;font-size:12px;line-height:2;font-weight:500;letter-spacing:1.2px;color:#0A0A0A;text-transform:uppercase;">
-          ${copy.lines.map(esc).join("<br>")}
+          ${esc(copy.body)}
         </td></tr>
         <tr><td class="px" style="padding:0 48px 42px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${buttons}</table>
@@ -274,7 +270,7 @@ Deno.serve(async (req) => {
   if (payload.test_decision_id) {
     const c = all.find((x) => x.decision_id === payload.test_decision_id);
     if (!c) return json({ error: "not an open post with advice" }, 404);
-    const step = Math.min(4, Math.max(1, Number(payload.step ?? 1)));
+    const step = Math.min(3, Math.max(1, Number(payload.step ?? 1)));
     const copy = copyFor(c, step);
     const channels: string[] = payload.channels ?? ["push", "email"];
     const result: Record<string, boolean> = {};

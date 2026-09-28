@@ -303,7 +303,7 @@ export default function LookingForView({
 
   const findFlow = (() => {
     if (!isOwn || isFound || recs.length === 0) return null;
-    if (step === "snoozed") return block("Did you find it?", <p style={body(14.5, C.ink)}>Keep looking. We'll circle back. ✦</p>);
+    if (step === "snoozed") return block("Did you find it?", <p style={body(14.5, C.ink)}>Keep looking. Take your time.</p>);
     if (step === "thanks") return block("Did you find it?", (
       <p style={body(14.5, C.ink)}>
         Logged. {picked ? `${firstNameOf(picked.profiles?.display_name)} will hear her rec landed.` : "Thanks for closing the loop."} ✦

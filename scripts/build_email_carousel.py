@@ -1,7 +1,10 @@
 import sys
 from PIL import Image
 
-W, H = 440, 510          # email hero box
+# The email shows the hero at 440x510. Build it at 2x so phone screens,
+# which have twice the pixels, don't stretch and blur it.
+SCALE = 2
+W, H = 440 * SCALE, 510 * SCALE
 BG = (255, 255, 255)
 HOLD_MS = 2500           # she asked for 2.5s per item
 SLIDE_MS = 480           # the swipe itself
@@ -43,13 +46,16 @@ for i, cur in enumerate(slides):
         frames.append(frame)
         durations.append(SLIDE_MS // SLIDE_FRAMES)
 
-# One shared adaptive palette keeps the file small and stops colours shifting
-# between frames.
-palette_src = Image.new("RGB", (W * len(slides), H), BG)
-for i, s in enumerate(slides):
-    palette_src.paste(s, (i * W, 0))
-pal = palette_src.quantize(colors=96, method=Image.MEDIANCUT)
-frames = [f.quantize(palette=pal, dither=Image.FLOYDSTEINBERG) for f in frames]
+# Each frame gets its own full 256-colour palette. A shared 96-colour palette
+# was fine for products on white but turned skin, hair and soft walls into
+# grain and blotches (the Quince bomber, 2026-09-28).
+def quantize(f):
+    # Pillow only dithers when handed a palette, so build one first; without
+    # the dither, skin tones band into flat patches.
+    pal = f.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
+    return f.quantize(palette=pal, dither=Image.Dither.FLOYDSTEINBERG)
+
+frames = [quantize(f) for f in frames]
 
 # Pillow drops a duration list when the frames are re-quantized, so stamp each
 # frame's own info too. Without this every frame renders at the slide speed and

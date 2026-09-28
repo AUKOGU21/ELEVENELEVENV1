@@ -152,6 +152,12 @@ interface DecisionRow {
 // shared decision ask the question the same way.
 
 const CATEGORY_OPTIONS = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Shoes", "Accessories", "Bags"];
+const SORT_LABELS = {
+  newest: "Newest",
+  relevant: "Most relevant",
+  discussed: "Most discussed",
+  needs_input: "Needs input",
+} as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1728,38 +1734,55 @@ const Feed = () => {
           />
         )}
         {!loading && (
+          // One line at every width: the categories scroll inside whatever room
+          // is left and the sort is pinned right as a solid button. Stacking them
+          // on mobile left NEWEST alone on a second line, where it read as a
+          // stray piece of the tab row.
           <div style={{
             display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
+            alignItems: "center",
             justifyContent: "space-between",
-            gap: isMobile ? 10 : 16,
+            gap: isMobile ? 12 : 16,
             margin: activeTab === "feed" ? (isMobile ? "18px 0 16px" : "26px 0 24px") : (isMobile ? "10px 0 16px" : "14px 0 24px"),
           }}>
-            <div className="no-scrollbar" style={{ display: "flex", gap: isMobile ? 22 : 40, overflowX: "auto", minWidth: 0, width: isMobile ? "100%" : undefined }}>
+            <div
+              className="no-scrollbar"
+              style={{
+                display: "flex", gap: isMobile ? 22 : 40, overflowX: "auto", minWidth: 0, flex: 1,
+                // On a phone the tail categories sit off-screen; fade the edge so
+                // the row reads as scrollable rather than cut off.
+                ...(isMobile ? { WebkitMaskImage: "linear-gradient(to right, #000 82%, transparent)", maskImage: "linear-gradient(to right, #000 82%, transparent)", paddingRight: 24 } : {}),
+              }}
+            >
               {CATEGORY_OPTIONS.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
-                  style={{ ...e11Meta(11, filterCategory === cat ? E11.burgundy : E11.ink), fontWeight: filterCategory === cat ? 700 : 600, letterSpacing: "0.2em", background: "none", border: "none", padding: "0 0 8px", cursor: "pointer", whiteSpace: "nowrap", borderBottom: `2px solid ${filterCategory === cat ? E11.burgundy : "transparent"}` }}
+                  style={{ ...e11Meta(11, filterCategory === cat ? E11.burgundy : E11.ink), fontWeight: filterCategory === cat ? 700 : 600, letterSpacing: "0.2em", background: "none", border: "none", padding: "8px 0", cursor: "pointer", whiteSpace: "nowrap", borderBottom: `2px solid ${filterCategory === cat ? E11.burgundy : "transparent"}` }}
                 >
                   {cat}
                 </button>
               ))}
             </div>
-            <select
-              aria-label="Sort"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              // Safari draws its own white rounded box over a select unless the
-              // native appearance is turned off.
-              style={{ ...e11Meta(11, E11.ink), fontWeight: 700, letterSpacing: "0.2em", background: "transparent", border: "none", borderRadius: 0, WebkitAppearance: "none", appearance: "none", cursor: "pointer", outline: "none", flexShrink: 0, paddingBottom: 8, alignSelf: isMobile ? "flex-end" : "auto", textAlign: isMobile ? "right" : "left" }}
-            >
-              <option value="newest">Newest</option>
-              <option value="relevant">Most relevant</option>
-              <option value="discussed">Most discussed</option>
-              <option value="needs_input">Needs input</option>
-            </select>
+            {/* The button shows the current sort; an invisible native select sits
+                over it. A visible select would size itself to its longest option
+                and eat half a phone's width. */}
+            <div style={{ position: "relative", flexShrink: 0, display: "flex", alignItems: "center", gap: 8, background: E11.ink, borderRadius: 0, padding: isMobile ? "10px 11px 10px 12px" : "11px 13px 11px 14px" }}>
+              <span style={{ ...e11Meta(isMobile ? 10 : 10.5, E11.paper), fontWeight: 700, letterSpacing: "0.18em", whiteSpace: "nowrap" }}>
+                {SORT_LABELS[sortBy]}
+              </span>
+              <ChevronDown size={13} strokeWidth={2.25} color={E11.paper} />
+              <select
+                aria-label="Sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", WebkitAppearance: "none", appearance: "none" }}
+              >
+                {(Object.keys(SORT_LABELS) as (keyof typeof SORT_LABELS)[]).map((k) => (
+                  <option key={k} value={k}>{SORT_LABELS[k]}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
         {loading ? (

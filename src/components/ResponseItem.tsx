@@ -110,6 +110,16 @@ export default function ResponseItem({
     return () => clearTimeout(t);
   }, [focused]);
 
+  // Every reply lands in the same thread under this take, so answering one just
+  // opens the composer, addressed to her by first name. notify-reply reaches
+  // everyone already in the thread, so she hears about it.
+  const openComposer = (to?: string | null) => {
+    if (!user) { onSignIn(); return; }
+    const first = (to ?? "").trim().split(/\s+/)[0];
+    if (first && !text.trim()) setText(`@${first} `);
+    setComposerOpen(true);
+  };
+
   const submit = async () => {
     const b = text.trim();
     if (!b || posting) return;
@@ -199,7 +209,7 @@ export default function ResponseItem({
               {myVote === "helpful" ? <Check style={{ width: 13, height: 13 }} /> : <ThumbsUp style={{ width: 13, height: 13 }} strokeWidth={1.75} />}
               Helpful{helpfulCount > 0 ? ` (${helpfulCount})` : ""}
             </button>
-            <button onClick={() => (user ? setComposerOpen(true) : onSignIn())} style={textBtn(C.ink)}>Reply</button>
+            <button onClick={() => openComposer()} style={textBtn(C.ink)}>Reply</button>
           </div>
 
           {/* Replies: one level, quieter than the take they answer. */}
@@ -225,7 +235,10 @@ export default function ResponseItem({
                           </div>
                         </div>
                       ) : (
-                        <p style={{ ...body(13.5, C.inkSoft), marginTop: 3 }}>{rp.body}</p>
+                        <>
+                          <p style={{ ...body(13.5, C.inkSoft), marginTop: 3 }}>{rp.body}</p>
+                          <button onClick={() => openComposer(isMine ? null : rp.profiles?.display_name)} style={{ ...textBtn(C.muted), marginTop: 6 }}>Reply</button>
+                        </>
                       )}
                     </div>
                     {isMine && !editing && (
@@ -249,7 +262,17 @@ export default function ResponseItem({
 
           {composerOpen && (
             <div style={{ marginTop: 14, paddingLeft: 16, borderLeft: `1px solid ${C.burgundy}` }}>
-              <textarea autoFocus rows={2} maxLength={MAXLEN} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask a follow-up..." style={field} />
+              <textarea
+                autoFocus
+                rows={2}
+                maxLength={MAXLEN}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                // Caret after the "@Name " it may open with, not before it.
+                onFocus={(e) => { const n = e.currentTarget.value.length; e.currentTarget.setSelectionRange(n, n); }}
+                placeholder={replies.length > 0 ? "Keep the conversation going..." : "Ask a follow-up..."}
+                style={field}
+              />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
                 <span style={body(11, C.muted)}>{text.length}/{MAXLEN}</span>
                 <div style={{ display: "flex", gap: 18 }}>

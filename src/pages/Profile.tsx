@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Bookmark, Camera, Check, ChevronDown, LogOut, MoreHorizontal, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Check, ChevronDown, LogOut, MoreHorizontal, Plus, X } from "lucide-react";
 import Cropper from "react-easy-crop";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -271,37 +271,73 @@ export function ProfileFooter({ isMobile }: { isMobile: boolean }) {
   );
 }
 
-// ── Hero ──────────────────────────────────────────────────────────────────────
+// ── Header ────────────────────────────────────────────────────────────────────
 
-/** Portrait, name block, and her in real outfits. Three columns on desktop, stacked on a phone. */
-export function Hero({ isMobile, isWide, portrait, identity, irl }: {
+/**
+ * Who she is, her photo, and her in real outfits.
+ *
+ * On a phone it is built to be short: her name on top at a size that leaves
+ * room for everything else, the portrait small with the actions beside it, then
+ * You, IRL and Ask me about. Desktop keeps the three columns.
+ */
+export function ProfileTop({ isMobile, isWide, name, facts, tier, since, bio, portrait, actions, irl, askAbout }: {
   isMobile: boolean;
   isWide: boolean;
+  name: string;
+  /** Age and city, already filtered. */
+  facts: (string | number)[];
+  tier: string | null;
+  since?: string | null;
+  bio?: string | null;
   portrait: React.ReactNode;
-  identity: React.ReactNode;
+  actions: React.ReactNode;
   irl: React.ReactNode | null;
+  askAbout: React.ReactNode | null;
 }) {
+  const line = <IdentityLine facts={facts} tier={tier} since={since} />;
+
   if (isMobile) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        {/* Capped, so her name and her decisions are on the first screen. */}
-        <div style={{ width: "min(62%, 220px)" }}>{portrait}</div>
-        {identity}
-        {irl}
+      <div>
+        <BigName name={name} isMobile compact />
+        <div style={{ marginTop: 8 }}>{line}</div>
+        <div style={{ display: "flex", alignItems: "stretch", gap: 14, marginTop: 16 }}>
+          <div style={{ width: 120, flexShrink: 0 }}>{portrait}</div>
+          {/* Bio at the top, the actions level with the bottom of the photo. */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: bio ? "space-between" : "flex-end", gap: 12 }}>
+            {bio && <p style={{ ...body(13.5), whiteSpace: "pre-line" }}>{bio}</p>}
+            {actions}
+          </div>
+        </div>
+        {irl && <div style={{ marginTop: 24 }}>{irl}</div>}
+        {askAbout && <div style={{ marginTop: irl ? 20 : 24 }}>{askAbout}</div>}
       </div>
     );
   }
+
+  const third = irl || askAbout ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {irl}
+      {askAbout}
+    </div>
+  ) : null;
+
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: isWide ? (irl ? "300px minmax(0, 1fr) minmax(0, 0.9fr)" : "300px minmax(0, 1fr)") : "240px minmax(0, 1fr)",
+      gridTemplateColumns: isWide ? (third ? "260px minmax(0, 1fr) minmax(0, 0.9fr)" : "260px minmax(0, 1fr)") : "220px minmax(0, 1fr)",
       columnGap: isWide ? 48 : 36,
-      rowGap: 40,
+      rowGap: 36,
       alignItems: "start",
     }}>
       <div>{portrait}</div>
-      <div style={{ minWidth: 0, paddingTop: 4 }}>{identity}</div>
-      {irl && <div style={isWide ? { minWidth: 0 } : { gridColumn: "1 / -1", maxWidth: 560 }}>{irl}</div>}
+      <div style={{ minWidth: 0, paddingTop: 4 }}>
+        <BigName name={name} isMobile={false} />
+        <div style={{ marginTop: 14 }}>{line}</div>
+        {bio && <p style={{ ...body(15.5), marginTop: 14, maxWidth: "42ch", whiteSpace: "pre-line" }}>{bio}</p>}
+        <div style={{ marginTop: 22 }}>{actions}</div>
+      </div>
+      {third && <div style={isWide ? { minWidth: 0 } : { gridColumn: "1 / -1", maxWidth: 560 }}>{third}</div>}
     </div>
   );
 }
@@ -313,27 +349,32 @@ export function Portrait({ url, name, onPick }: { url: string | null; name: stri
   };
   const inner = url
     ? <img src={url} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-    : <span style={display("clamp(64px, 9vw, 120px)", C.faint)}>{getInitials(name)}</span>;
+    : <span style={display("clamp(40px, 7vw, 110px)", C.faint)}>{getInitials(name)}</span>;
   return onPick
     ? <button onClick={onPick} aria-label="Add a photo" style={{ ...box, cursor: "pointer" }}>{inner}</button>
     : <div style={box}>{inner}</div>;
 }
 
-/** Her tier in burgundy, underlined. Below the first rung, when she joined. */
-export function HeroEyebrow({ tier, since }: { tier: string | null; since?: string | null }) {
-  if (tier) {
-    return (
-      <p style={{ margin: 0 }}>
-        <span style={{ ...meta(11, C.burgundy), fontWeight: 700, borderBottom: `1px solid ${C.burgundy}`, paddingBottom: 3 }}>{tier}</span>
-      </p>
-    );
-  }
-  const d = since ? new Date(since) : null;
-  if (!d || isNaN(d.getTime())) return null;
-  return <p style={meta(11, C.muted)}>Member since {d.toLocaleDateString("en-US", { month: "short", year: "numeric" })}</p>;
+/** "29 · Boston" and her tier beside it. Below the first rung, when she joined. */
+export function IdentityLine({ facts, tier, since }: { facts: (string | number)[]; tier: string | null; since?: string | null }) {
+  const d = !tier && since ? new Date(since) : null;
+  const joined = d && !isNaN(d.getTime()) ? `Member since ${d.toLocaleDateString("en-US", { month: "short", year: "numeric" })}` : null;
+  if (!facts.length && !tier && !joined) return null;
+  return (
+    <p style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 18, rowGap: 6, margin: 0 }}>
+      {facts.length > 0 && <span style={meta(11, C.inkSoft)}>{facts.join(" · ")}</span>}
+      {tier
+        ? <span style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>{tier}</span>
+        : joined && <span style={meta(11, C.muted)}>{joined}</span>}
+    </p>
+  );
 }
 
-export function BigName({ name, isMobile }: { name: string; isMobile: boolean }) {
+/** Desktop sets first name over surname, big. A phone runs it on one line at a size that leaves room for the rest. */
+export function BigName({ name, isMobile, compact }: { name: string; isMobile: boolean; compact?: boolean }) {
+  if (compact) {
+    return <h1 style={{ ...display("clamp(30px, 9vw, 40px)"), lineHeight: 0.95, overflowWrap: "anywhere" }}>{name}</h1>;
+  }
   const parts = nameParts(name);
   // Long names step down so a surname never has to break mid-word.
   const longest = Math.max(1, ...parts.flatMap((p) => p.split(/\s+/)).map((w) => w.length));
@@ -344,6 +385,39 @@ export function BigName({ name, isMobile }: { name: string; isMobile: boolean })
     <h1 style={{ ...display(size), lineHeight: 0.88, overflowWrap: "anywhere" }}>
       {parts.map((p, i) => <span key={i} style={{ display: "block" }}>{p}</span>)}
     </h1>
+  );
+}
+
+/**
+ * Ask me about: what she knows well, set as a slash line like her fit details.
+ * Three show, then +N. The owner gets a way in when it is empty.
+ */
+export function AskMeAbout({ items, isMobile, onAdd }: { items: string[]; isMobile: boolean; onAdd?: () => void }) {
+  const [all, setAll] = useState(false);
+  if (!items.length && !onAdd) return null;
+  const shown = all ? items : items.slice(0, 3);
+  const more = items.length - shown.length;
+  return (
+    <div>
+      <p style={{ ...meta(11, C.ink), fontWeight: 700 }}>Ask me about</p>
+      {items.length > 0 ? (
+        <p style={{ ...meta(isMobile ? 12 : 13, C.ink), lineHeight: 1.9, marginTop: 8 }}>
+          {shown.map((t, i) => (
+            <span key={`${t}-${i}`}>
+              {i > 0 && <span style={{ color: C.faint, padding: "0 10px" }}>/</span>}
+              {t}
+            </span>
+          ))}
+          {more > 0 && (
+            <button onClick={() => setAll(true)} aria-label={`Show ${more} more`} style={{ ...textLink(C.burgundy), fontSize: "inherit", marginLeft: 12, verticalAlign: "baseline" }}>
+              +{more}
+            </button>
+          )}
+        </p>
+      ) : (
+        <button onClick={onAdd} style={{ ...textLink(C.burgundy), marginTop: 10 }}>Add what people should ask you {arrow}</button>
+      )}
+    </div>
   );
 }
 
@@ -548,40 +622,108 @@ export function StatsRow({ decisions, takes, helpful, isMobile }: { decisions: n
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
+export type ProfileTab = { key: string; label: string; content: React.ReactNode };
+
 /**
- * One full-width section under a rule. On desktop the heading sits in a rail
- * that lines up with the portrait; on smaller screens it sits on top.
+ * Fit profile, Style, Mirrors, Decisions: one at a time under a row of tabs.
+ * Tap a tab, or on a phone swipe the content sideways. A swipe that starts on
+ * something that scrolls or swipes itself (the mirrors row, a tile's photos, a
+ * field) is left to that thing.
  */
-export function Section({ title, aside, action, rail, isMobile, children }: {
-  title: string;
-  aside?: string;
-  action?: React.ReactNode;
-  rail: boolean;
+export function ProfileTabs({ tabs, active, onChange, isMobile }: {
+  tabs: ProfileTab[];
+  active: string;
+  onChange: (key: string) => void;
   isMobile: boolean;
-  children: React.ReactNode;
 }) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const [dir, setDir] = useState(0);
+  const idx = Math.max(0, tabs.findIndex((t) => t.key === active));
+  const headerH = isMobile ? 46 : 70;
+
+  const go = (i: number) => {
+    if (i < 0 || i >= tabs.length || i === idx) return;
+    setDir(i > idx ? 1 : -1);
+    onChange(tabs[i].key);
+    // Scrolled deep into a long tab: bring the tabs back up so the new one starts at its top.
+    const bar = barRef.current;
+    if (bar && bar.getBoundingClientRect().top < headerH) bar.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.target as HTMLElement;
+    touch.current = t.closest("[data-noswipe], .e11-carousel, input, textarea, select")
+      ? null
+      : { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = touch.current;
+    touch.current = null;
+    if (!s) return;
+    const dx = e.changedTouches[0].clientX - s.x;
+    const dy = e.changedTouches[0].clientY - s.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    go(idx + (dx < 0 ? 1 : -1));
+  };
+
   return (
-    <section style={{ borderTop: `1px solid ${C.rule}`, marginTop: isMobile ? 44 : 64, paddingTop: isMobile ? 22 : 32 }}>
-      {rail ? (
-        <div style={{ display: "grid", gridTemplateColumns: "300px minmax(0, 1fr)", columnGap: 48 }}>
-          <div>
-            <h2 style={display("clamp(30px, 2.8vw, 42px)")}>{title}</h2>
-            {aside && <p style={{ ...body(14), marginTop: 14, maxWidth: "30ch" }}>{aside}</p>}
-            {action && <div style={{ marginTop: 18 }}>{action}</div>}
-          </div>
-          <div style={{ minWidth: 0 }}>{children}</div>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
-            <h2 style={display(isMobile ? 30 : 38)}>{title}</h2>
-            {action}
-          </div>
-          {aside && <p style={{ ...body(isMobile ? 13.5 : 14), marginTop: 10 }}>{aside}</p>}
-          <div style={{ marginTop: isMobile ? 20 : 26 }}>{children}</div>
-        </>
-      )}
-    </section>
+    <div>
+      <div
+        ref={barRef}
+        role="tablist"
+        onKeyDown={(e) => { if (e.key === "ArrowRight") go(idx + 1); if (e.key === "ArrowLeft") go(idx - 1); }}
+        style={{
+          display: "flex", justifyContent: isMobile ? "space-between" : "flex-start", gap: isMobile ? 12 : 44,
+          borderBottom: `1px solid ${C.rule}`, overflowX: "auto", scrollbarWidth: "none", scrollMarginTop: headerH + 12,
+        }}
+      >
+        {tabs.map((t, i) => {
+          const on = i === idx;
+          return (
+            <button
+              key={t.key}
+              role="tab"
+              id={`profile-tab-${t.key}`}
+              aria-selected={on}
+              aria-controls="profile-tabpanel"
+              tabIndex={on ? 0 : -1}
+              onClick={() => go(i)}
+              style={{
+                ...meta(isMobile ? 10.5 : 12, on ? C.ink : C.muted), fontWeight: 700,
+                background: "none", border: "none", borderBottom: `2px solid ${on ? C.burgundy : "transparent"}`,
+                padding: isMobile ? "0 0 12px" : "0 0 14px", marginBottom: -1, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        role="tabpanel"
+        id="profile-tabpanel"
+        aria-labelledby={`profile-tab-${tabs[idx]?.key}`}
+        onTouchStart={isMobile ? onTouchStart : undefined}
+        onTouchEnd={isMobile ? onTouchEnd : undefined}
+        style={{ paddingTop: isMobile ? 22 : 32, minHeight: isMobile ? 280 : 360 }}
+      >
+        <motion.div key={tabs[idx]?.key} initial={{ opacity: 0, x: dir * 18 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+          {tabs[idx]?.content}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+/** The line a section used to carry under its heading, and its Edit link, now that the tab is the heading. */
+export function PanelNote({ aside, action, isMobile }: { aside?: string; action?: React.ReactNode; isMobile: boolean }) {
+  if (!aside && !action) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, marginBottom: isMobile ? 18 : 24 }}>
+      {aside ? <p style={body(isMobile ? 13.5 : 14)}>{aside}</p> : <span />}
+      {action}
+    </div>
   );
 }
 
@@ -763,7 +905,7 @@ function SortControl({ value, onChange }: { value: Sort; onChange: (s: Sort) => 
  * Her decisions as the feed's tiles, with a sort and no category filters. Pass
  * `saved` and `onTab` to add a Saved tab beside the heading.
  */
-export function DecisionsBlock({ heading, decisions, saved, tab = "decisions", onTab, viewerId, isMobile, onOpen, empty, emptySaved, sectionRef }: {
+export function DecisionsBlock({ heading, decisions, saved, tab = "decisions", onTab, viewerId, isMobile, onOpen, empty, emptySaved, sectionRef, bare }: {
   heading: string;
   decisions: ProfileTile[] | null;
   saved?: ProfileTile[] | null;
@@ -775,6 +917,8 @@ export function DecisionsBlock({ heading, decisions, saved, tab = "decisions", o
   empty: React.ReactNode;
   emptySaved?: React.ReactNode;
   sectionRef?: React.Ref<HTMLElement>;
+  /** Inside a profile tab: no rule or gap above it. */
+  bare?: boolean;
 }) {
   const [sort, setSort] = useState<Sort>("recent");
   const [showAll, setShowAll] = useState(false);
@@ -801,7 +945,7 @@ export function DecisionsBlock({ heading, decisions, saved, tab = "decisions", o
   });
 
   return (
-    <section ref={sectionRef} style={{ borderTop: `1px solid ${C.rule}`, marginTop: isMobile ? 44 : 64, paddingTop: isMobile ? 22 : 32, scrollMarginTop: 90 }}>
+    <section ref={sectionRef} style={bare ? undefined : { borderTop: `1px solid ${C.rule}`, marginTop: isMobile ? 44 : 64, paddingTop: isMobile ? 22 : 32, scrollMarginTop: 90 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", columnGap: 24, rowGap: 14 }}>
         {hasSaved ? (
           <div role="tablist" style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", columnGap: isMobile ? 22 : 40, rowGap: 8 }}>
@@ -901,6 +1045,101 @@ function SaveRow({ onSave, onCancel, disabled, saving }: { onSave: () => void; o
   );
 }
 
+// ─── Ask me about ─────────────────────────────────────────────────────────────
+const ASK_MAX = 5;
+const ASK_LEN = 32;
+
+/** Seeds the autocomplete before other women's answers and posted brands fill it in. */
+const ASK_TOPICS = [
+  "Tall-girl denim", "Petite fits", "Curvy fits", "Plus-size fits", "Designer bags", "Luxury bags", "Vintage",
+  "Resale", "Workwear", "Wedding guest", "Swimwear", "Activewear", "Bra sizing", "Wide feet", "Sneakers", "Heels",
+  "Denim", "Tailoring", "Knitwear", "Outerwear", "Capsule wardrobe", "Quality vs. price", "Sizing across brands",
+  "Skincare", "Makeup", "Haircare", "Fragrance", "Jewelry", "Maternity",
+];
+
+/**
+ * Up to five things she knows well. Suggestions where they exist, her own words
+ * where they don't. What she picks reads as underlined words with an x, the way
+ * the size picker marks a choice: no pills.
+ */
+function AskAboutEditor({ value, onChange, pool }: { value: string[]; onChange: (v: string[]) => void; pool: string[] }) {
+  const [q, setQ] = useState("");
+  const [hi, setHi] = useState(-1);
+  const full = value.length >= ASK_MAX;
+  const has = (t: string) => value.some((v) => v.toLowerCase() === t.toLowerCase());
+  const needle = q.trim().toLowerCase();
+  const matches = needle ? pool.filter((p) => p.toLowerCase().includes(needle) && !has(p)).slice(0, 6) : [];
+
+  const add = (raw: string) => {
+    const t = raw.trim().replace(/\s+/g, " ").slice(0, ASK_LEN);
+    setQ(""); setHi(-1);
+    if (!t || full || has(t)) return;
+    onChange([...value, t]);
+  };
+
+  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(hi >= 0 && matches[hi] ? matches[hi] : q); }
+    else if (e.key === "ArrowDown" && matches.length) { e.preventDefault(); setHi((h) => Math.min(matches.length - 1, h + 1)); }
+    else if (e.key === "ArrowUp" && matches.length) { e.preventDefault(); setHi((h) => Math.max(-1, h - 1)); }
+    else if (e.key === "Backspace" && !q && value.length) onChange(value.slice(0, -1));
+    else if (e.key === "Escape") { setQ(""); setHi(-1); }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+        <label htmlFor="profile-ask" style={strong(14)}>What should people ask you about?</label>
+        <span style={meta(10.5, full ? C.burgundy : C.muted)}>{value.length}/{ASK_MAX}</span>
+      </div>
+      <p style={{ ...body(13, C.muted), marginTop: 4 }}>Brands, luxury bags, fit problems, or anything you know really well.</p>
+
+      {value.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", columnGap: 20, rowGap: 12, marginTop: 14 }}>
+          {value.map((v) => (
+            <span key={v} style={{ ...meta(11, C.ink), fontWeight: 700, letterSpacing: "0.08em", display: "inline-flex", alignItems: "center", gap: 8, paddingBottom: 4, borderBottom: `1px solid ${C.burgundy}` }}>
+              {v}
+              <button onClick={() => onChange(value.filter((x) => x !== v))} aria-label={`Remove ${v}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: C.muted, lineHeight: 0 }}>
+                <X style={{ width: 12, height: 12 }} strokeWidth={2} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {!full && (
+        <div style={{ position: "relative", marginTop: 12 }}>
+          <input
+            id="profile-ask"
+            value={q}
+            maxLength={ASK_LEN}
+            onChange={(e) => { setQ(e.target.value); setHi(-1); }}
+            onKeyDown={onKey}
+            placeholder={value.length ? "Add another" : "e.g. Tall-girl denim"}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={matches.length > 0}
+            aria-controls="profile-ask-list"
+            style={{ ...fieldStyle, paddingRight: q.trim() ? 64 : 13 }}
+          />
+          {q.trim() && (
+            <button onClick={() => add(q)} style={{ ...textLink(C.burgundy), position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)" }}>Add</button>
+          )}
+          {matches.length > 0 && (
+            <div id="profile-ask-list" role="listbox" style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#FFFFFF", border: `1px solid ${C.rule}`, borderRadius: RADIUS, overflow: "hidden", zIndex: 10 }}>
+              {matches.map((m, i) => (
+                <button key={m} role="option" aria-selected={i === hi} onMouseDown={(e) => e.preventDefault()} onClick={() => add(m)}
+                  style={{ ...body(14, C.ink), width: "100%", textAlign: "left", padding: "10px 13px", background: i === hi ? C.well : "none", border: "none", borderTop: i ? `1px solid ${C.rule}` : "none", cursor: "pointer" }}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export type Mirror = {
   id: string;
   display_name: string | null;
@@ -988,7 +1227,6 @@ const Profile = () => {
   const { isMobile, isWide } = useViewport();
   const { user, signOut } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const decisionsRef = useRef<HTMLElement>(null);
 
   // Data
   const [profile, setProfile]             = useState<any>(null);
@@ -1015,6 +1253,8 @@ const Profile = () => {
   const [editAge, setEditAge]             = useState("");
   const [editCity, setEditCity]           = useState("");
   const [editBio, setEditBio]             = useState("");
+  const [editAsk, setEditAsk]             = useState<string[]>([]);
+  const [askPool, setAskPool]             = useState<string[]>(ASK_TOPICS);
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const cityTyped                         = useRef(false);
   const [saving, setSaving]               = useState(false);
@@ -1043,7 +1283,14 @@ const Profile = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Mirrors
-  const [mirrors, setMirrors] = useState<Mirror[]>([]);
+  const [mirrors, setMirrors] = useState<Mirror[] | null>(null);
+
+  // Which tab is open: ?tab=decisions etc. opens on that one.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => {
+    const t = searchParams.get("tab");
+    return t && ["fit", "style", "mirrors", "decisions"].includes(t) ? t : "fit";
+  });
 
   // ─── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1078,6 +1325,32 @@ const Profile = () => {
     return () => clearTimeout(t);
   }, [editCity]);
 
+  // Ask me about suggestions: what other women offer and the brands posted here,
+  // on top of the seed topics. Fetched once, the first time she opens the editor.
+  const askPoolLoaded = useRef(false);
+  useEffect(() => {
+    if (!editing || askPoolLoaded.current) return;
+    askPoolLoaded.current = true;
+    (async () => {
+      const [askRes, brandRes] = await Promise.all([
+        supabase.from("profiles").select("ask_me_about").not("ask_me_about", "is", null).limit(500),
+        supabase.from("decisions").select("brand_name").not("brand_name", "is", null).is("deleted_at", null).limit(1000),
+      ]);
+      const seen = new Set<string>();
+      const out: string[] = [];
+      const push = (v: unknown) => {
+        if (typeof v !== "string") return;
+        const t = v.trim();
+        if (!t || t.length > ASK_LEN || seen.has(t.toLowerCase())) return;
+        seen.add(t.toLowerCase()); out.push(t);
+      };
+      ASK_TOPICS.forEach(push);
+      ((askRes.data ?? []) as any[]).forEach((r) => (r.ask_me_about ?? []).forEach(push));
+      ((brandRes.data ?? []) as any[]).forEach((r) => push(r.brand_name));
+      setAskPool(out);
+    })();
+  }, [editing]);
+
   useEffect(() => {
     if (!profile || !user) return;
     const fetchMirrors = async () => {
@@ -1086,7 +1359,7 @@ const Profile = () => {
         .select("id, display_name, avatar_url, age, city, silhouette_preference, height_range, top_size, bottom_size, fit_preference, fit_details, style_aesthetics, purchase_frequency, risk_tolerance")
         .neq("id", user.id)
         .limit(120);
-      if (!data) return;
+      if (!data) { setMirrors([]); return; }
       const scored = data
         .filter((p: any) => p != null)
         .map((p: any) => ({ ...p, score: Math.round(computeMatchScore(profile, p).total) }))
@@ -1099,7 +1372,6 @@ const Profile = () => {
 
   // First run. She lands here straight from onboarding (?welcome=1). If she
   // skips, it comes back once on a later visit, then never again.
-  const [searchParams, setSearchParams] = useSearchParams();
   const [showWelcome, setShowWelcome] = useState(false);
   const welcomeSettled = useRef(false);
 
@@ -1133,6 +1405,7 @@ const Profile = () => {
       cityTyped.current = false;
       setEditCity(data.city ?? "");
       setEditBio(data.bio ?? "");
+      setEditAsk(Array.isArray(data.ask_me_about) ? data.ask_me_about : []);
       setFitPhotos(fitPhotosFor(data));
     }
     setLoading(false);
@@ -1177,11 +1450,6 @@ const Profile = () => {
 
   const openDecision = (id: string) => navigate("/feed", { state: { openDecisionId: id } });
 
-  const showSaved = () => {
-    setDecTab("saved");
-    requestAnimationFrame(() => decisionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  };
-
   const saveBasicInfo = async () => {
     if (!editName.trim()) return;
     setSaving(true);
@@ -1190,6 +1458,7 @@ const Profile = () => {
       age: editAge ? parseInt(editAge) : null,
       city: editCity || null,
       bio: editBio.trim().slice(0, BIO_MAX) || null,
+      ask_me_about: editAsk.length ? editAsk.slice(0, ASK_MAX) : null,
     }).eq("id", user!.id);
     setSaving(false);
     if (error) { alert("Could not save: " + error.message); return; }
@@ -1203,6 +1472,7 @@ const Profile = () => {
     cityTyped.current = false;
     setEditCity(profile?.city ?? "");
     setEditBio(profile?.bio ?? "");
+    setEditAsk(Array.isArray(profile?.ask_me_about) ? profile.ask_me_about : []);
     setCitySuggestions([]);
   };
 
@@ -1350,19 +1620,21 @@ const Profile = () => {
   };
   const closeBtn: React.CSSProperties = { background: "none", border: "none", cursor: "pointer", color: C.ink, lineHeight: 0, padding: 4 };
 
-  const portrait = (
-    <div>
-      <Portrait url={profile?.avatar_url ?? null} name={displayName} onPick={profile?.avatar_url ? undefined : pickPhoto} />
-      <button onClick={pickPhoto} style={{ ...textLink(C.muted), marginTop: 12 }}>
-        <Camera style={{ width: 14, height: 14 }} strokeWidth={1.75} />
-        {profile?.avatar_url ? "Change photo" : "Add photo"}
-      </button>
-    </div>
-  );
+  // Changing the photo lives in Edit profile. An empty portrait still opens the picker.
+  const portrait = <Portrait url={profile?.avatar_url ?? null} name={displayName} onPick={profile?.avatar_url ? undefined : pickPhoto} />;
 
   const editForm = (
     <div style={{ maxWidth: 460 }}>
       <p style={{ ...meta(11, C.ink), fontWeight: 700, marginBottom: 16 }}>Edit profile</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
+        <div style={{ width: 72, flexShrink: 0 }}>
+          <Portrait url={profile?.avatar_url ?? null} name={displayName} onPick={pickPhoto} />
+        </div>
+        <button onClick={pickPhoto} style={textLink(C.ink)}>
+          <Camera style={{ width: 14, height: 14 }} strokeWidth={1.75} />
+          {profile?.avatar_url ? "Change photo" : "Add photo"}
+        </button>
+      </div>
       <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} placeholder="Full name"
         style={{ ...fieldStyle, marginBottom: 8 }} />
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
@@ -1388,7 +1660,10 @@ const Profile = () => {
       </div>
       <textarea id="profile-bio" value={editBio} onChange={e => setEditBio(e.target.value.slice(0, BIO_MAX))} maxLength={BIO_MAX} rows={3}
         placeholder="Add a short bio" style={fieldStyle} />
-      <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+      <div style={{ marginTop: 22 }}>
+        <AskAboutEditor value={editAsk} onChange={setEditAsk} pool={askPool} />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 22 }}>
         <button onClick={saveBasicInfo} disabled={saving || !editName.trim()}
           style={{ ...squareBtn(true, C.burgundy), opacity: saving || !editName.trim() ? 0.5 : 1 }}>
           {saving ? "Saving..." : "Save"}
@@ -1399,47 +1674,34 @@ const Profile = () => {
   );
 
   const menuItems: { label: string; on: () => void; tone?: string }[] = [
-    { label: profile?.avatar_url ? "Change photo" : "Add photo", on: pickPhoto },
     { label: fitPhotos.length ? "Manage IRL photos" : "Add IRL photos", on: fitPhotos.length ? () => setFitPhotoModal("manage") : openUpload },
     { label: "Dial in your fit", on: () => setShowFitModal(true) },
     { label: "Sign out", on: handleSignOut, tone: C.burgundy },
   ];
 
-  const identity = editing ? editForm : (
-    <div>
-      <HeroEyebrow tier={tier} since={profile?.created_at} />
-      <div style={{ marginTop: 16 }}><BigName name={displayName} isMobile={isMobile} /></div>
-      {(profile?.age || profile?.city) && (
-        <p style={{ ...meta(12, C.inkSoft), marginTop: 16 }}>
-          {[profile?.age, profile?.city?.split(",")[0]].filter(Boolean).join(" · ")}
-        </p>
-      )}
-      {profile?.bio && (
-        <p style={{ ...body(isMobile ? 14.5 : 15.5), marginTop: 14, maxWidth: "42ch", whiteSpace: "pre-line" }}>{profile.bio}</p>
-      )}
-      <div style={{ display: "flex", alignItems: "stretch", gap: 8, marginTop: 24 }}>
-        <button onClick={() => setEditing(true)} style={squareBtn(true, C.burgundy)}>Edit profile</button>
-        <button onClick={showSaved} aria-label="Saved decisions" title="Saved" style={iconSquare}>
-          <Bookmark style={{ width: 18, height: 18 }} strokeWidth={1.75} />
+  // Sized down on a phone so they sit beside the portrait.
+  const actionBtn: React.CSSProperties = isMobile ? { ...squareBtn(true, C.burgundy), fontSize: 11, padding: "12px 14px" } : squareBtn(true, C.burgundy);
+  const actionIcon: React.CSSProperties = isMobile ? { ...iconSquare, width: 42 } : iconSquare;
+  const actions = (
+    <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
+      <button onClick={() => setEditing(true)} style={actionBtn}>Edit profile</button>
+      <div style={{ position: "relative", display: "flex" }}>
+        <button onClick={() => setMenuOpen(v => !v)} aria-label="More" aria-haspopup="menu" aria-expanded={menuOpen} style={actionIcon}>
+          <MoreHorizontal style={{ width: 18, height: 18 }} strokeWidth={1.75} />
         </button>
-        <div style={{ position: "relative", display: "flex" }}>
-          <button onClick={() => setMenuOpen(v => !v)} aria-label="More" aria-haspopup="menu" aria-expanded={menuOpen} style={iconSquare}>
-            <MoreHorizontal style={{ width: 18, height: 18 }} strokeWidth={1.75} />
-          </button>
-          {menuOpen && (
-            <>
-              <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
-              <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 31, minWidth: 210, background: C.paper, border: `1px solid ${C.ink}`, borderRadius: RADIUS }}>
-                {menuItems.map((it, i) => (
-                  <button key={it.label} role="menuitem" onClick={() => { setMenuOpen(false); it.on(); }}
-                    style={{ ...textLink(it.tone ?? C.ink), width: "100%", padding: "13px 16px", justifyContent: "flex-start", borderTop: i ? `1px solid ${C.rule}` : "none" }}>
-                    {it.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        {menuOpen && (
+          <>
+            <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+            <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 31, minWidth: 210, background: C.paper, border: `1px solid ${C.ink}`, borderRadius: RADIUS }}>
+              {menuItems.map((it, i) => (
+                <button key={it.label} role="menuitem" onClick={() => { setMenuOpen(false); it.on(); }}
+                  style={{ ...textLink(it.tone ?? C.ink), width: "100%", padding: "13px 16px", justifyContent: "flex-start", borderTop: i ? `1px solid ${C.rule}` : "none" }}>
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1654,9 +1916,23 @@ const Profile = () => {
 
       <main style={wrap(isMobile)}>
 
-        {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <div style={{ marginTop: isMobile ? 16 : 44 }}>
-          <Hero isMobile={isMobile} isWide={isWide} portrait={portrait} identity={identity} irl={irl} />
+        {/* ── Header ───────────────────────────────────────────────────────── */}
+        <div style={{ marginTop: isMobile ? 18 : 44 }}>
+          {editing ? editForm : (
+            <ProfileTop
+              isMobile={isMobile}
+              isWide={isWide}
+              name={displayName}
+              facts={[profile?.age, profile?.city?.split(",")[0]].filter(Boolean)}
+              tier={tier}
+              since={profile?.created_at}
+              bio={profile?.bio}
+              portrait={portrait}
+              actions={actions}
+              irl={irl}
+              askAbout={<AskMeAbout items={profile?.ask_me_about ?? []} isMobile={isMobile} onAdd={() => setEditing(true)} />}
+            />
+          )}
         </div>
 
         {/* ── First run ────────────────────────────────────────────────────── */}
@@ -1664,73 +1940,91 @@ const Profile = () => {
           <WelcomeNudge isMobile={isMobile} onDismiss={() => setShowWelcome(false)} />
         )}
 
-        {/* ── Stats and standing ───────────────────────────────────────────── */}
-        <div style={{ marginTop: isMobile ? 36 : 56 }}>
-          <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} />
+        {/* ── Fit profile / Style / Mirrors / Decisions ────────────────────── */}
+        <div style={{ marginTop: isMobile ? 32 : 56 }}>
+          <ProfileTabs isMobile={isMobile} active={tab} onChange={setTab} tabs={[
+            {
+              key: "fit",
+              label: "Fit profile",
+              content: editMode === "silhouette" ? silhouettePicker : sil ? (
+                <FitSummary
+                  profile={profile}
+                  isMobile={isMobile}
+                  owner={{
+                    onChangeSilhouette: openSilhouetteEdit,
+                    onEditSizes: openSizesEdit,
+                    onEditFit: () => setShowFitModal(true),
+                    sizesEditor: editMode === "sizes" ? sizesEditor : null,
+                    showAll: showAllTags,
+                    onToggleAll: () => setShowAllTags(v => !v),
+                  }}
+                />
+              ) : (
+                <EmptyNote text="Your silhouette is the strongest signal in every match." action="Set your body type" onAction={openSilhouetteEdit} />
+              ),
+            },
+            {
+              key: "style",
+              label: "Style",
+              content: (
+                <>
+                  {editMode !== "style" && (
+                    <PanelNote
+                      isMobile={isMobile}
+                      aside="The aesthetics you shop for."
+                      action={styles.length > 0 ? <button onClick={openStyleEdit} style={textLink(C.burgundy)}>Edit</button> : undefined}
+                    />
+                  )}
+                  {editMode === "style" ? stylePicker : styles.length > 0 ? (
+                    <StyleRow labels={styles} isMobile={isMobile} />
+                  ) : (
+                    <EmptyNote text="Pick up to three aesthetics that sound like you." action="Set your aesthetic" onAction={openStyleEdit} />
+                  )}
+                </>
+              ),
+            },
+            {
+              key: "mirrors",
+              label: "Mirrors",
+              content: !mirrors ? <p style={meta(10.5)}>Loading</p> : mirrors.length > 0 ? (
+                <>
+                  <PanelNote isMobile={isMobile} aside="Women with similar fit, taste, and how they shop." />
+                  <div data-noswipe style={isMobile
+                    ? { display: "flex", gap: 12, overflowX: "auto", scrollbarWidth: "none", margin: "0 -16px", padding: "0 16px 4px", scrollSnapType: "x mandatory" }
+                    : { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: isWide ? 24 : 16 }}>
+                    {mirrors.map((m) => <MirrorCard key={m.id} m={m} isMobile={isMobile} onOpen={() => navigate(`/profile/${m.id}`)} />)}
+                  </div>
+                </>
+              ) : (
+                <EmptyNote text="Your mirrors are women with a similar fit, taste, and way of shopping. Fill in your fit profile to find them." action="Your fit profile" onAction={() => setTab("fit")} />
+              ),
+            },
+            {
+              key: "decisions",
+              label: "Decisions",
+              content: (
+                <>
+                  <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} />
+                  <div style={{ marginTop: isMobile ? 26 : 36 }}>
+                    <DecisionsBlock
+                      bare
+                      heading={`${firstName}'s decisions`}
+                      decisions={decisions}
+                      saved={savedDecisions}
+                      tab={decTab}
+                      onTab={setDecTab}
+                      viewerId={user?.id ?? null}
+                      isMobile={isMobile}
+                      onOpen={openDecision}
+                      empty={<EmptyNote text="No decisions yet." action="Post a decision" onAction={() => navigate("/feed")} />}
+                      emptySaved={<EmptyNote text="Nothing saved yet. Bookmark posts in the feed to revisit them later." action="Go to feed" onAction={() => navigate("/feed")} />}
+                    />
+                  </div>
+                </>
+              ),
+            },
+          ]} />
         </div>
-
-        {/* ── Fit profile ──────────────────────────────────────────────────── */}
-        <Section title="Your fit profile" rail={isWide} isMobile={isMobile}>
-          {editMode === "silhouette" ? silhouettePicker : sil ? (
-            <FitSummary
-              profile={profile}
-              isMobile={isMobile}
-              owner={{
-                onChangeSilhouette: openSilhouetteEdit,
-                onEditSizes: openSizesEdit,
-                onEditFit: () => setShowFitModal(true),
-                sizesEditor: editMode === "sizes" ? sizesEditor : null,
-                showAll: showAllTags,
-                onToggleAll: () => setShowAllTags(v => !v),
-              }}
-            />
-          ) : (
-            <EmptyNote text="Your silhouette is the strongest signal in every match." action="Set your body type" onAction={openSilhouetteEdit} />
-          )}
-        </Section>
-
-        {/* ── Style ────────────────────────────────────────────────────────── */}
-        <Section
-          title="Your style"
-          aside="The aesthetics you shop for."
-          rail={isWide}
-          isMobile={isMobile}
-          action={editMode !== "style" && styles.length > 0
-            ? <button onClick={openStyleEdit} style={textLink(C.burgundy)}>Edit</button>
-            : undefined}
-        >
-          {editMode === "style" ? stylePicker : styles.length > 0 ? (
-            <StyleRow labels={styles} isMobile={isMobile} />
-          ) : (
-            <EmptyNote text="Pick up to three aesthetics that sound like you." action="Set your aesthetic" onAction={openStyleEdit} />
-          )}
-        </Section>
-
-        {/* ── Mirrors ──────────────────────────────────────────────────────── */}
-        {mirrors.length > 0 && (
-          <Section title="Your mirrors" aside="Women with similar fit, taste, and how they shop." rail={isWide} isMobile={isMobile}>
-            <div style={isMobile
-              ? { display: "flex", gap: 12, overflowX: "auto", scrollbarWidth: "none", margin: "0 -16px", padding: "0 16px 4px", scrollSnapType: "x mandatory" }
-              : { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: isWide ? 24 : 16 }}>
-              {mirrors.map((m) => <MirrorCard key={m.id} m={m} isMobile={isMobile} onOpen={() => navigate(`/profile/${m.id}`)} />)}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Decisions and saved ──────────────────────────────────────────── */}
-        <DecisionsBlock
-          sectionRef={decisionsRef}
-          heading={`${firstName}'s decisions`}
-          decisions={decisions}
-          saved={savedDecisions}
-          tab={decTab}
-          onTab={setDecTab}
-          viewerId={user?.id ?? null}
-          isMobile={isMobile}
-          onOpen={openDecision}
-          empty={<EmptyNote text="No decisions yet." action="Post a decision" onAction={() => navigate("/feed")} />}
-          emptySaved={<EmptyNote text="Nothing saved yet. Bookmark posts in the feed to revisit them later." action="Go to feed" onAction={() => navigate("/feed")} />}
-        />
 
         <ProfileFooter isMobile={isMobile} />
       </main>

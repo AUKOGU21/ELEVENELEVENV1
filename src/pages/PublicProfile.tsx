@@ -13,8 +13,8 @@ import { track } from "@/lib/track";
 import { C, body, meta } from "@/lib/design";
 // The layout and read-only sections are shared with her own profile page.
 import {
-  BigName, DecisionsBlock, EmptyNote, FitSummary, Hero, HeroEyebrow, IrlPhotos, Lightbox, Portrait,
-  ProfileFooter, ProfileHeader, Section, StatsRow, StyleRow, TILE_FIELDS, fitPhotosFor, helpfulStats,
+  AskMeAbout, DecisionsBlock, EmptyNote, FitSummary, IrlPhotos, Lightbox, PanelNote, Portrait,
+  ProfileFooter, ProfileHeader, ProfileTabs, ProfileTop, StatsRow, StyleRow, TILE_FIELDS, fitPhotosFor, helpfulStats,
   nameParts, silhouetteFor, squareBtn, textLink, useViewport, withTileExtras, wrap, type ProfileTile,
 } from "./Profile";
 
@@ -53,6 +53,7 @@ const PublicProfile = () => {
   const [matchScore, setMatchScore] = useState<number | null>(null);
   const [loading, setLoading]       = useState(true);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [tab, setTab]               = useState("fit");
 
   useEffect(() => {
     if (!userId) return;
@@ -123,36 +124,27 @@ const PublicProfile = () => {
   const styles: string[] = profile.style_aesthetics ?? [];
   const isOwner   = !!user && user.id === userId;
 
-  const identity = (
-    <div>
-      <HeroEyebrow tier={tier} since={profile.created_at} />
-      <div style={{ marginTop: 16 }}><BigName name={name} isMobile={isMobile} /></div>
-      {(profile.age || profile.city) && (
-        <p style={{ ...meta(12, C.inkSoft), marginTop: 16 }}>
-          {[profile.age, profile.city?.split(",")[0]].filter(Boolean).join(" · ")}
-        </p>
-      )}
-      {profile.bio && (
-        <p style={{ ...body(isMobile ? 14.5 : 15.5), marginTop: 14, maxWidth: "42ch", whiteSpace: "pre-line" }}>{profile.bio}</p>
-      )}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 16, marginTop: 24 }}>
-        {isOwner ? (
-          <button onClick={() => navigate("/profile")} style={squareBtn(false)}>Edit profile</button>
-        ) : userId ? (
-          <FollowButton
-            targetUserId={userId}
-            user={user}
-            following={following}
-            onChange={(_, on) => setFollowing(on)}
-            onSignIn={() => navigate("/signin?mode=signup")}
-            size="md"
-            variant="editorial"
-          />
-        ) : null}
-        {matchScore !== null && <MatchSeal score={matchScore} size={isMobile ? 48 : 56} withLabel labelSize={10.5} />}
-      </div>
+  // Follow and how closely she matches you, beside her portrait.
+  const actions = (
+    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: isMobile ? 12 : 16 }}>
+      {isOwner ? (
+        <button onClick={() => navigate("/profile")} style={isMobile ? { ...squareBtn(false), fontSize: 11, padding: "12px 14px" } : squareBtn(false)}>Edit profile</button>
+      ) : userId ? (
+        <FollowButton
+          targetUserId={userId}
+          user={user}
+          following={following}
+          onChange={(_, on) => setFollowing(on)}
+          onSignIn={() => navigate("/signin?mode=signup")}
+          size="md"
+          variant="editorial"
+        />
+      ) : null}
+      {matchScore !== null && <MatchSeal score={matchScore} size={isMobile ? 40 : 56} withLabel labelSize={10.5} />}
     </div>
   );
+
+  const askItems: string[] = Array.isArray(profile.ask_me_about) ? profile.ask_me_about : [];
 
   return (
     <div className="fixed inset-0 overflow-hidden flex justify-center" style={{ background: C.paper, color: C.ink }}>
@@ -172,45 +164,64 @@ const PublicProfile = () => {
       <main style={wrap(isMobile)}>
         {back}
 
-        {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <div style={{ marginTop: isMobile ? 16 : 28 }}>
-          <Hero
+        {/* ── Header ───────────────────────────────────────────────────────── */}
+        <div style={{ marginTop: isMobile ? 14 : 28 }}>
+          <ProfileTop
             isMobile={isMobile}
             isWide={isWide}
+            name={name}
+            facts={[profile.age, profile.city?.split(",")[0]].filter(Boolean)}
+            tier={tier}
+            since={profile.created_at}
+            bio={profile.bio}
             portrait={<Portrait url={profile.avatar_url ?? null} name={name} />}
-            identity={identity}
+            actions={actions}
             irl={fitPhotos.length > 0 ? <IrlPhotos label={`${first}, IRL`} photos={fitPhotos} onOpen={setLightboxIdx} /> : null}
+            askAbout={askItems.length > 0 ? <AskMeAbout items={askItems} isMobile={isMobile} /> : null}
           />
         </div>
 
-        {/* ── Stats and standing ───────────────────────────────────────────── */}
-        <div style={{ marginTop: isMobile ? 36 : 56 }}>
-          <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} />
+        {/* ── Fit profile / Style / Decisions ──────────────────────────────── */}
+        {/* No Mirrors here: her mirrors are hers to see. */}
+        <div style={{ marginTop: isMobile ? 32 : 56 }}>
+          <ProfileTabs isMobile={isMobile} active={tab} onChange={setTab} tabs={[
+            {
+              key: "fit",
+              label: "Fit profile",
+              content: sil ? <FitSummary profile={profile} isMobile={isMobile} /> : <EmptyNote text={`${first} hasn't set her fit profile yet.`} />,
+            },
+            {
+              key: "style",
+              label: "Style",
+              content: styles.length > 0 ? (
+                <>
+                  <PanelNote isMobile={isMobile} aside="The aesthetics she shops for." />
+                  <StyleRow labels={styles} isMobile={isMobile} />
+                </>
+              ) : <EmptyNote text={`${first} hasn't picked her aesthetic yet.`} />,
+            },
+            {
+              key: "decisions",
+              label: "Decisions",
+              content: (
+                <>
+                  <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} />
+                  <div style={{ marginTop: isMobile ? 26 : 36 }}>
+                    <DecisionsBlock
+                      bare
+                      heading={`${first}'s decisions`}
+                      decisions={decisions}
+                      viewerId={user?.id ?? null}
+                      isMobile={isMobile}
+                      onOpen={(id) => navigate("/feed", { state: { openDecisionId: id } })}
+                      empty={<EmptyNote text={`${first} hasn't shared a public decision yet.`} />}
+                    />
+                  </div>
+                </>
+              ),
+            },
+          ]} />
         </div>
-
-        {/* ── Fit profile ──────────────────────────────────────────────────── */}
-        {sil && (
-          <Section title="Fit profile" rail={isWide} isMobile={isMobile}>
-            <FitSummary profile={profile} isMobile={isMobile} />
-          </Section>
-        )}
-
-        {/* ── Style ────────────────────────────────────────────────────────── */}
-        {styles.length > 0 && (
-          <Section title="Style" rail={isWide} isMobile={isMobile}>
-            <StyleRow labels={styles} isMobile={isMobile} />
-          </Section>
-        )}
-
-        {/* ── Decisions ────────────────────────────────────────────────────── */}
-        <DecisionsBlock
-          heading={`${first}'s decisions`}
-          decisions={decisions}
-          viewerId={user?.id ?? null}
-          isMobile={isMobile}
-          onOpen={(id) => navigate("/feed", { state: { openDecisionId: id } })}
-          empty={<EmptyNote text={`${first} hasn't shared a public decision yet.`} />}
-        />
 
         <ProfileFooter isMobile={isMobile} />
       </main>

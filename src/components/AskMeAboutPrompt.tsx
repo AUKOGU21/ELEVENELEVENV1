@@ -74,7 +74,9 @@ export default function AskMeAboutPrompt({ userId, hold = false }: { userId: str
   }, [open, saving]);
 
   const save = async () => {
-    if (!value.length || saving) return;
+    if (saving) return;
+    // Full colour even when empty, so a tap with nothing added just sends her to the field.
+    if (!value.length) { document.getElementById("profile-ask")?.focus(); return; }
     setSaving(true);
     const { error } = await supabase.from("profiles").update({ ask_me_about: value.slice(0, ASK_MAX) }).eq("id", userId);
     setSaving(false);
@@ -117,7 +119,7 @@ export default function AskMeAboutPrompt({ userId, hold = false }: { userId: str
                 Tell us what you're good at.
               </h2>
               <p style={{ ...body(15, C.ink), fontWeight: 500, margin: "14px auto 0", maxWidth: "32ch" }}>
-                We heard you're an expert. Tell us your categories so the women who need you know to ask.
+                Everyone has their thing. Add the brands, categories, or niches you know best so we know when to find you.
               </p>
             </div>
 
@@ -132,10 +134,10 @@ export default function AskMeAboutPrompt({ userId, hold = false }: { userId: str
                   <div style={{ textAlign: "left" }}>
                     <AskAboutEditor bare placeholder="e.g. Vintage" value={value} onChange={setValue} pool={pool} />
                   </div>
-                  <button onClick={save} disabled={!value.length || saving} style={{
+                  <button onClick={save} disabled={saving} style={{
                     width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                     background: C.burgundy, border: "none", borderRadius: RADIUS, padding: "17px 0",
-                    cursor: value.length && !saving ? "pointer" : "default", opacity: value.length ? 1 : 0.6,
+                    cursor: saving ? "default" : "pointer",
                     ...meta(12, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", marginTop: 12,
                   }}>
                     {saving ? "Saving..." : "Add to my profile"}

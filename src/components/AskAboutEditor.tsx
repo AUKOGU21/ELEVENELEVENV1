@@ -47,12 +47,14 @@ export const ASK_TOPICS = [
  * where they don't. What she picks reads as underlined words with an x, the way
  * the size picker marks a choice: no pills.
  */
-export default function AskAboutEditor({ value, onChange, pool, bare }: {
+export default function AskAboutEditor({ value, onChange, pool, bare, placeholder = "e.g. Tall-girl denim" }: {
   value: string[];
   onChange: (v: string[]) => void;
   pool: string[];
   /** No question or helper line: the prompt around it is already asking. */
   bare?: boolean;
+  /** The example in the empty field. */
+  placeholder?: string;
 }) {
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(-1);
@@ -109,7 +111,7 @@ export default function AskAboutEditor({ value, onChange, pool, bare }: {
             maxLength={ASK_LEN}
             onChange={(e) => { setQ(e.target.value); setHi(-1); }}
             onKeyDown={onKey}
-            placeholder={value.length ? "Add another" : "e.g. Tall-girl denim"}
+            placeholder={value.length ? "Add another" : placeholder}
             autoComplete="off"
             role="combobox"
             aria-expanded={matches.length > 0}

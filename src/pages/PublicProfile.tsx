@@ -13,8 +13,8 @@ import { track } from "@/lib/track";
 import { C, body, meta } from "@/lib/design";
 // The layout and read-only sections are shared with her own profile page.
 import {
-  AskMeAbout, DecisionsBlock, EmptyNote, FitSummary, IrlPhotos, Lightbox, PanelNote, Portrait,
-  ProfileFooter, ProfileHeader, ProfileTabs, ProfileTop, StatsRow, StyleRow, TILE_FIELDS, fitPhotosFor, helpfulStats,
+  AskMeAbout, DecisionsBlock, EmptyNote, FitSummary, IrlPhotos, Lightbox, Portrait,
+  ProfileFooter, ProfileHeader, ProfileTabs, ProfileTop, StatsRow, TierStatus, StyleRow, TILE_FIELDS, fitPhotosFor, helpfulStats,
   nameParts, silhouetteFor, squareBtn, textLink, useViewport, withTileExtras, wrap, type ProfileTile,
 } from "./Profile";
 
@@ -124,11 +124,11 @@ const PublicProfile = () => {
   const styles: string[] = profile.style_aesthetics ?? [];
   const isOwner   = !!user && user.id === userId;
 
-  // Follow and how closely she matches you, beside her portrait.
+  // Follow (or Edit, on her own) in the top right corner.
   const actions = (
-    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: isMobile ? 12 : 16 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       {isOwner ? (
-        <button onClick={() => navigate("/profile")} style={isMobile ? { ...squareBtn(false), fontSize: 11, padding: "12px 14px" } : squareBtn(false)}>Edit profile</button>
+        <button onClick={() => navigate("/profile")} style={{ ...squareBtn(false), fontSize: 11, padding: isMobile ? "10px 16px" : "12px 20px" }}>Edit</button>
       ) : userId ? (
         <FollowButton
           targetUserId={userId}
@@ -140,8 +140,14 @@ const PublicProfile = () => {
           variant="editorial"
         />
       ) : null}
-      {matchScore !== null && <MatchSeal score={matchScore} size={isMobile ? 40 : 56} withLabel labelSize={10.5} />}
     </div>
+  );
+
+  // Her standing beside the photo, and how closely she matches you.
+  const status = (
+    <TierStatus tier={tier} helpful={stats.helpfulVotes} isMobile={isMobile}>
+      {matchScore !== null && <MatchSeal score={matchScore} size={isMobile ? 40 : 52} withLabel labelSize={10.5} />}
+    </TierStatus>
   );
 
   const askItems: string[] = Array.isArray(profile.ask_me_about) ? profile.ask_me_about : [];
@@ -171,8 +177,8 @@ const PublicProfile = () => {
             isWide={isWide}
             name={name}
             facts={[profile.age, profile.city?.split(",")[0]].filter(Boolean)}
-            tier={tier}
             since={profile.created_at}
+            status={status}
             bio={profile.bio}
             portrait={<Portrait url={profile.avatar_url ?? null} name={name} />}
             actions={actions}
@@ -193,12 +199,7 @@ const PublicProfile = () => {
             {
               key: "style",
               label: "Style",
-              content: styles.length > 0 ? (
-                <>
-                  <PanelNote isMobile={isMobile} aside="The aesthetics she shops for." />
-                  <StyleRow labels={styles} isMobile={isMobile} />
-                </>
-              ) : <EmptyNote text={`${first} hasn't picked her aesthetic yet.`} />,
+              content: styles.length > 0 ? <StyleRow labels={styles} isMobile={isMobile} /> : <EmptyNote text={`${first} hasn't picked her aesthetic yet.`} />,
             },
             {
               key: "decisions",

@@ -276,47 +276,58 @@ export function ProfileFooter({ isMobile }: { isMobile: boolean }) {
 /**
  * Who she is, her photo, and her in real outfits.
  *
- * On a phone it is built to be short: her name on top at a size that leaves
- * room for everything else, the portrait small with the actions beside it, then
+ * On a phone it is built to be short: her name on top with Edit (or Follow) in
+ * the top right corner, the portrait small with her standing beside it, then
  * You, IRL and Ask me about. Desktop keeps the three columns.
  */
-export function ProfileTop({ isMobile, isWide, name, facts, tier, since, bio, portrait, actions, irl, askAbout }: {
+export function ProfileTop({ isMobile, isWide, name, facts, since, bio, portrait, status, actions, irl, askAbout }: {
   isMobile: boolean;
   isWide: boolean;
   name: string;
   /** Age and city, already filtered. */
   facts: (string | number)[];
-  tier: string | null;
+  /** When she joined: shown only when she has no standing yet. */
   since?: string | null;
   bio?: string | null;
   portrait: React.ReactNode;
+  /** Her tier and helpful count, for everyone to see. */
+  status: React.ReactNode | null;
   actions: React.ReactNode;
   irl: React.ReactNode | null;
   askAbout: React.ReactNode | null;
 }) {
-  const line = <IdentityLine facts={facts} tier={tier} since={since} />;
+  const line = <IdentityLine facts={facts} tier={null} since={status ? null : since} />;
+  const nameRow = (compact: boolean) => (
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+      <div style={{ minWidth: 0 }}>
+        <BigName name={name} isMobile={compact} compact={compact} />
+        <div style={{ marginTop: compact ? 8 : 14 }}>{line}</div>
+      </div>
+      <div style={{ flexShrink: 0 }}>{actions}</div>
+    </div>
+  );
 
   if (isMobile) {
     return (
       <div>
-        <BigName name={name} isMobile compact />
-        <div style={{ marginTop: 8 }}>{line}</div>
-        <div style={{ display: "flex", alignItems: "stretch", gap: 14, marginTop: 16 }}>
+        {nameRow(true)}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 16 }}>
           <div style={{ width: 120, flexShrink: 0 }}>{portrait}</div>
-          {/* Bio at the top, the actions level with the bottom of the photo. */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: bio ? "space-between" : "flex-end", gap: 12 }}>
-            {bio && <p style={{ ...body(13.5), whiteSpace: "pre-line" }}>{bio}</p>}
-            {actions}
-          </div>
+          {(status || bio) && (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12, paddingTop: 2 }}>
+              {status}
+              {bio && <p style={{ ...body(13.5), whiteSpace: "pre-line" }}>{bio}</p>}
+            </div>
+          )}
         </div>
-        {irl && <div style={{ marginTop: 24 }}>{irl}</div>}
-        {askAbout && <div style={{ marginTop: irl ? 20 : 24 }}>{askAbout}</div>}
+        {irl && <div style={{ marginTop: 26 }}>{irl}</div>}
+        {askAbout && <div style={{ marginTop: 24 }}>{askAbout}</div>}
       </div>
     );
   }
 
   const third = irl || askAbout ? (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
       {irl}
       {askAbout}
     </div>
@@ -332,15 +343,34 @@ export function ProfileTop({ isMobile, isWide, name, facts, tier, since, bio, po
     }}>
       <div>{portrait}</div>
       <div style={{ minWidth: 0, paddingTop: 4 }}>
-        <BigName name={name} isMobile={false} />
-        <div style={{ marginTop: 14 }}>{line}</div>
-        {bio && <p style={{ ...body(15.5), marginTop: 14, maxWidth: "42ch", whiteSpace: "pre-line" }}>{bio}</p>}
-        <div style={{ marginTop: 22 }}>{actions}</div>
+        {nameRow(false)}
+        {status && <div style={{ marginTop: 22 }}>{status}</div>}
+        {bio && <p style={{ ...body(15.5), marginTop: 16, maxWidth: "42ch", whiteSpace: "pre-line" }}>{bio}</p>}
       </div>
       {third && <div style={isWide ? { minWidth: 0 } : { gridColumn: "1 / -1", maxWidth: 560 }}>{third}</div>}
     </div>
   );
 }
+
+/** Her tier and how many of her takes were marked helpful. Public: this is how others read her standing. */
+export function TierStatus({ tier, helpful, isMobile, children }: { tier: string | null; helpful: number; isMobile: boolean; children?: React.ReactNode }) {
+  if (!tier && !helpful && !children) return null;
+  return (
+    <div>
+      {tier && <p style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>{tier}</p>}
+      {(tier || helpful > 0) && (
+        <p style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 10, rowGap: 4, marginTop: tier ? 8 : 0, marginBottom: 0 }}>
+          <span style={display(isMobile ? 30 : 38)}>{helpful}</span>
+          <span style={meta(10)}>{helpful === 1 ? "Helpful response" : "Helpful responses"}</span>
+        </p>
+      )}
+      {children && <div style={{ marginTop: 12 }}>{children}</div>}
+    </div>
+  );
+}
+
+/** A heading inside the header (You, IRL / Ask me about): the name's typeface, a few sizes down. */
+export const headerLabel: React.CSSProperties = display("clamp(22px, 2.1vw, 28px)");
 
 export function Portrait({ url, name, onPick }: { url: string | null; name: string; onPick?: () => void }) {
   const box: React.CSSProperties = {
@@ -399,9 +429,9 @@ export function AskMeAbout({ items, isMobile, onAdd }: { items: string[]; isMobi
   const more = items.length - shown.length;
   return (
     <div>
-      <p style={{ ...meta(11, C.ink), fontWeight: 700 }}>Ask me about</p>
+      <h2 style={headerLabel}>Ask me about</h2>
       {items.length > 0 ? (
-        <p style={{ ...meta(isMobile ? 12 : 13, C.ink), lineHeight: 1.9, marginTop: 8 }}>
+        <p style={{ ...meta(isMobile ? 12 : 13, C.ink), lineHeight: 1.9, marginTop: 10 }}>
           {shown.map((t, i) => (
             <span key={`${t}-${i}`}>
               {/* Spaces round the slash are where a line may break; an entry never breaks inside itself. */}
@@ -428,12 +458,12 @@ export function IrlPhotos({ label, photos, onOpen, owner }: {
   label: string;
   photos: string[];
   onOpen: (i: number) => void;
-  owner?: { onAdd: () => void; onManage: () => void; confirm: boolean };
+  owner?: { onAdd: () => void; confirm: boolean };
 }) {
   const empties = owner ? Math.max(0, 3 - photos.length) : 0;
   return (
     <div>
-      <p style={{ ...meta(11, C.ink), fontWeight: 700 }}>{label}</p>
+      <h2 style={headerLabel}>{label}</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 14 }}>
         {photos.map((url, i) => (
           <button
@@ -462,9 +492,6 @@ export function IrlPhotos({ label, photos, onOpen, owner }: {
           </button>
         ))}
       </div>
-      {owner && photos.length > 0 && (
-        <button onClick={owner.onManage} style={{ ...textLink(C.muted), marginTop: 12 }}>Manage photos</button>
-      )}
       {owner && photos.length === 0 && (
         <>
           <p style={{ ...body(13), marginTop: 14, maxWidth: "46ch" }}>
@@ -556,68 +583,50 @@ export function Lightbox({ photos, index, onIndex, onClose }: {
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
-/** Three big numbers and where she stands on the tier ladder, split by thin rules. */
-export function StatsRow({ decisions, takes, helpful, isMobile }: { decisions: number; takes: number; helpful: number; isMobile: boolean }) {
-  const earned = tierFor(helpful);
+/**
+ * Three numbers on a plain row. With `progress` (her own profile only) a thin
+ * bar underneath shows how far she is from the next tier.
+ */
+export function StatsRow({ decisions, takes, helpful, isMobile, progress }: { decisions: number; takes: number; helpful: number; isMobile: boolean; progress?: boolean }) {
   const next = nextTier(helpful);
-  const threshold = next?.min ?? earned?.min ?? 5;
-  const pct = next ? Math.min(100, Math.round((helpful / threshold) * 100)) : 100;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const rule = `1px solid ${C.rule}`;
+  const threshold = next?.min ?? helpful;
+  const pct = next ? Math.min(100, Math.round((helpful / Math.max(1, threshold)) * 100)) : 100;
 
-  const numbers = [
-    { value: decisions, label: "Decisions posted" },
-    { value: takes, label: "Takes given" },
-    { value: helpful, label: "Marked helpful" },
-  ].map((s, i) => (
-    <div key={s.label} style={{
-      padding: isMobile ? "18px 10px" : "28px 28px",
-      paddingLeft: i === 0 ? 0 : isMobile ? 12 : 28,
-      borderLeft: i ? rule : "none",
-      minWidth: 0,
-    }}>
-      <p style={display(isMobile ? 40 : "clamp(48px, 4.6vw, 68px)")}>{s.value}</p>
-      <p style={{ ...meta(isMobile ? 9.5 : 10.5), marginTop: isMobile ? 10 : 14, lineHeight: 1.45 }}>{s.label}</p>
-    </div>
-  ));
-
-  const standing = (
-    <div style={{
-      padding: isMobile ? "20px 0 22px" : "28px 0 28px 32px",
-      borderLeft: isMobile ? "none" : rule,
-      borderTop: isMobile ? rule : "none",
-      minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center",
-    }}>
-      <p style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>{earned?.label ?? "Building trust"}</p>
-      <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 12, rowGap: 6, marginTop: 12 }}>
-        <span style={display(isMobile ? 30 : 38)}>{next ? `${pad(helpful)} / ${pad(threshold)}` : helpful}</span>
-        <span style={meta(10.5)}>Helpful responses</span>
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: isMobile ? 12 : 28 }}>
+        {[
+          { value: decisions, label: "Decisions posted" },
+          { value: takes, label: "Takes given" },
+          { value: helpful, label: "Marked helpful" },
+        ].map((s) => (
+          <div key={s.label} style={{ minWidth: 0 }}>
+            <p style={display(isMobile ? 34 : 48)}>{s.value}</p>
+            <p style={{ ...meta(isMobile ? 9.5 : 10.5), marginTop: 8, lineHeight: 1.45 }}>{s.label}</p>
+          </div>
+        ))}
       </div>
-      <div
-        role="progressbar"
-        aria-label="Progress to the next tier"
-        aria-valuemin={0}
-        aria-valuemax={threshold}
-        aria-valuenow={Math.min(helpful, threshold)}
-        style={{ height: 8, background: "rgba(20,18,16,0.10)", marginTop: 14 }}
-      >
-        <div style={{ width: `${pct}%`, height: "100%", background: C.burgundy, transition: "width .6s ease" }} />
-      </div>
-      <p style={{ ...meta(10.5, C.ink), marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
-        {next ? <>Next <ArrowRight style={{ width: 13, height: 13 }} strokeWidth={2} /> {next.label}</> : "Highest tier"}
-      </p>
-    </div>
-  );
 
-  return isMobile ? (
-    <div style={{ borderTop: rule, borderBottom: rule }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>{numbers}</div>
-      {standing}
-    </div>
-  ) : (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr)) minmax(0, 1.7fr)", borderTop: rule, borderBottom: rule }}>
-      {numbers}
-      {standing}
+      {progress && (
+        <div style={{ marginTop: isMobile ? 22 : 28, maxWidth: 520 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+            <p style={{ ...meta(10.5, C.ink), fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              {next ? <>Next <ArrowRight style={{ width: 13, height: 13 }} strokeWidth={2} /> {next.label}</> : "Highest tier"}
+            </p>
+            {next && <p style={meta(10.5)}>{helpful} / {threshold} helpful</p>}
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Progress to the next tier"
+            aria-valuemin={0}
+            aria-valuemax={threshold}
+            aria-valuenow={Math.min(helpful, threshold)}
+            style={{ height: 4, background: "rgba(20,18,16,0.10)", marginTop: 10 }}
+          >
+            <div style={{ width: `${pct}%`, height: "100%", background: C.burgundy, transition: "width .6s ease" }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1632,10 +1641,16 @@ const Profile = () => {
         <div style={{ width: 72, flexShrink: 0 }}>
           <Portrait url={profile?.avatar_url ?? null} name={displayName} onPick={pickPhoto} />
         </div>
-        <button onClick={pickPhoto} style={textLink(C.ink)}>
-          <Camera style={{ width: 14, height: 14 }} strokeWidth={1.75} />
-          {profile?.avatar_url ? "Change photo" : "Add photo"}
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
+          <button onClick={pickPhoto} style={textLink(C.ink)}>
+            <Camera style={{ width: 14, height: 14 }} strokeWidth={1.75} />
+            {profile?.avatar_url ? "Change photo" : "Add photo"}
+          </button>
+          <button onClick={fitPhotos.length ? () => setFitPhotoModal("manage") : openUpload} style={textLink(C.ink)}>
+            <Plus style={{ width: 14, height: 14 }} strokeWidth={1.75} />
+            {fitPhotos.length ? "Manage IRL photos" : "Add IRL photos"}
+          </button>
+        </div>
       </div>
       <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} placeholder="Full name"
         style={{ ...fieldStyle, marginBottom: 8 }} />
@@ -1681,12 +1696,12 @@ const Profile = () => {
     { label: "Sign out", on: handleSignOut, tone: C.burgundy },
   ];
 
-  // Sized down on a phone so they sit beside the portrait.
-  const actionBtn: React.CSSProperties = isMobile ? { ...squareBtn(true, C.burgundy), fontSize: 11, padding: "12px 14px" } : squareBtn(true, C.burgundy);
-  const actionIcon: React.CSSProperties = isMobile ? { ...iconSquare, width: 42 } : iconSquare;
+  // Top right corner, beside her name: small enough to never crowd it.
+  const actionBtn: React.CSSProperties = { ...squareBtn(true, C.burgundy), fontSize: 11, padding: isMobile ? "10px 16px" : "12px 20px" };
+  const actionIcon: React.CSSProperties = { ...iconSquare, width: isMobile ? 38 : 42 };
   const actions = (
     <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
-      <button onClick={() => setEditing(true)} style={actionBtn}>Edit profile</button>
+      <button onClick={() => setEditing(true)} style={actionBtn}>Edit</button>
       <div style={{ position: "relative", display: "flex" }}>
         <button onClick={() => setMenuOpen(v => !v)} aria-label="More" aria-haspopup="menu" aria-expanded={menuOpen} style={actionIcon}>
           <MoreHorizontal style={{ width: 18, height: 18 }} strokeWidth={1.75} />
@@ -1713,7 +1728,7 @@ const Profile = () => {
       label="You, IRL"
       photos={fitPhotos}
       onOpen={setLightboxIdx}
-      owner={{ onAdd: openUpload, onManage: () => setFitPhotoModal("manage"), confirm: fitPhotoConfirm }}
+      owner={{ onAdd: openUpload, confirm: fitPhotoConfirm }}
     />
   );
 
@@ -1926,10 +1941,10 @@ const Profile = () => {
               isWide={isWide}
               name={displayName}
               facts={[profile?.age, profile?.city?.split(",")[0]].filter(Boolean)}
-              tier={tier}
               since={profile?.created_at}
               bio={profile?.bio}
               portrait={portrait}
+              status={<TierStatus tier={tier} helpful={stats.helpfulVotes} isMobile={isMobile} />}
               actions={actions}
               irl={irl}
               askAbout={<AskMeAbout items={profile?.ask_me_about ?? []} isMobile={isMobile} onAdd={() => setEditing(true)} />}
@@ -1973,7 +1988,6 @@ const Profile = () => {
                   {editMode !== "style" && (
                     <PanelNote
                       isMobile={isMobile}
-                      aside="The aesthetics you shop for."
                       action={styles.length > 0 ? <button onClick={openStyleEdit} style={textLink(C.burgundy)}>Edit</button> : undefined}
                     />
                   )}
@@ -1990,7 +2004,6 @@ const Profile = () => {
               label: "Mirrors",
               content: !mirrors ? <p style={meta(10.5)}>Loading</p> : mirrors.length > 0 ? (
                 <>
-                  <PanelNote isMobile={isMobile} aside="Women with similar fit, taste, and how they shop." />
                   <div data-noswipe style={isMobile
                     ? { display: "flex", gap: 12, overflowX: "auto", scrollbarWidth: "none", margin: "0 -16px", padding: "0 16px 4px", scrollSnapType: "x mandatory" }
                     : { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: isWide ? 24 : 16 }}>
@@ -2006,7 +2019,7 @@ const Profile = () => {
               label: "Decisions",
               content: (
                 <>
-                  <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} />
+                  <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} progress />
                   <div style={{ marginTop: isMobile ? 26 : 36 }}>
                     <DecisionsBlock
                       bare

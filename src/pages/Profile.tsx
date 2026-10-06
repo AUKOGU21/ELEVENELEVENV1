@@ -404,12 +404,14 @@ export function AskMeAbout({ items, isMobile, onAdd }: { items: string[]; isMobi
         <p style={{ ...meta(isMobile ? 12 : 13, C.ink), lineHeight: 1.9, marginTop: 8 }}>
           {shown.map((t, i) => (
             <span key={`${t}-${i}`}>
-              {i > 0 && <span style={{ color: C.faint, padding: "0 10px" }}>/</span>}
-              {t}
+              {/* Spaces round the slash are where a line may break; an entry never breaks inside itself. */}
+              {i > 0 && <span style={{ color: C.faint, padding: "0 4px" }}> / </span>}
+              <span style={{ whiteSpace: "nowrap" }}>{t}</span>
             </span>
           ))}
+          {more > 0 && " "}
           {more > 0 && (
-            <button onClick={() => setAll(true)} aria-label={`Show ${more} more`} style={{ ...textLink(C.burgundy), fontSize: "inherit", marginLeft: 12, verticalAlign: "baseline" }}>
+            <button onClick={() => setAll(true)} aria-label={`Show ${more} more`} style={{ ...textLink(C.burgundy), fontSize: "inherit", marginLeft: 8, verticalAlign: "baseline" }}>
               +{more}
             </button>
           )}

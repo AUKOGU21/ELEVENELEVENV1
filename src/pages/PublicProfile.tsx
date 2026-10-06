@@ -145,7 +145,7 @@ const PublicProfile = () => {
 
   // Her standing beside the photo, and how closely she matches you.
   const status = (
-    <TierStatus tier={tier} helpful={stats.helpfulVotes} isMobile={isMobile}>
+    <TierStatus tier={tier}>
       {matchScore !== null && <MatchSeal score={matchScore} size={isMobile ? 40 : 52} withLabel labelSize={10.5} />}
     </TierStatus>
   );
@@ -180,7 +180,7 @@ const PublicProfile = () => {
             since={profile.created_at}
             status={status}
             bio={profile.bio}
-            portrait={<Portrait url={profile.avatar_url ?? null} name={name} />}
+            portrait={<Portrait url={profile.avatar_url ?? null} name={name} tier={tier} />}
             actions={actions}
             irl={fitPhotos.length > 0 ? <IrlPhotos label={`${first}, IRL`} photos={fitPhotos} onOpen={setLightboxIdx} /> : null}
             askAbout={askItems.length > 0 ? <AskMeAbout items={askItems} isMobile={isMobile} /> : null}

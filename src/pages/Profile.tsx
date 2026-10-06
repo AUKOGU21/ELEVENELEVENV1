@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS, HEIGHT_OPTIONS, SIZE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { DialInFitModal } from "@/components/DialInFitModal";
-import { tierFor, nextTier } from "@/lib/tiers";
+import { tierFor, nextTier, TIERS } from "@/lib/tiers";
 import { computeMatchScore } from "@/lib/matching";
 import { imageToJpeg } from "@/lib/image";
 import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
@@ -277,8 +277,8 @@ export function ProfileFooter({ isMobile }: { isMobile: boolean }) {
  * Who she is, her photo, and her in real outfits.
  *
  * On a phone it is built to be short: her name on top with Edit (or Follow) in
- * the top right corner, the portrait small with her standing beside it, then
- * You, IRL and Ask me about. Desktop keeps the three columns.
+ * the top right corner, the portrait small with her tier and Ask me about
+ * beside it, then You, IRL. Desktop keeps the three columns.
  */
 export function ProfileTop({ isMobile, isWide, name, facts, since, bio, portrait, status, actions, irl, askAbout }: {
   isMobile: boolean;
@@ -313,25 +313,20 @@ export function ProfileTop({ isMobile, isWide, name, facts, since, bio, portrait
         {nameRow(true)}
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 16 }}>
           <div style={{ width: 120, flexShrink: 0 }}>{portrait}</div>
-          {(status || bio) && (
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12, paddingTop: 2 }}>
+          {(status || askAbout || bio) && (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 20, paddingTop: 2 }}>
               {status}
+              {askAbout}
               {bio && <p style={{ ...body(13.5), whiteSpace: "pre-line" }}>{bio}</p>}
             </div>
           )}
         </div>
         {irl && <div style={{ marginTop: 26 }}>{irl}</div>}
-        {askAbout && <div style={{ marginTop: 24 }}>{askAbout}</div>}
       </div>
     );
   }
 
-  const third = irl || askAbout ? (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-      {irl}
-      {askAbout}
-    </div>
-  ) : null;
+  const third = irl;
 
   return (
     <div style={{
@@ -345,6 +340,7 @@ export function ProfileTop({ isMobile, isWide, name, facts, since, bio, portrait
       <div style={{ minWidth: 0, paddingTop: 4 }}>
         {nameRow(false)}
         {status && <div style={{ marginTop: 22 }}>{status}</div>}
+        {askAbout && <div style={{ marginTop: 18 }}>{askAbout}</div>}
         {bio && <p style={{ ...body(15.5), marginTop: 16, maxWidth: "42ch", whiteSpace: "pre-line" }}>{bio}</p>}
       </div>
       {third && <div style={isWide ? { minWidth: 0 } : { gridColumn: "1 / -1", maxWidth: 560 }}>{third}</div>}
@@ -352,19 +348,18 @@ export function ProfileTop({ isMobile, isWide, name, facts, since, bio, portrait
   );
 }
 
-/** Her tier and how many of her takes were marked helpful. Public: this is how others read her standing. */
-export function TierStatus({ tier, helpful, isMobile, children }: { tier: string | null; helpful: number; isMobile: boolean; children?: React.ReactNode }) {
-  if (!tier && !helpful && !children) return null;
+/** A tier's own colour: the same one as the ring round her photo. */
+export function tierColour(tier: string | null | undefined): string | null {
+  return TIERS.find((t) => t.label === tier)?.ring ?? null;
+}
+
+/** Her tier, in its colour, beside her photo. Public: this is how others read her standing. */
+export function TierStatus({ tier, children }: { tier: string | null; children?: React.ReactNode }) {
+  if (!tier && !children) return null;
   return (
     <div>
-      {tier && <p style={{ ...meta(11, C.burgundy), fontWeight: 700 }}>{tier}</p>}
-      {(tier || helpful > 0) && (
-        <p style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 10, rowGap: 4, marginTop: tier ? 8 : 0, marginBottom: 0 }}>
-          <span style={display(isMobile ? 30 : 38)}>{helpful}</span>
-          <span style={meta(10)}>{helpful === 1 ? "Helpful response" : "Helpful responses"}</span>
-        </p>
-      )}
-      {children && <div style={{ marginTop: 12 }}>{children}</div>}
+      {tier && <p style={{ ...headerLabel, color: tierColour(tier) ?? C.burgundy }}>{tier}</p>}
+      {children && <div style={{ marginTop: tier ? 12 : 0 }}>{children}</div>}
     </div>
   );
 }
@@ -372,10 +367,13 @@ export function TierStatus({ tier, helpful, isMobile, children }: { tier: string
 /** A heading inside the header (You, IRL / Ask me about): the name's typeface, a few sizes down. */
 export const headerLabel: React.CSSProperties = display("clamp(22px, 2.1vw, 28px)");
 
-export function Portrait({ url, name, onPick }: { url: string | null; name: string; onPick?: () => void }) {
+/** Her photo. With a tier, framed in that tier's colour, like the ring on her avatar everywhere else. */
+export function Portrait({ url, name, onPick, tier }: { url: string | null; name: string; onPick?: () => void; tier?: string | null }) {
+  const ring = tierColour(tier);
   const box: React.CSSProperties = {
     width: "100%", aspectRatio: "1 / 1", height: "auto", background: C.well, borderRadius: RADIUS, overflow: "hidden",
     display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: "none",
+    boxShadow: ring ? `0 0 0 3px ${ring}` : undefined,
   };
   const inner = url
     ? <img src={url} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -1632,7 +1630,7 @@ const Profile = () => {
   const closeBtn: React.CSSProperties = { background: "none", border: "none", cursor: "pointer", color: C.ink, lineHeight: 0, padding: 4 };
 
   // Changing the photo lives in Edit profile. An empty portrait still opens the picker.
-  const portrait = <Portrait url={profile?.avatar_url ?? null} name={displayName} onPick={profile?.avatar_url ? undefined : pickPhoto} />;
+  const portrait = <Portrait url={profile?.avatar_url ?? null} name={displayName} tier={tier} onPick={profile?.avatar_url ? undefined : pickPhoto} />;
 
   const editForm = (
     <div style={{ maxWidth: 460 }}>
@@ -1944,7 +1942,7 @@ const Profile = () => {
               since={profile?.created_at}
               bio={profile?.bio}
               portrait={portrait}
-              status={<TierStatus tier={tier} helpful={stats.helpfulVotes} isMobile={isMobile} />}
+              status={<TierStatus tier={tier} />}
               actions={actions}
               irl={irl}
               askAbout={<AskMeAbout items={profile?.ask_me_about ?? []} isMobile={isMobile} onAdd={() => setEditing(true)} />}

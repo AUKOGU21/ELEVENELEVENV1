@@ -118,7 +118,7 @@ export default function AskMeAboutPrompt({ userId, hold = false }: { userId: str
               <h2 id="e11-ask-title" style={{ ...display("clamp(40px, 11vw, 54px)"), lineHeight: 0.92, marginTop: 22 }}>
                 Tell us what you're good at.
               </h2>
-              <p style={{ ...body(15, C.ink), fontWeight: 500, margin: "14px auto 0", maxWidth: "32ch" }}>
+              <p style={{ ...body(15, C.ink), fontWeight: 500, margin: "14px auto 0", maxWidth: "32ch", textWrap: "pretty" } as React.CSSProperties}>
                 Everyone has their thing. Add the brands, categories, or niches you know best so we know when to find you.
               </p>
             </div>

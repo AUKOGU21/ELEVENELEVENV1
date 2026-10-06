@@ -25,6 +25,7 @@ import NotificationPrompt from "@/components/NotificationPrompt";
 import NotificationBell from "@/components/NotificationBell";
 import { type LookingForFoundPayload } from "@/lib/lookingFor";
 import RecommendationModal, { RecommendationDraft } from "@/components/RecommendationModal";
+import AskMeAboutPrompt from "@/components/AskMeAboutPrompt";
 import ReferralPopup from "@/components/ReferralPopup";
 import { ensureInviteCode, ensureReferral } from "@/lib/referral";
 import { toast } from "sonner";
@@ -1404,7 +1405,12 @@ const Feed = () => {
     let done = false;
     let timer: ReturnType<typeof setTimeout>;
     const scroller = scrollRef.current;
-    const fire = () => { if (done) return; done = true; clearTimeout(timer); scroller?.removeEventListener("scroll", onScroll); setShowReferral(true); };
+    const fire = () => {
+      if (done) return;
+      // Another prompt is up (Ask me about, notifications): wait it out, don't stack.
+      if (document.querySelector('[role="dialog"]')) { clearTimeout(timer); timer = setTimeout(fire, 15000); return; }
+      done = true; clearTimeout(timer); scroller?.removeEventListener("scroll", onScroll); setShowReferral(true);
+    };
     const onScroll = () => { if ((scroller?.scrollTop ?? 0) > 600) fire(); };
     timer = setTimeout(fire, 12000);
     scroller?.addEventListener("scroll", onScroll, { passive: true });
@@ -2115,6 +2121,7 @@ const Feed = () => {
       <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} only={missingFit} auto />
 
       {user && <NotificationPrompt userId={user.id} isMobile={isMobile} />}
+      {user && <AskMeAboutPrompt userId={user.id} hold={showFitModal || showReferral} />}
     </div>
   );
 };

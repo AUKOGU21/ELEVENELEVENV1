@@ -23,7 +23,10 @@ export type EventKind =
   | "guest_signup_started"     // a guest tapped Create my profile
   | "guest_signup_completed"   // that guest became a member
   // A one-tap answer from a check-in email or push (bought / passed / deciding).
-  | "checkin_answer";
+  | "checkin_answer"
+  // The returning-member prompt to fill in Ask me about.
+  | "ask_prompt_shown"
+  | "ask_prompt_saved";
 
 export function track(
   kind: EventKind,

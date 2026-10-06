@@ -14,6 +14,7 @@ import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
 import DecisionTile, { type TileDecision } from "@/components/DecisionTile";
 import MatchSeal from "@/components/MatchSeal";
 import { getInitials } from "@/lib/format";
+import AskAboutEditor, { ASK_MAX, useAskPool } from "@/components/AskAboutEditor";
 
 // ════════════════════════════════════════════════════════════════════════════
 // Shared with PublicProfile.tsx
@@ -1054,101 +1055,6 @@ function SaveRow({ onSave, onCancel, disabled, saving }: { onSave: () => void; o
   );
 }
 
-// ─── Ask me about ─────────────────────────────────────────────────────────────
-const ASK_MAX = 5;
-const ASK_LEN = 32;
-
-/** Seeds the autocomplete before other women's answers and posted brands fill it in. */
-const ASK_TOPICS = [
-  "Tall-girl denim", "Petite fits", "Curvy fits", "Plus-size fits", "Designer bags", "Luxury bags", "Vintage",
-  "Resale", "Workwear", "Wedding guest", "Swimwear", "Activewear", "Bra sizing", "Wide feet", "Sneakers", "Heels",
-  "Denim", "Tailoring", "Knitwear", "Outerwear", "Capsule wardrobe", "Quality vs. price", "Sizing across brands",
-  "Skincare", "Makeup", "Haircare", "Fragrance", "Jewelry", "Maternity",
-];
-
-/**
- * Up to five things she knows well. Suggestions where they exist, her own words
- * where they don't. What she picks reads as underlined words with an x, the way
- * the size picker marks a choice: no pills.
- */
-function AskAboutEditor({ value, onChange, pool }: { value: string[]; onChange: (v: string[]) => void; pool: string[] }) {
-  const [q, setQ] = useState("");
-  const [hi, setHi] = useState(-1);
-  const full = value.length >= ASK_MAX;
-  const has = (t: string) => value.some((v) => v.toLowerCase() === t.toLowerCase());
-  const needle = q.trim().toLowerCase();
-  const matches = needle ? pool.filter((p) => p.toLowerCase().includes(needle) && !has(p)).slice(0, 6) : [];
-
-  const add = (raw: string) => {
-    const t = raw.trim().replace(/\s+/g, " ").slice(0, ASK_LEN);
-    setQ(""); setHi(-1);
-    if (!t || full || has(t)) return;
-    onChange([...value, t]);
-  };
-
-  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(hi >= 0 && matches[hi] ? matches[hi] : q); }
-    else if (e.key === "ArrowDown" && matches.length) { e.preventDefault(); setHi((h) => Math.min(matches.length - 1, h + 1)); }
-    else if (e.key === "ArrowUp" && matches.length) { e.preventDefault(); setHi((h) => Math.max(-1, h - 1)); }
-    else if (e.key === "Backspace" && !q && value.length) onChange(value.slice(0, -1));
-    else if (e.key === "Escape") { setQ(""); setHi(-1); }
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-        <label htmlFor="profile-ask" style={strong(14)}>What should people ask you about?</label>
-        <span style={meta(10.5, full ? C.burgundy : C.muted)}>{value.length}/{ASK_MAX}</span>
-      </div>
-      <p style={{ ...body(13, C.muted), marginTop: 4 }}>Brands, luxury bags, fit problems, or anything you know really well.</p>
-
-      {value.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", columnGap: 20, rowGap: 12, marginTop: 14 }}>
-          {value.map((v) => (
-            <span key={v} style={{ ...meta(11, C.ink), fontWeight: 700, letterSpacing: "0.08em", display: "inline-flex", alignItems: "center", gap: 8, paddingBottom: 4, borderBottom: `1px solid ${C.burgundy}` }}>
-              {v}
-              <button onClick={() => onChange(value.filter((x) => x !== v))} aria-label={`Remove ${v}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: C.muted, lineHeight: 0 }}>
-                <X style={{ width: 12, height: 12 }} strokeWidth={2} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {!full && (
-        <div style={{ position: "relative", marginTop: 12 }}>
-          <input
-            id="profile-ask"
-            value={q}
-            maxLength={ASK_LEN}
-            onChange={(e) => { setQ(e.target.value); setHi(-1); }}
-            onKeyDown={onKey}
-            placeholder={value.length ? "Add another" : "e.g. Tall-girl denim"}
-            autoComplete="off"
-            role="combobox"
-            aria-expanded={matches.length > 0}
-            aria-controls="profile-ask-list"
-            style={{ ...fieldStyle, paddingRight: q.trim() ? 64 : 13 }}
-          />
-          {q.trim() && (
-            <button onClick={() => add(q)} style={{ ...textLink(C.burgundy), position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)" }}>Add</button>
-          )}
-          {matches.length > 0 && (
-            <div id="profile-ask-list" role="listbox" style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#FFFFFF", border: `1px solid ${C.rule}`, borderRadius: RADIUS, overflow: "hidden", zIndex: 10 }}>
-              {matches.map((m, i) => (
-                <button key={m} role="option" aria-selected={i === hi} onMouseDown={(e) => e.preventDefault()} onClick={() => add(m)}
-                  style={{ ...body(14, C.ink), width: "100%", textAlign: "left", padding: "10px 13px", background: i === hi ? C.well : "none", border: "none", borderTop: i ? `1px solid ${C.rule}` : "none", cursor: "pointer" }}>
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export type Mirror = {
   id: string;
   display_name: string | null;
@@ -1263,7 +1169,6 @@ const Profile = () => {
   const [editCity, setEditCity]           = useState("");
   const [editBio, setEditBio]             = useState("");
   const [editAsk, setEditAsk]             = useState<string[]>([]);
-  const [askPool, setAskPool]             = useState<string[]>(ASK_TOPICS);
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const cityTyped                         = useRef(false);
   const [saving, setSaving]               = useState(false);
@@ -1290,6 +1195,9 @@ const Profile = () => {
   const [zoom, setZoom]                   = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Ask me about suggestions, fetched the first time she opens Edit.
+  const askPool = useAskPool(editing);
 
   // Mirrors
   const [mirrors, setMirrors] = useState<Mirror[] | null>(null);
@@ -1333,32 +1241,6 @@ const Profile = () => {
     }, 250);
     return () => clearTimeout(t);
   }, [editCity]);
-
-  // Ask me about suggestions: what other women offer and the brands posted here,
-  // on top of the seed topics. Fetched once, the first time she opens the editor.
-  const askPoolLoaded = useRef(false);
-  useEffect(() => {
-    if (!editing || askPoolLoaded.current) return;
-    askPoolLoaded.current = true;
-    (async () => {
-      const [askRes, brandRes] = await Promise.all([
-        supabase.from("profiles").select("ask_me_about").not("ask_me_about", "is", null).limit(500),
-        supabase.from("decisions").select("brand_name").not("brand_name", "is", null).is("deleted_at", null).limit(1000),
-      ]);
-      const seen = new Set<string>();
-      const out: string[] = [];
-      const push = (v: unknown) => {
-        if (typeof v !== "string") return;
-        const t = v.trim();
-        if (!t || t.length > ASK_LEN || seen.has(t.toLowerCase())) return;
-        seen.add(t.toLowerCase()); out.push(t);
-      };
-      ASK_TOPICS.forEach(push);
-      ((askRes.data ?? []) as any[]).forEach((r) => (r.ask_me_about ?? []).forEach(push));
-      ((brandRes.data ?? []) as any[]).forEach((r) => push(r.brand_name));
-      setAskPool(out);
-    })();
-  }, [editing]);
 
   useEffect(() => {
     if (!profile || !user) return;

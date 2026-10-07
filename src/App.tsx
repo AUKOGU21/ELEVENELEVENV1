@@ -15,6 +15,7 @@ import BrandLibrary from "./pages/BrandLibrary.tsx";
 import SignIn from "./pages/SignIn.tsx";
 import CheckEmail from "./pages/CheckEmail.tsx";
 import Profile from "./pages/Profile.tsx";
+import { PrivacyPage, TermsPage } from "./pages/Legal.tsx";
 import SharedDecision from "./pages/SharedDecision.tsx";
 import PublicProfile from "./pages/PublicProfile.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -48,6 +49,8 @@ const App = () => (
             <Route path="/d/:id" element={<SharedDecision />} />
             <Route path="/brands" element={<BrandLibrary />} />
             <Route path="/check-email" element={<CheckEmail />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<PublicProfile />} />
             <Route path="*" element={<NotFound />} />

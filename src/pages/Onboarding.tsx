@@ -10,6 +10,7 @@ import { computeMatchScore } from "@/lib/matching";
 import { ensureReferral, pendingReferrer } from "@/lib/referral";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { C, RADIUS, SANS, body, display, hairline, meta, strong } from "@/lib/design";
+import { AgreeLine } from "@/pages/Legal";
 
 // ─── Match label helper ───────────────────────────────────────────────────────
 
@@ -309,7 +310,8 @@ const Onboarding = () => {
     || "";
 
   const canContinue = () => {
-    if (current.type === "account")      return !!(firstName.trim() && lastName.trim() && (resuming || email.trim()) && age.trim() && city.trim());
+    // 18 and over only (Terms, section 2).
+    if (current.type === "account")      return !!(firstName.trim() && lastName.trim() && (resuming || email.trim()) && Number(age) >= 18 && city.trim());
     if (current.type === "transition")   return true;
     if (current.type === "fit")          return true;   // every answer is optional
     if (current.type === "pinterest")    return true;
@@ -501,6 +503,9 @@ const Onboarding = () => {
                 )}
                 <input className="ob-field" value={age} onChange={e => setAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" type="text" inputMode="numeric" maxLength={3}
                   style={field} />
+                {age.length >= 2 && Number(age) < 18 && (
+                  <p style={{ ...body(13.5, C.burgundy), marginTop: -4 }}>ELEVENELEVEN is for women 18 and older.</p>
+                )}
                 <div style={{ position: "relative" }}>
                   <input className="ob-field" value={city} onChange={e => setCity(e.target.value)} placeholder="City (e.g. New York)"
                     style={field} />
@@ -521,6 +526,7 @@ const Onboarding = () => {
                   )}
                 </div>
               </div>
+              <AgreeLine style={{ marginTop: 16 }} />
             </motion.div>
           )}
 
@@ -829,7 +835,7 @@ const Onboarding = () => {
             {/* Privacy note — shown on all onboarding screens */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 20 }}>
               <Lock style={{ width: 11, height: 11, color: C.faint }} strokeWidth={2} />
-              <span style={meta(10, C.muted)}>We keep your info private</span>
+              <span style={meta(10, C.muted)}>Your email is never shown on your profile</span>
             </div>
           </div>
         )}

@@ -267,7 +267,11 @@ export function ProfileFooter({ isMobile }: { isMobile: boolean }) {
       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap",
     }}>
       <p style={{ ...meta(isMobile ? 9.5 : 10.5, C.ink), letterSpacing: "0.3em", fontWeight: 500 }}>Real women. Real decisions.</p>
-      <Wordmark size={isMobile ? 10 : 11} />
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 16 : 24 }}>
+        <a href="/terms" style={{ ...meta(isMobile ? 9.5 : 10.5, C.muted), textDecoration: "none" }}>Terms</a>
+        <a href="/privacy" style={{ ...meta(isMobile ? 9.5 : 10.5, C.muted), textDecoration: "none" }}>Privacy</a>
+        <Wordmark size={isMobile ? 10 : 11} />
+      </div>
     </footer>
   );
 }

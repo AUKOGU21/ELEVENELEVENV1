@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { C, RADIUS, SANS, body, display, meta } from "@/lib/design";
+import { AgreeLine } from "@/pages/Legal";
 
 // ── The front door, set in the editorial system ───────────────────────────────
 // Paper, rules and square edges per src/lib/design.ts. Nothing here changes what
@@ -366,6 +367,8 @@ const SignIn = () => {
               {error && (
                 <p style={{ ...body(14, C.burgundy), marginTop: 4 }}>{error}</p>
               )}
+
+              {mode === "signup" && <AgreeLine action="creating an account" style={{ marginTop: 2 }} />}
 
               <button
                 onClick={mode === "signin" ? handleSignIn : handleSignUp}

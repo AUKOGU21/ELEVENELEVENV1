@@ -15,6 +15,8 @@ Env:
 Usage: SUPABASE_ACCESS_TOKEN=sbp_xxx RESEND_API_KEY=re_xxx python3 scripts/send_mens_survey.py
 """
 import os, sys, json, time, subprocess
+sys.path.insert(0, os.path.dirname(__file__))
+from email_guard import excluded, unsub_headers, unsub_url  # noqa: E402
 
 REF = "bmiquikoxxukfujnpizp"
 SURVEY_BASE = "https://join.geteleveneleven.com/men"
@@ -58,6 +60,10 @@ rows = query(f"""
   order by first_name
 """)
 
+# Never email anyone in admin.email_exclude (unsubscribes included).
+_skip = excluded(query)
+rows = [r for r in rows if (r.get("email") or "").strip().lower() not in _skip]
+
 if not rows:
     print("No men left to email (all already sent). ✅")
     sys.exit(0)
@@ -74,7 +80,7 @@ for r in rows:
         continue
     html = template.replace("{{FIRST_NAME}}", first).replace("{{SURVEY_URL}}", url)
     payload = json.dumps({"from": FROM, "to": [email], "subject": SUBJECT, "html": html,
-                          "headers": {"List-Unsubscribe": "<mailto:hello@geteleveneleven.com?subject=Unsubscribe>"}})
+                          "headers": unsub_headers(email)})
     out = curl(["curl", "-s", "https://api.resend.com/emails", "-X", "POST",
                 "-H", f"Authorization: Bearer {KEY}", "-H", "Content-Type: application/json", "--data", payload])
     try:

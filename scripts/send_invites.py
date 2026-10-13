@@ -12,6 +12,8 @@ Env:
 Usage: SUPABASE_ACCESS_TOKEN=sbp_xxx RESEND_API_KEY=re_xxx python3 scripts/send_invites.py
 """
 import os, sys, json, time, subprocess
+sys.path.insert(0, os.path.dirname(__file__))
+from email_guard import excluded, unsub_headers, unsub_url  # noqa: E402
 
 REF = "bmiquikoxxukfujnpizp"
 SB = os.environ.get("SUPABASE_ACCESS_TOKEN")
@@ -50,6 +52,8 @@ rows = query("""
   where w.invited_at is null and u.id is null
   order by w.created_at
 """)
+# The hardcoded list plus everyone in admin.email_exclude (unsubscribes included).
+EXCLUDE = EXCLUDE | excluded(query)
 targets = [r for r in rows if (r.get("email") or "").lower() not in EXCLUDE]
 
 if not targets:
@@ -68,7 +72,7 @@ for r in targets:
     html = template.replace("{{FIRST_NAME}}", first).replace("{{SITE_URL}}", "https://geteleveneleven.com/onboarding")
     payload = json.dumps({"from": "ElevenEleven <hello@geteleveneleven.com>", "to": [email],
                           "subject": "you're in.", "html": html,
-                          "headers": {"List-Unsubscribe": "<mailto:hello@geteleveneleven.com?subject=Unsubscribe>"}})
+                          "headers": unsub_headers(email)})
     out = curl(["curl", "-s", "https://api.resend.com/emails", "-X", "POST",
                 "-H", f"Authorization: Bearer {KEY}", "-H", "Content-Type: application/json", "--data", payload])
     try:

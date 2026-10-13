@@ -32,7 +32,38 @@ const SECRET = Deno.env.get("REMINDER_SECRET") ?? "";
 const PUSH_SECRET = Deno.env.get("PUSH_HOOK_SECRET") ?? "";
 const SITE = Deno.env.get("SITE_URL") ?? "https://geteleveneleven.com";
 const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
-const UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
+
+// ── Unsubscribes ──────────────────────────────────────────────────────────────
+// Each email carries her own signed geteleveneleven.com/unsubscribe link (see the
+// unsubscribe function; same HMAC recipe as scripts/email_guard.py), and nobody
+// who unsubscribed is emailed. Only scope 'all' blocks this kind of email; the
+// marketing-only rows (the men list, duplicates) still get their own notifications.
+const UNSUB_SECRET = Deno.env.get("UNSUB_SECRET") ?? "";
+const MAILTO_UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
+async function unsubUrl(email: string): Promise<string> {
+  if (!UNSUB_SECRET) return MAILTO_UNSUB;
+  const e = email.trim().toLowerCase();
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(UNSUB_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(e));
+  const t = [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  return `https://geteleveneleven.com/unsubscribe?e=${encodeURIComponent(e)}&t=${t}`;
+}
+function unsubHeaders(url: string): Record<string, string> {
+  return url.startsWith("mailto:")
+    ? { "List-Unsubscribe": `<${url}>` }
+    : { "List-Unsubscribe": `<${url}>, <${MAILTO_UNSUB}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+}
+/** True if she unsubscribed. If the check itself fails, the email still goes. */
+async function emailBlocked(email: string): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL"), key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return false;
+  const r = await fetch(`${url}/rest/v1/rpc/email_blocked`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ addr: email, transactional: true }),
+  }).catch(() => null);
+  return r?.ok ? (await r.json().catch(() => false)) === true : false;
+}
 
 const STEP_DAYS = [3, 10, 21];
 const MIN_GAP_DAYS = 4; // never two check-ins on one post closer than this
@@ -154,7 +185,7 @@ function button(label: string, href: string): string {
           </td></tr>`;
 }
 
-function renderEmail(c: Candidate, copy: Copy): string {
+function renderEmail(c: Candidate, copy: Copy, unsub: string): string {
   const lf = c.post_type === "looking_for";
   const buttons = lf
     ? button("Found it", link(c, "found")) + button("Still looking", link(c, "deciding"))
@@ -210,7 +241,7 @@ function renderEmail(c: Candidate, copy: Copy): string {
           You're receiving this because you posted on ElevenEleven<br>
           <a href="mailto:hello@geteleveneleven.com" style="color:#8E8E88;text-decoration:underline;">hello@geteleveneleven.com</a>
           &nbsp;&middot;&nbsp;
-          <a href="${UNSUB}" style="color:#8E8E88;text-decoration:underline;">Unsubscribe</a>
+          <a href="${unsub}" style="color:#8E8E88;text-decoration:underline;">Unsubscribe</a>
         </td></tr>
       </table>
     </td></tr>
@@ -233,12 +264,14 @@ async function sendPush(c: Candidate, copy: Copy): Promise<boolean> {
 
 async function sendEmail(c: Candidate, copy: Copy): Promise<boolean> {
   if (!RESEND_API_KEY || !c.owner_email) return false;
+  if (await emailBlocked(c.owner_email)) return false;
+  const unsub = await unsubUrl(c.owner_email);
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: EMAIL_FROM, to: [c.owner_email], subject: copy.title, html: renderEmail(c, copy),
-      headers: { "List-Unsubscribe": `<${UNSUB}>` },
+      from: EMAIL_FROM, to: [c.owner_email], subject: copy.title, html: renderEmail(c, copy, unsub),
+      headers: unsubHeaders(unsub),
     }),
   });
   if (!r.ok) console.error("check-in email failed:", c.decision_id, r.status, await r.text());

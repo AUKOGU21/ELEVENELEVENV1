@@ -16,7 +16,38 @@
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "";
 const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
-const UNSUBSCRIBE_URL = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
+
+// ── Unsubscribes ──────────────────────────────────────────────────────────────
+// Each email carries her own signed geteleveneleven.com/unsubscribe link (see the
+// unsubscribe function; same HMAC recipe as scripts/email_guard.py), and nobody
+// who unsubscribed is emailed. Only scope 'all' blocks this kind of email; the
+// marketing-only rows (the men list, duplicates) still get their own notifications.
+const UNSUB_SECRET = Deno.env.get("UNSUB_SECRET") ?? "";
+const MAILTO_UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
+async function unsubUrl(email: string): Promise<string> {
+  if (!UNSUB_SECRET) return MAILTO_UNSUB;
+  const e = email.trim().toLowerCase();
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(UNSUB_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(e));
+  const t = [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  return `https://geteleveneleven.com/unsubscribe?e=${encodeURIComponent(e)}&t=${t}`;
+}
+function unsubHeaders(url: string): Record<string, string> {
+  return url.startsWith("mailto:")
+    ? { "List-Unsubscribe": `<${url}>` }
+    : { "List-Unsubscribe": `<${url}>, <${MAILTO_UNSUB}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+}
+/** True if she unsubscribed. If the check itself fails, the email still goes. */
+async function emailBlocked(email: string): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL"), key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return false;
+  const r = await fetch(`${url}/rest/v1/rpc/email_blocked`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ addr: email, transactional: true }),
+  }).catch(() => null);
+  return r?.ok ? (await r.json().catch(() => false)) === true : false;
+}
 
 const SUBJECT = "welcome to the no-guess list";
 
@@ -191,6 +222,8 @@ Deno.serve(async (req) => {
   if (!justConfirmed) return json({ skipped: "not a confirmation transition" });
 
   if (!RESEND_API_KEY) return json({ error: "RESEND_API_KEY not set" }, 500);
+  if (await emailBlocked(email)) return json({ skipped: "unsubscribed" });
+  const unsub = await unsubUrl(email);
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -203,7 +236,7 @@ Deno.serve(async (req) => {
       to: [email],
       subject: SUBJECT,
       html: renderEmail(),
-      headers: { "List-Unsubscribe": `<${UNSUBSCRIBE_URL}>` },
+      headers: unsubHeaders(unsub),
     }),
   });
 

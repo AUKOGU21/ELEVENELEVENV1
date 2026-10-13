@@ -18,6 +18,8 @@ import sys
 import json
 import time
 import subprocess
+sys.path.insert(0, os.path.dirname(__file__))
+from email_guard import excluded, unsub_headers, unsub_url  # noqa: E402
 
 PROJECT_REF = "bmiquikoxxukfujnpizp"
 SB_TOKEN = os.environ.get("SUPABASE_ACCESS_TOKEN")
@@ -68,6 +70,10 @@ recipients = query(
     """
 )
 
+# Never email anyone in admin.email_exclude (unsubscribes included).
+_skip = excluded(query)
+recipients = [r for r in recipients if (r.get("email") or "").strip().lower() not in _skip]
+
 if not recipients:
     print("Nothing to nudge — every invited person has already joined. ✅")
     sys.exit(0)
@@ -85,7 +91,7 @@ for r in recipients:
     html = template.replace("{{FIRST_NAME}}", first).replace("{{SITE_URL}}", SITE_URL)
     payload = json.dumps({
         "from": FROM, "to": [email], "subject": SUBJECT, "html": html,
-        "headers": {"List-Unsubscribe": "<mailto:hello@geteleveneleven.com?subject=Unsubscribe>"},
+        "headers": unsub_headers(email),
     })
     out = curl([
         "curl", "-s", "https://api.resend.com/emails", "-X", "POST",

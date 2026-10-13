@@ -17,7 +17,38 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const SITE = Deno.env.get("SITE_URL") ?? "https://geteleveneleven.com";
 const FROM = Deno.env.get("EMAIL_FROM") ?? "ElevenEleven <hello@geteleveneleven.com>";
-const UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
+
+// ── Unsubscribes ──────────────────────────────────────────────────────────────
+// Each email carries her own signed geteleveneleven.com/unsubscribe link (see the
+// unsubscribe function; same HMAC recipe as scripts/email_guard.py), and nobody
+// who unsubscribed is emailed. Only scope 'all' blocks this kind of email; the
+// marketing-only rows (the men list, duplicates) still get their own notifications.
+const UNSUB_SECRET = Deno.env.get("UNSUB_SECRET") ?? "";
+const MAILTO_UNSUB = "mailto:hello@geteleveneleven.com?subject=Unsubscribe";
+async function unsubUrl(email: string): Promise<string> {
+  if (!UNSUB_SECRET) return MAILTO_UNSUB;
+  const e = email.trim().toLowerCase();
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(UNSUB_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(e));
+  const t = [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  return `https://geteleveneleven.com/unsubscribe?e=${encodeURIComponent(e)}&t=${t}`;
+}
+function unsubHeaders(url: string): Record<string, string> {
+  return url.startsWith("mailto:")
+    ? { "List-Unsubscribe": `<${url}>` }
+    : { "List-Unsubscribe": `<${url}>, <${MAILTO_UNSUB}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+}
+/** True if she unsubscribed. If the check itself fails, the email still goes. */
+async function emailBlocked(email: string): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL"), key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return false;
+  const r = await fetch(`${url}/rest/v1/rpc/email_blocked`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ addr: email, transactional: true }),
+  }).catch(() => null);
+  return r?.ok ? (await r.json().catch(() => false)) === true : false;
+}
 
 const CHERRY = SITE + "/email/cherry-faded.jpg";
 const LEGS = SITE + "/email/legs-faded.jpg";
@@ -177,7 +208,7 @@ function fill(tpl: string, v: Record<string, string>): string {
   return out;
 }
 
-function render(e: Event, v: Record<string, string>): string {
+function render(e: Event, v: Record<string, string>, unsub: string): string {
   const head = esc(fill(e.head, v));
   const sub = esc(fill(e.sub, v));
   const cta = esc(fill(e.cta, v));
@@ -238,7 +269,7 @@ ${body}
 <tr><td align="center" class="px" style="padding:22px 48px 30px;font-size:10px;line-height:1.9;letter-spacing:0.8px;color:#9A9A94;text-transform:uppercase;">
 ${esc(e.foot)}<br>
 <a href="mailto:hello@geteleveneleven.com" style="color:#9A9A94;text-decoration:underline;">hello@geteleveneleven.com</a>
-&nbsp;&middot;&nbsp;<a href="${UNSUB}" style="color:#9A9A94;text-decoration:underline;">Unsubscribe</a>
+&nbsp;&middot;&nbsp;<a href="${unsub}" style="color:#9A9A94;text-decoration:underline;">Unsubscribe</a>
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -312,6 +343,8 @@ Deno.serve(async (req) => {
     }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const to = u?.email;
     if (!to) return json({ ok: true, emailed: false, note: "no email on file" });
+    if (await emailBlocked(to)) return json({ ok: true, emailed: false, note: "unsubscribed" });
+    const unsub = await unsubUrl(to);
 
     const send = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -319,8 +352,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: FROM, to: [to],
         subject: fill(e.subject, v),
-        html: render(e, v),
-        headers: { "List-Unsubscribe": "<" + UNSUB + ">" },
+        html: render(e, v, unsub),
+        headers: unsubHeaders(unsub),
       }),
     });
     if (!send.ok) {

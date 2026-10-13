@@ -25,6 +25,8 @@ The waitlist (joined, never made an account) is WW_AUDIENCE=waitlist:
   WW_AUDIENCE=waitlist WW_TEMPLATE=join-open-now.html WW_CAMPAIGN=join_open_now_2026_09_28
 """
 import os, sys, json, time, subprocess
+sys.path.insert(0, os.path.dirname(__file__))
+from email_guard import excluded, unsub_headers, unsub_url  # noqa: E402
 
 REF = "bmiquikoxxukfujnpizp"
 
@@ -87,12 +89,12 @@ def send(email, first, onboarded=True):
     url = SITE + ("/feed" if onboarded else "/onboarding")
     html = (template
             .replace("{{FIRST_NAME}}", first)
-            .replace("{{UNSUBSCRIBE_URL}}", UNSUB)
+            .replace("{{UNSUBSCRIBE_URL}}", unsub_url(email))
             .replace("{{CTA_LABEL}}", label)
             .replace("{{CTA_URL}}", url))
     payload = json.dumps({"from": "ElevenEleven <hello@geteleveneleven.com>", "to": [email],
                           "subject": SUBJECT, "html": html,
-                          "headers": {"List-Unsubscribe": f"<{UNSUB}>"}})
+                          "headers": unsub_headers(email)})
     out = curl(["curl", "-s", "https://api.resend.com/emails", "-X", "POST",
                 "-H", f"Authorization: Bearer {KEY}", "-H", "Content-Type: application/json",
                 "--data", payload])

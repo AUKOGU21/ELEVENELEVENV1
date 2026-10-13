@@ -18,6 +18,8 @@ Usage:
     SUPABASE_ACCESS_TOKEN=sbp_xxx RESEND_API_KEY=re_xxx python3 scripts/notify_weighin.py [decision_id]
 """
 import os, sys, json, subprocess
+sys.path.insert(0, os.path.dirname(__file__))
+from email_guard import excluded, unsub_headers, unsub_url  # noqa: E402
 
 REF = "bmiquikoxxukfujnpizp"
 SITE_URL = "https://geteleveneleven.com"
@@ -79,6 +81,9 @@ print(f"  responder : {responder}")
 print(f"  item      : {item}")
 print(f"  subject   : {subject}")
 
+# A notification about her own post: only an unsubscribe stops it.
+if owner_email and owner_email.lower() in excluded(query, transactional=True):
+    sys.exit(f"Skipped: {owner_email} has unsubscribed.")
 if not owner_email:
     sys.exit("✗ No owner email on that decision.")
 if DRY:
@@ -90,7 +95,7 @@ html = (open(TEMPLATE).read()
         .replace("{{SITE_URL}}", SITE_URL))
 
 payload = json.dumps({"from": FROM, "to": [owner_email], "subject": subject, "html": html,
-                      "headers": {"List-Unsubscribe": "<mailto:hello@geteleveneleven.com?subject=Unsubscribe>"}})
+                      "headers": unsub_headers(owner_email)})
 out = curl(["curl", "-s", "https://api.resend.com/emails", "-X", "POST",
             "-H", f"Authorization: Bearer {KEY}", "-H", "Content-Type: application/json", "--data", payload])
 try:

@@ -1,8 +1,9 @@
 // ElevenEleven for Chrome
 // -----------------------------------------------------------------------------
 // Click the E11 logo in the toolbar on any product page, or right-click a page,
-// a product photo or a link and pick "Post to ElevenEleven". Either way a new
-// tab opens on geteleveneleven.com/post with the product already filled in.
+// a product photo or a link and pick "Post to ElevenEleven". Either way the side
+// panel opens beside the store (panel.html) on geteleveneleven.com/post, with the
+// product already filled in. She keeps shopping on the left.
 //
 // The product is read right here, from the page she's looking at: it's already
 // loaded in her browser, so there's no bot wall and no wait. That is the whole
@@ -16,7 +17,8 @@
 // is missing, the site falls back to its own lookup from the url.
 //
 // Permissions show no install warning: activeTab (the page she's on, only at the
-// moment she clicks), scripting (to read that page then) and contextMenus.
+// moment she clicks), scripting (to read that page then), sidePanel, storage
+// (to hand the product to the panel) and contextMenus.
 // -----------------------------------------------------------------------------
 const SITE = "https://geteleveneleven.com";
 const MENU_ID = "post-to-eleveneleven";
@@ -106,7 +108,8 @@ async function readTab(tab) {
   }
 }
 
-function openPost(pageUrl, imageUrl, fromTab, read) {
+/** The /post link for this product: page, and whatever we read off it. */
+function postUrl(pageUrl, imageUrl, read) {
   let target = `${SITE}/post`;
   // Our own site, a new tab or a chrome:// page has no product to read.
   if (isWeb(pageUrl) && !pageUrl.startsWith(SITE)) {
@@ -123,11 +126,36 @@ function openPost(pageUrl, imageUrl, fromTab, read) {
     q.set("src", "extension");
     target += `?${q.toString()}`;
   }
-  chrome.tabs.create({
-    url: target,
-    // Right next to the store she's on, so going back to shopping is one tab over.
-    ...(fromTab && typeof fromTab.index === "number" ? { index: fromTab.index + 1 } : {}),
-  });
+  return target;
+}
+
+/**
+ * Open the side panel beside the store, then fill it. The open has to come
+ * first and without awaiting anything: Chrome only lets an extension open the
+ * panel in direct response to her click. The product is read after and handed
+ * to the panel (panel.js) through session storage. If the panel can't open
+ * (Chrome older than 116), the post opens in a tab next to the store instead.
+ */
+function present(tab, pageUrl, imageUrl, { readPage = true } = {}) {
+  let panel = null;
+  try {
+    panel = chrome.sidePanel && tab && typeof tab.windowId === "number"
+      ? chrome.sidePanel.open({ windowId: tab.windowId })
+      : null;
+  } catch (e) {
+    panel = null;
+  }
+  (async () => {
+    const read = readPage ? await readTab(tab) : null;
+    const url = postUrl(pageUrl, imageUrl, read);
+    let opened = false;
+    try { if (panel) { await panel; opened = true; } } catch (e) { opened = false; }
+    if (opened) {
+      await chrome.storage.session.set({ panelTarget: { url, at: Date.now() } });
+    } else {
+      chrome.tabs.create({ url, ...(tab && typeof tab.index === "number" ? { index: tab.index + 1 } : {}) });
+    }
+  })();
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -138,14 +166,12 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.action.onClicked.addListener(async (tab) => {
-  openPost(tab.url, null, tab, await readTab(tab));
-});
+chrome.action.onClicked.addListener((tab) => present(tab, tab.url, null));
 
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== MENU_ID) return;
-  if (info.mediaType === "image") openPost(info.pageUrl, info.srcUrl, tab, await readTab(tab));
+  if (info.mediaType === "image") present(tab, info.pageUrl, info.srcUrl);
   // A link points at another page we haven't loaded: the site looks that one up.
-  else if (info.linkUrl) openPost(info.linkUrl, null, tab, null);
-  else openPost(info.pageUrl, null, tab, await readTab(tab));
+  else if (info.linkUrl) present(tab, info.linkUrl, null, { readPage: false });
+  else present(tab, info.pageUrl, null);
 });

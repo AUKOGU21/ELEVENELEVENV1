@@ -20,6 +20,18 @@
       "128": "icons/icon-128.png"
     }
   },
-  "background": { "service_worker": "background.js" },
-  "permissions": ["activeTab", "scripting", "contextMenus"]
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "sidePanel",
+    "storage",
+    "contextMenus"
+  ],
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "minimum_chrome_version": "116"
 }

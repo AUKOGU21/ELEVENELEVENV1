@@ -127,6 +127,7 @@ const SignIn = () => {
     if (!authLoading && user) navigate(next ?? "/feed", { replace: true });
   }, [authLoading, user, navigate, next]);
 
+  const inFrame = typeof window !== "undefined" && window.self !== window.top;
   const [mode, setMode] = useState<"signin" | "signup">(
     searchParams.get("mode") === "signup" ? "signup" : "signin"
   );
@@ -378,7 +379,9 @@ const SignIn = () => {
                 {loading ? "..." : mode === "signin" ? "Sign in" : "Create account"}
               </button>
 
-              {mode === "signin" && (
+              {/* Not inside the Chrome extension's side panel: the emailed link opens in a
+                  normal tab, which Chrome keeps signed in separately from the panel. */}
+              {mode === "signin" && !inFrame && (
                 linkState === "sent" ? (
                   <p style={{ ...body(13.5, C.muted), marginTop: 6 }}>
                     Sent. Check {email.trim()} for a link to sign in. It works for an hour.

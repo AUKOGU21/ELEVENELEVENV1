@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "ElevenEleven",
+  "short_name": "ElevenEleven",
+  "description": "On the fence about something you're shopping? Send it to women with your body and style before you check out.",
+  "version": "1.0.0",
+  "homepage_url": "https://geteleveneleven.com",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Post to ElevenEleven",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["activeTab", "contextMenus"]
+}

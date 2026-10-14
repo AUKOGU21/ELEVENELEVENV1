@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, type CSSProperties } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useCallback, useEffect, type CSSProperties } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -248,8 +248,9 @@ const enter = {
 
 const PostDecision = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
 
   const [flowStep, setFlowStep] = useState<FlowStep>("input");
   // "Who would you especially like input from?" — captured to learn what women
@@ -389,8 +390,15 @@ const PostDecision = () => {
   };
 
   // ─── URL submit handler ───────────────────────────────────────────
-  const handleUrlSubmit = async () => {
-    const trimmed = urlInput.trim();
+  const handleUrlSubmit = () => extractFromUrl(urlInput);
+
+  /**
+   * Read a product page into the post. Used by the link field and by the Chrome
+   * extension, which opens /post?url=<page>&img=<photo she right-clicked>. A
+   * photo she picked herself beats the one the page advertises.
+   */
+  const extractFromUrl = async (raw: string, pickedImage?: string | null) => {
+    const trimmed = raw.trim();
     if (!trimmed) return;
     setUrlError(null);
 
@@ -413,7 +421,7 @@ const PostDecision = () => {
         brand: data.brand ?? "",
         name: data.name ?? "",
         retailer: data.retailer ?? "",
-        image_url: data.image_url ?? null,
+        image_url: pickedImage || data.image_url || null,
         color: data.color ?? null,
         category: normalizeCategory(data.category) ?? normalizeCategory(data.name) ?? data.category ?? null,
         price: data.price ? String(data.price) : null,
@@ -429,6 +437,24 @@ const PostDecision = () => {
     }
     setFlowStep("preview");
   };
+
+  // Arrived from the Chrome extension (or any /post?url= link): start reading
+  // the product straight away. Signed out, she signs in first and comes back here.
+  const linkedUrl = searchParams.get("url");
+  const linkedImg = searchParams.get("img");
+  const linkedStarted = useRef(false);
+  useEffect(() => {
+    if (!linkedUrl || linkedStarted.current || authLoading) return;
+    if (!user) {
+      const here = `/post?url=${encodeURIComponent(linkedUrl)}${linkedImg ? `&img=${encodeURIComponent(linkedImg)}` : ""}`;
+      navigate(`/signin?next=${encodeURIComponent(here)}`, { replace: true });
+      return;
+    }
+    linkedStarted.current = true;
+    setUrlInput(linkedUrl);
+    extractFromUrl(linkedUrl, linkedImg && /^https?:\/\//.test(linkedImg) ? linkedImg : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedUrl, authLoading, user]);
 
   const handleSecondPhotoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

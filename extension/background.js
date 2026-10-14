@@ -158,12 +158,44 @@ function present(tab, pageUrl, imageUrl, { readPage = true } = {}) {
   })();
 }
 
+// ── The logo on product photos (opt-in) ────────────────────────────────────────
+// Off until she turns it on in the side panel, which asks Chrome for the "all
+// sites" permission (optional in the manifest, so installing never shows that
+// warning). With it, hover.js runs on pages she opens; without it, nothing does.
+const ALL_SITES = { origins: ["https://*/*", "http://*/*"] };
+const HOVER_ID = "e11-hover";
+
+async function syncHover() {
+  const on = await chrome.permissions.contains(ALL_SITES);
+  const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [HOVER_ID] });
+  if (on && !existing.length) {
+    await chrome.scripting.registerContentScripts([{
+      id: HOVER_ID, matches: ALL_SITES.origins, js: ["hover.js"], runAt: "document_idle", persistAcrossSessions: true,
+    }]);
+    // Tabs already open don't need a reload to get it.
+    const tabs = await chrome.tabs.query({ url: ALL_SITES.origins });
+    for (const t of tabs) chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["hover.js"] }).catch(() => {});
+  } else if (!on && existing.length) {
+    await chrome.scripting.unregisterContentScripts({ ids: [HOVER_ID] });
+  }
+}
+
+chrome.permissions.onAdded.addListener(() => syncHover());
+chrome.permissions.onRemoved.addListener(() => syncHover());
+chrome.runtime.onStartup.addListener(() => syncHover());
+
+// Her click on the logo on a photo (hover.js): same panel, with that photo.
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg && msg.type === "e11-post-photo" && sender.tab) present(sender.tab, msg.pageUrl, msg.image);
+});
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: MENU_ID,
     title: "Post to ElevenEleven",
     contexts: ["page", "image", "link"],
   });
+  syncHover();
 });
 
 chrome.action.onClicked.addListener((tab) => present(tab, tab.url, null));

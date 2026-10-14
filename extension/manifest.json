@@ -33,5 +33,20 @@
   "side_panel": {
     "default_path": "panel.html"
   },
-  "minimum_chrome_version": "116"
+  "minimum_chrome_version": "116",
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon-48.png"
+      ],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ]
+    }
+  ]
 }

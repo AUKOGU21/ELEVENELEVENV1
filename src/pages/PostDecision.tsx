@@ -442,6 +442,9 @@ const PostDecision = () => {
   // the product straight away. Signed out, she signs in first and comes back here.
   const linkedUrl = searchParams.get("url");
   const linkedImg = searchParams.get("img");
+  // The extension reads the product off the page she's on and sends it along,
+  // which skips the server lookup (15 to 20 seconds on stores that block it).
+  const linkedName = searchParams.get("name");
   const linkedStarted = useRef(false);
   useEffect(() => {
     if (!linkedUrl || linkedStarted.current || authLoading) return;
@@ -452,7 +455,35 @@ const PostDecision = () => {
     }
     linkedStarted.current = true;
     setUrlInput(linkedUrl);
-    extractFromUrl(linkedUrl, linkedImg && /^https?:\/\//.test(linkedImg) ? linkedImg : null);
+    const img = linkedImg && /^https?:\/\//.test(linkedImg) ? linkedImg : null;
+    let source: URL | null = null;
+    try { source = new URL(linkedUrl); } catch { source = null; }
+    // Name and photo straight from the page: show them now, no lookup.
+    if (linkedName && img && source && /^https?:$/.test(source.protocol)) {
+      const raw = linkedName.trim();
+      const name = raw === raw.toUpperCase() ? raw.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : raw; // Zara ships ALL CAPS
+      const brandRaw = (searchParams.get("brand") ?? "").trim();
+      const brand = brandRaw && brandRaw === brandRaw.toUpperCase() && brandRaw.length > 3 ? brandRaw.charAt(0) + brandRaw.slice(1).toLowerCase() : brandRaw;
+      const priceNum = parseFloat((searchParams.get("price") ?? "").replace(/,/g, ""));
+      const price = Number.isFinite(priceNum) && priceNum > 0 ? String(Math.round(priceNum * 100) / 100) : null;
+      const cat = searchParams.get("cat");
+      setProduct({
+        brand,
+        name,
+        retailer: source.hostname.replace(/^www\./, ""),
+        image_url: img,
+        color: null,
+        category: normalizeCategory(cat) ?? normalizeCategory(name) ?? null,
+        price,
+        source_url: source.href,
+        uploaded_image: null,
+        uploaded_file: null,
+      });
+      if (price) setPriceNote(price);
+      setFlowStep("preview");
+      return;
+    }
+    extractFromUrl(linkedUrl, img);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedUrl, authLoading, user]);
 

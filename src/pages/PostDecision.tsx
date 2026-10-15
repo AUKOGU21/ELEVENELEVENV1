@@ -8,6 +8,7 @@ import { shouldShowFitPrompt } from "@/components/DialInFitModal";
 import { imageToJpeg } from "@/lib/image";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { C, RADIUS, SANS, body, display, hairline, meta, strong } from "@/lib/design";
+import { capture } from "@/lib/analytics";
 
 type FlowStep = "input" | "extracting" | "preview" | "uncertainty" | "context" | "confidence" | "audience";
 
@@ -600,6 +601,14 @@ const PostDecision = () => {
       input_from_other: inputFrom.includes("Other") && inputFromOther.trim() ? inputFromOther.trim() : null,
       is_public: true,
     }).select("id").single();
+
+    if (inserted?.id) {
+      // src=extension when it came in through the Chrome extension: shows what the extension drives.
+      capture("decision_posted", {
+        decision_id: inserted.id, post_type: "decision", category: product.category || null,
+        confidence, source: searchParams.get("src") || "app",
+      });
+    }
 
     // Tell anyone following her that she posted. In-app only.
     if (inserted?.id) {

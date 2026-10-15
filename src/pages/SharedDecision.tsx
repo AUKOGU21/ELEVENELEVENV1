@@ -23,6 +23,7 @@ import ResponseItem, { type ResponseItemData } from "@/components/ResponseItem";
 import LookingForView from "@/components/LookingForView";
 import RecommendationModal, { type RecommendationDraft } from "@/components/RecommendationModal";
 import type { LookingForDecision, RecommendationData } from "@/lib/lookingFor";
+import { capture } from "@/lib/analytics";
 
 type SharedDecisionRow = {
   id: string;
@@ -228,6 +229,7 @@ export default function SharedDecision() {
           ...(p.link ? { product_url: p.link } : {}),
         });
         if (insErr) throw new Error(insErr.message);
+        capture("input_given", { decision_id: d.id, kind: "response", vote: p.vote, experience: p.context, via: "shared_link" });
         supabase.functions.invoke("notify-weigh-in", { body: { decision_id: d.id, responder_id: user.id } })
           .catch((e) => console.warn("weigh-in notify failed:", e));
         setSubmitted(true);
@@ -285,6 +287,7 @@ export default function SharedDecision() {
           product_image_url: draft.product_image_url,
         });
         if (e) throw new Error(e.message);
+        capture("input_given", { decision_id: d.id, kind: "recommendation", via: "shared_link" });
       } else {
         const { data, error: e } = await supabase.functions.invoke("guest-weigh-in", {
           body: {

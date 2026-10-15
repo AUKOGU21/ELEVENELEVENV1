@@ -5,6 +5,7 @@
 // Rules: never block the interaction, never throw, never surface an error. A
 // failed write is a lost data point, not a broken feature.
 import { supabase } from "./supabase";
+import { capture } from "./analytics";
 
 export type EventKind =
   | "product_click"    // clicked through to the retailer
@@ -38,6 +39,8 @@ export function track(
     meta?: Record<string, unknown>;
   }
 ): void {
+  // The same event in PostHog, so it can sit in funnels next to page views and time on site.
+  capture(kind, { decision_id: opts?.decisionId ?? undefined, ...(opts?.meta ?? {}) });
   try {
     void supabase
       .from("events")

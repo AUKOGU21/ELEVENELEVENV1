@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { C, RADIUS, SANS, body, display, meta } from "@/lib/design";
 import { AgreeLine } from "@/pages/Legal";
+import { capture } from "@/lib/analytics";
 
 // ── The front door, set in the editorial system ───────────────────────────────
 // Paper, rules and square edges per src/lib/design.ts. Nothing here changes what
@@ -203,6 +204,7 @@ const SignIn = () => {
       signupError = thrown;
     }
     if (!signupError) {
+      capture("signed_up", { method: "password" });
       navigate("/onboarding?fromSignup=true");
       return;
     }

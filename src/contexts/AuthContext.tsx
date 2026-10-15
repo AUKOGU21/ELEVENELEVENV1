@@ -3,6 +3,8 @@ import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { recordHomeScreenUse, syncPushSubscription } from '@/lib/push'
 import { track } from '@/lib/track'
+import { identifyMember, resetMember } from '@/lib/analytics'
+import { saveSignupAttribution } from '@/lib/attribution'
 
 interface AuthContextType {
   user: User | null
@@ -140,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         recordHomeScreenUse(session.user.id)
         syncPushSubscription(session.user.id)
+        identifyMember(session.user)
       }
     })
 
@@ -155,9 +158,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // effect here reports a signup the server already accepted as a failure.
       // Supabase's own guidance is to never call Supabase from in here. Deferring
       // one tick keeps all of this out of signup's way, and none of it may throw.
+      if (event === 'SIGNED_OUT') resetMember()
+
       if (event === 'SIGNED_IN' && session?.user) {
         const id = session.user.id
+        const signedIn = session.user
         setTimeout(() => {
+          identifyMember(signedIn)
+          saveSignupAttribution(signedIn).catch(() => { /* a lost source, never a failed sign-in */ })
           recordHomeScreenUse(id).catch(() => {})
           syncPushSubscription(id).catch(() => {})
           syncLocalProfileToDb(id).catch((e) => console.error('profile sync failed:', e))

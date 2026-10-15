@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { C, RADIUS, SANS, body, display, hairline, meta } from "@/lib/design";
+import { capture } from "@/lib/analytics";
 
 const PRIORITY_OPTIONS = [
   "Tall friendly", "Petite friendly", "Natural fibers", "Bust support", "Machine washable",
@@ -104,6 +105,7 @@ export default function LookingFor() {
         status: "open",
         is_public: true,
       });
+      capture("decision_posted", { post_type: "looking_for", confidence, source: "app" });
       navigate("/feed");
     } catch (e) {
       console.error("looking-for post failed:", e);

@@ -31,6 +31,7 @@ import { ensureInviteCode, ensureReferral } from "@/lib/referral";
 import { toast } from "sonner";
 import { normalizeProductUrl } from "@/lib/url";
 import WeighInSheet, { CONTEXT_OPTIONS, type WeighInPayload } from "@/components/WeighInSheet";
+import { capture } from "@/lib/analytics";
 
 // ─── Product-link helpers ───────────────────────────────────────────────────
 // normalizeProductUrl moved to lib/url so the extracted weigh-in sheet can use
@@ -1008,6 +1009,7 @@ const Feed = () => {
         { decision_id: id, user_id: user.id, ...outcomeRow },
         { onConflict: "decision_id" },
       );
+      capture("outcome_logged", { decision_id: id, outcome });
       await supabase.from("decisions").update({ status: newStatus }).eq("id", id);
       supabase.functions
         .invoke("notify-outcome", { body: { decision_id: id } })
@@ -1029,6 +1031,7 @@ const Feed = () => {
     setMyDecisions(prev => prev.map(merge));
     try {
       await supabase.from("outcomes").upsert({ decision_id: id, user_id: user.id, ...outcomeRow }, { onConflict: "decision_id" });
+      capture("outcome_logged", { decision_id: id, outcome: "still_deciding" });
     } catch (e) {
       console.error("still-deciding note failed:", e);
     }
@@ -1182,6 +1185,7 @@ const Feed = () => {
       ...(responsePhotoUrl ? { photo_url: responsePhotoUrl } : {}),
       ...(p.link ? { product_url: p.link } : {}),
     });
+    capture("input_given", { decision_id: weighingIn, kind: "response", vote: p.vote, experience: p.context, match_score: matchScore });
 
     // Email the post owner that someone weighed in (fire-and-forget; the
     // function skips self-weigh-ins and never blocks the UI on failure).
@@ -1445,6 +1449,7 @@ const Feed = () => {
         product_image_url: draft.product_image_url,
         match_score: matchScore,
       });
+      capture("input_given", { decision_id: lookingForId, kind: "recommendation", match_score: matchScore });
       supabase.functions
         .invoke("notify-recommendation", { body: { looking_for_id: lookingForId, recommender_id: user.id } })
         .catch((e) => console.warn("recommendation notify failed:", e));
@@ -1490,6 +1495,7 @@ const Feed = () => {
       { decision_id: decisionId, user_id: user.id, did_purchase: didPurchase },
       { onConflict: "decision_id" }
     );
+    capture("outcome_logged", { decision_id: decisionId, outcome: didPurchase ? "bought_it" : outcome });
     if (didPurchase) {
       await supabase.from("decisions").update({ status: "purchased" }).eq("id", decisionId);
     }

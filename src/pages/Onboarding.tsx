@@ -11,6 +11,7 @@ import { ensureReferral, pendingReferrer } from "@/lib/referral";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { C, RADIUS, SANS, body, display, hairline, meta, strong } from "@/lib/design";
 import { AgreeLine } from "@/pages/Legal";
+import { capture } from "@/lib/analytics";
 
 // ─── Match label helper ───────────────────────────────────────────────────────
 
@@ -358,6 +359,7 @@ const Onboarding = () => {
       if (v === null || v === "" || (Array.isArray(v) && v.length === 0)) delete d[k];
     }
     await supabase.from("profiles").update(d).eq("id", user.id);
+    capture("onboarding_completed");
   };
 
   const next = async () => {

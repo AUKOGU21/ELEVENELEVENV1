@@ -9,7 +9,7 @@
 // leather. The leather is photographed (public/home), never faked in CSS.
 // Scale, type, whitespace and one slow horizontal movement carry it. No cards,
 // no pills, no icons, no serifs.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
@@ -20,10 +20,16 @@ import { getInitials } from "@/lib/format";
 import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
 import logoSymbol from "@/assets/logo-symbol.png";
 
-const BURGUNDY_LEATHER = "/home/leather-burgundy.png";
-const WHITE_LEATHER    = "/home/leather-white.png";
-const MODELS_STRIP     = "/home/models-strip.png";
-const MODEL_PORTRAIT   = "/home/model-leather-pants.png";
+// WebP: the same photographs at a fraction of the weight (7.3 MB of PNG was
+// keeping phones on a blank hero long enough for the walk to start empty).
+const BURGUNDY_LEATHER = "/home/leather-burgundy.webp";
+const WHITE_LEATHER    = "/home/leather-white.webp";
+const MODELS_STRIP     = "/home/models-strip.webp";
+const MODEL_PORTRAIT   = "/home/model-leather-pants.webp";
+// The strip's own size, so its width is known before it downloads.
+const STRIP_W = 1924, STRIP_H = 722;
+// One full copy of the strip passes in this long.
+const WALK_MS = 30000;
 
 // Cream, for type on the leather.
 const CREAM = "#F2EDE6";
@@ -35,10 +41,9 @@ const PAGE_CSS = `
 .e11-cta:hover { background: #5E1414; border-color: #5E1414; }
 .e11-link { transition: opacity 0.18s; }
 .e11-link:hover { opacity: 0.6; }
-/* The walk: two copies of the same strip, sliding one full copy then resetting. */
-@keyframes e11-walk { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
-.e11-walk { will-change: transform; }
-@media (prefers-reduced-motion: reduce) { .e11-walk { animation: none; } }
+/* The walk: two copies of the strip side by side, each sliding one copy's width
+   to the left in step, so the second lands exactly where the first began. */
+.e11-walk img { will-change: transform; backface-visibility: hidden; }
 `;
 
 const MAX = 1320;
@@ -182,39 +187,97 @@ const Index = () => {
     </button>
   );
 
-  // The walk. Driven here rather than in CSS: the shorthand's iteration count
-  // was not surviving, so the strip made a single pass and held. This keeps a
-  // handle on the animation, so it can be checked and restarted.
+  // The walk. Each copy of the strip is animated by its own width in pixels,
+  // measured, not by a percentage: Safari works a percentage out once, when the
+  // animation starts, so a strip that hadn't loaded yet (width 0) moved 0px and
+  // the hero sat still on iPhones. Animating each copy separately also keeps
+  // every moving layer under the size Safari can composite on a phone; one
+  // 6,000-pixel-wide track flickered or vanished.
+  //
+  // It restarts, keeping its place, whenever the width changes (images
+  // arriving, rotation, the address bar resizing the hero) and whenever the
+  // page comes back from the background without moving.
   const walkRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const track = walkRef.current;
     if (!track) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const anim = track.animate(
-      [{ transform: "translate3d(0, 0, 0)" }, { transform: "translate3d(-50%, 0, 0)" }],
-      { duration: 30000, iterations: Infinity, easing: "linear" },
-    );
-    // A tab that sleeps can leave an animation idle or finished. Whenever the
-    // page comes back, make sure it is still running.
+    const imgs = Array.from(track.querySelectorAll("img"));
+    if (!imgs.length || typeof imgs[0].animate !== "function") return;
+    let anims: Animation[] = [];
+    let width = 0;
+    let lastTime = -1;
+
+    const place = () => (anims[0] && typeof anims[0].currentTime === "number" ? anims[0].currentTime % WALK_MS : 0);
+    const start = (force = false) => {
+      const w = imgs[0].getBoundingClientRect().width;
+      if (w < 1) return;
+      if (!force && Math.abs(w - width) < 1 && anims.length) return;
+      const at = place();
+      anims.forEach((a) => a.cancel());
+      width = w;
+      anims = imgs.map((img) => img.animate(
+        [{ transform: "translate3d(0, 0, 0)" }, { transform: `translate3d(${-w}px, 0, 0)` }],
+        { duration: WALK_MS, iterations: Infinity, easing: "linear" },
+      ));
+      anims.forEach((a) => { a.currentTime = at; });
+    };
+
+    // A tab that slept can leave the walk idle, paused or frozen: check it.
     const keepGoing = () => {
       if (document.visibilityState !== "visible") return;
-      if (anim.playState === "finished" || anim.playState === "idle") {
-        try { anim.cancel(); } catch { /* already gone */ }
-        anim.play();
-      } else if (anim.playState === "paused") {
-        anim.play();
-      }
+      if (!anims.length) return start();
+      const t = place();
+      const stuck = anims.some((a) => a.playState !== "running") || t === lastTime;
+      lastTime = t;
+      if (stuck) start(true);
     };
+
+    start();
+    imgs.forEach((img) => {
+      if (!img.complete) img.addEventListener("load", () => start(true), { once: true });
+      img.decode?.().then(() => start(true)).catch(() => { /* broken image: nothing to walk */ });
+    });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => start()) : null;
+    ro?.observe(imgs[0]);
     document.addEventListener("visibilitychange", keepGoing);
     window.addEventListener("pageshow", keepGoing);
-    const beat = window.setInterval(keepGoing, 5000);
+    const beat = window.setInterval(keepGoing, 4000);
     return () => {
+      ro?.disconnect();
       document.removeEventListener("visibilitychange", keepGoing);
       window.removeEventListener("pageshow", keepGoing);
       clearInterval(beat);
-      anim.cancel();
+      anims.forEach((a) => a.cancel());
     };
   }, []);
+
+  // The wordmark fills the width exactly, in Anton. Until Anton arrives, phones
+  // draw the fallback face, which is far wider, and the word ran off both edges
+  // ("the screen gets cut off"). So it's sized to fit whatever face is showing,
+  // and sized again when Anton loads and when the screen changes width.
+  const wordRef = useRef<HTMLHeadingElement>(null);
+  const wordInner = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const h = wordRef.current, inner = wordInner.current;
+    if (!h || !inner) return;
+    const fit = () => {
+      const avail = h.clientWidth;
+      if (!avail) return;
+      const base = avail * (isMobile ? 0.199 : 0.198);
+      h.style.fontSize = `${base}px`;
+      const natural = inner.getBoundingClientRect().width;
+      if (natural > avail) h.style.fontSize = `${base * (avail / natural) * 0.995}px`;
+    };
+    fit();
+    document.fonts?.ready.then(fit).catch(() => {});
+    document.fonts?.addEventListener?.("loadingdone", fit);
+    window.addEventListener("resize", fit);
+    return () => {
+      document.fonts?.removeEventListener?.("loadingdone", fit);
+      window.removeEventListener("resize", fit);
+    };
+  }, [isMobile]);
 
   const leather = (src: string): React.CSSProperties => ({
     backgroundImage: `url(${src})`,
@@ -269,7 +332,7 @@ const Index = () => {
           height: isMobile ? "min(62svh, 520px)" : "min(74svh, 760px)",
           marginTop: isMobile ? 18 : 10,
         }}>
-          <h1 aria-label="ElevenEleven" style={{
+          <h1 ref={wordRef} aria-label="ElevenEleven" style={{
             position: "absolute", left: 0, right: 0, top: isMobile ? "16%" : "10%",
             margin: 0, textAlign: "center", whiteSpace: "nowrap", pointerEvents: "none",
             ...display(isMobile ? "19.9vw" : "19.8vw", C.ink),
@@ -278,7 +341,7 @@ const Index = () => {
             transform: `scaleY(${isMobile ? 1.5 : 1.7})`,
             transformOrigin: "top center",
           }}>
-            ELEVENELEVEN
+            <span ref={wordInner} style={{ display: "inline-block" }}>ELEVENELEVEN</span>
           </h1>
 
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
@@ -287,6 +350,9 @@ const Index = () => {
                 <img
                   key={i}
                   src={MODELS_STRIP}
+                  width={STRIP_W}
+                  height={STRIP_H}
+                  decoding="async"
                   alt={i === 0 ? "Women walking" : ""}
                   aria-hidden={i === 1}
                   style={{

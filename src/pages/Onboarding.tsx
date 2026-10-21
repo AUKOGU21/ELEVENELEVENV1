@@ -141,7 +141,13 @@ const Onboarding = () => {
   // asks for the basics again, without the email field and without sending
   // anything, since she's already in.
   const resuming = searchParams.get("resume") === "true" && !!user;
-  const [step, setStep] = useState(skipAccount && searchParams.get("resume") !== "true" ? 1 : 0);
+  // Age and city only. The Create account page asks for her name, email and
+  // password but not these, and sending her on with fromSignup used to skip
+  // this step entirely, so half the members since August had neither.
+  // details=true is the same screen, once, for a member who joined that way.
+  const backfill = searchParams.get("details") === "true";
+  const detailsOnly = !resuming && (backfill || skipAccount);
+  const [step, setStep] = useState(0);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName]   = useState("");
   const [email, setEmail]         = useState("");
@@ -312,6 +318,7 @@ const Onboarding = () => {
 
   const canContinue = () => {
     // 18 and over only (Terms, section 2).
+    if (current.type === "account" && detailsOnly) return !!(user && Number(age) >= 18 && city.trim());
     if (current.type === "account")      return !!(firstName.trim() && lastName.trim() && (resuming || email.trim()) && Number(age) >= 18 && city.trim());
     if (current.type === "transition")   return true;
     if (current.type === "fit")          return true;   // every answer is optional
@@ -363,14 +370,15 @@ const Onboarding = () => {
   };
 
   const next = async () => {
-    if (current.key === "account" && resuming && user) {
+    if (current.key === "account" && (resuming || detailsOnly) && user) {
       setAuthLoading(true);
       const basics: Record<string, any> = {};
-      if (fullName) basics.display_name = fullName;
+      if (fullName && !detailsOnly) basics.display_name = fullName;
       if (age) basics.age = parseInt(age);
       if (city) basics.city = city;
       if (Object.keys(basics).length) await supabase.from("profiles").update(basics).eq("id", user.id);
       setAuthLoading(false);
+      if (backfill) { navigate("/feed", { replace: true }); return; }
       setStep(step + 1);
       return;
     }
@@ -490,20 +498,20 @@ const Onboarding = () => {
           {/* ACCOUNT */}
           {current.type === "account" && (
             <motion.div key="account" {...slideVariants} transition={{ duration: 0.3 }}>
-              <h2 style={heading}>{resuming ? "Let's finish your account" : "Let's get started"}</h2>
-              <p style={lede}>Just the basics.</p>
+              <h2 style={heading}>{detailsOnly ? "Two quick things" : resuming ? "Let's finish your account" : "Let's get started"}</h2>
+              <p style={lede}>{detailsOnly ? "Your age and city help us match you with women like you." : "Just the basics."}</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ display: "flex", gap: 12 }}>
+                {!detailsOnly && <div style={{ display: "flex", gap: 12 }}>
                   <input autoFocus className="ob-field" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name"
                     style={{ ...field, flex: 1, minWidth: 0 }} />
                   <input className="ob-field" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name"
                     style={{ ...field, flex: 1, minWidth: 0 }} />
-                </div>
-                {!resuming && (
+                </div>}
+                {!resuming && !detailsOnly && (
                   <input className="ob-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
                     style={field} />
                 )}
-                <input className="ob-field" value={age} onChange={e => setAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" type="text" inputMode="numeric" maxLength={3}
+                <input autoFocus={detailsOnly} className="ob-field" value={age} onChange={e => setAge(e.target.value.replace(/\D/g, ""))} placeholder="Age" type="text" inputMode="numeric" maxLength={3}
                   style={field} />
                 {age.length >= 2 && Number(age) < 18 && (
                   <p style={{ ...body(13.5, C.burgundy), marginTop: -4 }}>ELEVENELEVEN is for women 18 and older.</p>
@@ -528,7 +536,7 @@ const Onboarding = () => {
                   )}
                 </div>
               </div>
-              <AgreeLine style={{ marginTop: 16 }} />
+              {!detailsOnly && <AgreeLine style={{ marginTop: 16 }} />}
             </motion.div>
           )}
 
@@ -825,8 +833,15 @@ const Onboarding = () => {
         {current.type !== "quickwin" && current.type !== "pinterest" && (
           <div style={{ marginTop: 36 }}>
             <button onClick={next} disabled={!canContinue() || authLoading} style={primaryBtn(canContinue() && !authLoading)}>
-              {authLoading ? "Sending..." : current.type === "transition" ? "Get started" : "Continue"}
+              {authLoading ? (detailsOnly ? "Saving..." : "Sending...") : current.type === "transition" ? "Get started" : "Continue"}
             </button>
+            {backfill && current.type === "account" && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+                <button onClick={() => navigate("/feed", { replace: true })} style={textLink(C.muted)}>
+                  Skip for now
+                </button>
+              </div>
+            )}
             {step > 0 && current.type !== "transition" && (
               <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
                 <button onClick={() => setStep(step - 1)} style={textLink(C.muted)}>

@@ -728,6 +728,12 @@ const Feed = () => {
     // instead of dropping her into a feed that calls her "Someone".
     if (myProfileData && myProfileData.onboarding_completed === false) {
       navigate("/onboarding?resume=true", { replace: true });
+    } else if (myProfileData && (myProfileData.age == null || !myProfileData.city)) {
+      // Joined through Create account before that path asked for age and city.
+      // Ask once (two fields, skippable), not every visit.
+      let asked = true;
+      try { asked = !!localStorage.getItem("ee_details_asked"); localStorage.setItem("ee_details_asked", "1"); } catch { /* private mode: don't ask */ }
+      if (!asked) navigate("/onboarding?details=true", { replace: true });
     }
 
     const local = JSON.parse(localStorage.getItem("eleven_decisions") || "[]");

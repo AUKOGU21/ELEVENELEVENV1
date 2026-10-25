@@ -25,7 +25,7 @@ type Doc = { title: string; intro: Block[]; sections: { heading: string; blocks:
 const PRIVACY: Doc = {
   title: "Privacy Policy",
   intro: [
-    "ELEVENELEVEN (“ELEVENELEVEN,” “we,” “us,” or “our”) helps people make better purchase decisions by connecting them with people and experiences relevant to what they are considering buying.",
+    "ELEVENELEVEN Studio, Inc. (“ELEVENELEVEN,” “we,” “us,” or “our”) helps people make better purchase decisions by connecting them with people and experiences relevant to what they are considering buying.",
     "This Privacy Policy explains what information we collect when you use ELEVENELEVEN, how we use and share it, and the choices you have regarding your information.",
     "By using ELEVENELEVEN, you acknowledge the practices described in this Privacy Policy.",
   ],
@@ -148,7 +148,7 @@ const PRIVACY: Doc = {
       heading: "12. Contact Us",
       blocks: [
         "If you have questions or requests regarding this Privacy Policy or our privacy practices, contact us at:",
-        `ELEVENELEVEN, Inc.\n${PRIVACY_EMAIL}`,
+        `ELEVENELEVEN Studio, Inc.\n${PRIVACY_EMAIL}`,
       ],
     },
   ],
@@ -158,7 +158,7 @@ const TERMS: Doc = {
   title: "Terms of Use",
   intro: [
     "Welcome to ELEVENELEVEN.",
-    "These Terms of Use (“Terms”) govern your access to and use of ELEVENELEVEN's websites, applications, features, and services (collectively, the “Service”).",
+    "These Terms of Use (“Terms”) govern your access to and use of ELEVENELEVEN's websites, applications, features, and services (collectively, the “Service”), operated by ELEVENELEVEN Studio, Inc. (“ELEVENELEVEN,” “we,” “us,” or “our”).",
     "By creating an account, accessing, or using the Service, you agree to these Terms.",
   ],
   sections: [
@@ -306,7 +306,7 @@ const TERMS: Doc = {
       heading: "17. Contact",
       blocks: [
         "Questions about these Terms may be sent to:",
-        `ELEVENELEVEN, Inc.\n${LEGAL_EMAIL}`,
+        `ELEVENELEVEN Studio, Inc.\n${LEGAL_EMAIL}`,
       ],
     },
   ],

@@ -506,10 +506,6 @@ const Feed = () => {
   // Who I follow. Ids only — no counts are shown anywhere yet.
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
-  // ── Activation nudge: surface one matched decision to brand-new users.
-  // Persists until they weigh in once — no manual dismiss.
-  const [hasWeighedIn, setHasWeighedIn] = useState<boolean | null>(null);
-
   // ── Vote state
   const [userVotes, setUserVotes] = useState<Record<string, "helpful" | "not_helpful">>({});
   const [voteCounts, setVoteCounts] = useState<Record<string, { helpful: number; not_helpful: number }>>({});
@@ -587,17 +583,6 @@ const Feed = () => {
       }
     };
     loadUserVotes();
-  }, [user]);
-
-  // Has this user ever weighed in? Drives the activation nudge (shown only to
-  // accounts that have never weighed in and never posted).
-  useEffect(() => {
-    if (!user) { setHasWeighedIn(null); return; }
-    supabase
-      .from("responses")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .then(({ count }) => setHasWeighedIn((count ?? 0) > 0));
   }, [user]);
 
   // ─── Data fetch ──────────────────────────────────────────────────────────────
@@ -1200,7 +1185,6 @@ const Feed = () => {
       .catch((e) => console.warn("weigh-in notify failed:", e));
 
     await fetchDecisions();
-    setHasWeighedIn(true); // dismiss the activation nudge — they've now acted
     setSubmitting(false);
     weighInCompletedRef.current = true;
     setWeighInStep("done");
@@ -1615,15 +1599,20 @@ const Feed = () => {
   const displayList = getFilteredDecisions(activeTab === "feed" ? decisions : myDecisions)
     .filter(d => !hiddenDecisionIds.has(d.id));
 
-  // ── Activation nudge target: the single highest-match open decision the user
-  // didn't post. Shown only to brand-new accounts (no posts, no weigh-ins).
+  // ── "For you": the single highest-match open decision she didn't post, hasn't
+  // weighed in on and hasn't hidden. Every member, every visit; once she answers
+  // it, the next best match takes its place, so the feed always opens on one.
   const activationTarget = (() => {
-    const open = decisions.filter(d => d.user_id !== user?.id && (!d.status || d.status === "open"));
+    const open = decisions.filter(d =>
+      d.user_id !== user?.id
+      && (!d.status || d.status === "open")
+      && (d.post_type ?? "decision") !== "looking_for"
+      && !hiddenDecisionIds.has(d.id)
+      && !(d.responses ?? []).some((r: { user_id?: string | null }) => r.user_id === user?.id));
     open.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
     return open[0] ?? null;
   })();
-  const showActivation = !!user && activeTab === "feed"
-    && myDecisions.length === 0 && hasWeighedIn === false && !!activationTarget;
+  const showActivation = !!user && activeTab === "feed" && !!activationTarget;
 
   // Purchases still owed their received-it log — drives the top-of-feed banner.
   const followupPending = myDecisions.filter((d) => {
@@ -1649,7 +1638,7 @@ const Feed = () => {
       ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
       : <span>{getInitials(displayName)}</span>;
 
-  // Activation nudge card — pinned above the feed for never-active accounts.
+  // "For you" card, pinned above the feed: her best-matched decision still waiting on her.
   const renderActivationCard = () => {
     const t = activationTarget!;
     const m = t.matchScore != null ? Math.round(t.matchScore) : null;

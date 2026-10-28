@@ -1,7 +1,8 @@
 // ── NotificationBanner ────────────────────────────────────────────────────────
 // A one-time, dismissible nudge at the top of the feed to turn on push alerts.
 // Shows only when push is available but not yet enabled. On iPhones still in
-// Safari (not installed), it guides the user to add to Home Screen instead.
+// Safari (not installed), it guides the user to add to Home Screen instead, and
+// on a computer it walks her to her phone first.
 //
 // Set like a notification: icon, one bold line, one line under it. The whole
 // card is the tap target, because iPhone can't be sent to the Home Screen by
@@ -116,6 +117,30 @@ function stepOne(browser: IosBrowser): Step {
   };
 }
 
+// On a computer there's no home screen, so the first step is getting to the phone.
+const DESKTOP_STEPS: Step[] = [
+  {
+    label: "Step one",
+    title: <>Open <Mark>ElevenEleven</Mark> on your phone</>,
+    items: [
+      <>
+        <img src="/qr-open-on-phone.png" alt="QR code for geteleveneleven.com" width={132} height={132}
+          style={{ display: "block", width: 132, height: 132, border: `1px solid ${C.rule}`, background: "#FFFFFF", padding: 6, boxSizing: "border-box", marginBottom: 8 }} />
+        Point your phone's camera at this code, or go to <b>geteleveneleven.com</b> in Safari (iPhone) or Chrome (Android).
+      </>,
+      <>Sign in with the same account.</>,
+    ],
+  },
+  {
+    label: "Step two",
+    title: <>Add it to your home screen</>,
+    items: [
+      <><b>iPhone:</b> tap <ShareGlyph /> <b>Share</b>, then <b>Add to Home Screen</b>, then <b>Add</b>.</>,
+      <><b>Android:</b> tap the <DotsGlyph /> menu, then <b>Add to Home screen</b> or <b>Install app</b>.</>,
+    ],
+  },
+];
+
 const STEP_TWO: Step = {
   label: "Step two",
   title: <>Turn notifications on</>,
@@ -128,14 +153,16 @@ const STEP_TWO: Step = {
   ],
 };
 
-export function HowTo({ isMobile, onClose }: { isMobile: boolean; onClose: () => void }) {
+export function HowTo({ isMobile, onClose, desktop = false }: { isMobile: boolean; onClose: () => void; desktop?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const steps = [stepOne(iosBrowser()), STEP_TWO];
+  const steps = desktop
+    ? [...DESKTOP_STEPS, { ...STEP_TWO, label: "Step three" }]
+    : [stepOne(iosBrowser()), STEP_TWO];
 
   return createPortal(
     <div
@@ -245,7 +272,10 @@ export default function NotificationBanner({ userId, isMobile }: { userId: strin
   // iPhone needs the manual share sheet. Android gets a real one-tap install.
   const iosInstall = state === "needs-install";
   const androidInstall = !iosInstall && installable;
-  const install = iosInstall || androidInstall;
+  // On a computer the nudge still shows, and its first step is opening E11 on her phone.
+  const desktopInstall = !iosInstall && !androidInstall && !isStandalone()
+    && !/android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  const install = iosInstall || androidInstall || desktopInstall;
 
   // Push nudges are only for the installed app, where push actually lands. In a
   // browser, desktop included, email is the channel and this has nothing to
@@ -271,7 +301,7 @@ export default function NotificationBanner({ userId, isMobile }: { userId: strin
   };
 
   const title = install ? "Add us to your home screen" : "Turn on notifications";
-  const open = androidInstall ? addToHome : iosInstall ? () => setHowTo(true) : turnOn;
+  const open = androidInstall ? addToHome : (iosInstall || desktopInstall) ? () => setHowTo(true) : turnOn;
 
   return (
     <>
@@ -304,7 +334,7 @@ export default function NotificationBanner({ userId, isMobile }: { userId: strin
           <X style={{ width: 16, height: 16 }} strokeWidth={1.6} />
         </button>
       </div>
-      {howTo && <HowTo isMobile={isMobile} onClose={() => setHowTo(false)} />}
+      {howTo && <HowTo isMobile={isMobile} desktop={desktopInstall} onClose={() => setHowTo(false)} />}
     </>
   );
 }

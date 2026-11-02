@@ -13,6 +13,7 @@ import InvitePage from "./pages/InvitePage.tsx";
 import Feed from "./pages/Feed.tsx";
 import BrandLibrary from "./pages/BrandLibrary.tsx";
 import SignIn from "./pages/SignIn.tsx";
+import ChromeLink from "./pages/ChromeLink";
 import CheckEmail from "./pages/CheckEmail.tsx";
 import Profile from "./pages/Profile.tsx";
 import { PrivacyPage, TermsPage } from "./pages/Legal.tsx";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/signin" element={<SignIn />} />
+            <Route path="/chrome" element={<ChromeLink />} />
             <Route path="/post" element={<PostDecision />} />
             <Route path="/looking-for" element={<LookingFor />} />
             <Route path="/invite/:code" element={<InvitePage />} />

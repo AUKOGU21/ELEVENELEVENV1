@@ -27,7 +27,10 @@ export type EventKind =
   | "checkin_answer"
   // The returning-member prompt to fill in Ask me about.
   | "ask_prompt_shown"
-  | "ask_prompt_saved";
+  | "ask_prompt_saved"
+  // /chrome: someone asked for the link by email, or clicked through to the store.
+  | "chrome_link_requested"
+  | "chrome_store_click";
 
 export function track(
   kind: EventKind,

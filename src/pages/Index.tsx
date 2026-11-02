@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/format";
 import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
 import logoSymbol from "@/assets/logo-symbol.png";
+import ChromeMark from "@/components/ChromeMark";
 
 // WebP: the same photographs at a fraction of the weight (7.3 MB of PNG was
 // keeping phones on a blank hero long enough for the walk to start empty).
@@ -301,6 +302,15 @@ const Index = () => {
           padding: isMobile ? "16px 18px 0" : "26px 40px 0",
           display: "flex", alignItems: "center", justifyContent: "flex-end", gap: isMobile ? 12 : 22,
         }}>
+          {!isMobile && (
+            <button
+              onClick={() => navigate("/chrome")}
+              className="e11-link"
+              style={{ ...navLink(C.ink), marginRight: "auto", display: "inline-flex", alignItems: "center", gap: 9 }}
+            >
+              <ChromeMark size={18} /> Add to Chrome
+            </button>
+          )}
           <button onClick={() => navigate("/feed")} className="e11-link" style={navLink(C.ink)}>
             Feed <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />
           </button>

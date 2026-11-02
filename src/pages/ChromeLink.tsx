@@ -3,7 +3,6 @@
 // phone, and that's where most people find us, so there it offers to email the
 // link to open later.
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { track } from "@/lib/track";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +15,6 @@ const CREAM = "#F7F4EF";
 const isPhone = () => /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 
 export default function ChromeLink() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [phone] = useState(isPhone);
   const [email, setEmail] = useState("");
@@ -53,17 +51,19 @@ export default function ChromeLink() {
   };
 
   return (
-    <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: `#8c8c8c url(/chrome/chrome-still.jpg) center / cover no-repeat`, fontFamily: SANS, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", padding: "32px 22px" }}>
+    <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: `#8c8c8c url(/chrome/chrome-still.jpg) ${phone ? "10% 0" : "center"} / cover no-repeat`, fontFamily: SANS, display: "flex", alignItems: phone ? "flex-end" : "center", justifyContent: "center", boxSizing: "border-box", padding: phone ? "32px 22px 44px" : "32px 22px" }}>
       <video
         ref={video} src="/chrome/chrome-loop.mp4" poster="/chrome/chrome-still.jpg" muted loop playsInline autoPlay preload="auto" aria-hidden
         onPlaying={() => setPlaying(true)}
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: playing ? 1 : 0, transition: "opacity .4s ease" }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: phone ? "10% 0" : "center", opacity: playing ? 1 : 0, transition: "opacity .4s ease" }}
       />
       {/* A soft light behind the words, so oxblood holds up against the metal. */}
-      <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 62% 58% at 50% 50%, rgba(247,244,239,0.82) 0%, rgba(247,244,239,0.62) 48%, rgba(247,244,239,0) 100%)" }} />
+      <div aria-hidden style={{ position: "absolute", inset: 0, background: phone
+        ? "linear-gradient(180deg, rgba(247,244,239,0) 34%, rgba(247,244,239,0.72) 54%, rgba(247,244,239,0.86) 100%)"
+        : "radial-gradient(ellipse 62% 58% at 50% 50%, rgba(247,244,239,0.82) 0%, rgba(247,244,239,0.62) 48%, rgba(247,244,239,0) 100%)" }} />
 
       <main style={{ position: "relative", width: "100%", maxWidth: 640, textAlign: "center" }}>
-        <h1 style={{ fontFamily: DISPLAY, fontWeight: 400, textTransform: "uppercase", color: C.burgundy, fontSize: "clamp(52px, 11vw, 96px)", lineHeight: 1.02, margin: 0 }}>
+        <h1 style={{ fontFamily: DISPLAY, fontWeight: 400, textTransform: "uppercase", color: C.burgundy, fontSize: phone ? "clamp(42px, 12.5vw, 56px)" : "clamp(52px, 11vw, 96px)", lineHeight: 1.02, margin: 0 }}>
           Take ELEVENELEVEN shopping with you.
         </h1>
         <p style={{ ...body(phone ? 16 : 18, C.ink), maxWidth: 480, margin: "18px auto 0" }}>
@@ -90,11 +90,6 @@ export default function ChromeLink() {
         )}
         {phone && state === "sent" && (
           <p style={{ ...body(17, C.burgundy), fontWeight: 700, marginTop: 24 }}>Sent. Open it on your laptop to add ELEVENELEVEN to Chrome.</p>
-        )}
-        {phone && (
-          <button onClick={() => navigate("/")} style={{ ...meta(11, C.ink), fontWeight: 700, background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 22, textDecoration: "underline" }}>
-            See what ELEVENELEVEN is
-          </button>
         )}
       </main>
     </div>

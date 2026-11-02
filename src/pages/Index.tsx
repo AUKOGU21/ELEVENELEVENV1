@@ -339,7 +339,8 @@ const Index = () => {
             JavaScript: it is the first thing she sees. */}
         <div style={{
           position: "relative",
-          height: isMobile ? "min(62svh, 520px)" : "min(74svh, 760px)",
+          // On a computer the hero is the whole first screen; the next section waits for a scroll.
+          height: isMobile ? "min(62svh, 520px)" : "max(calc(100svh - 77px), 520px)",
           marginTop: isMobile ? 18 : 10,
         }}>
           <h1 ref={wordRef} aria-label="ElevenEleven" style={{
@@ -366,7 +367,7 @@ const Index = () => {
                   alt={i === 0 ? "Women walking" : ""}
                   aria-hidden={i === 1}
                   style={{
-                    height: isMobile ? "min(44svh, 380px)" : "min(58svh, 600px)",
+                    height: isMobile ? "min(44svh, 380px)" : "min(66svh, 760px)",
                     width: "auto", maxWidth: "none", display: "block", flexShrink: 0,
                   }}
                 />

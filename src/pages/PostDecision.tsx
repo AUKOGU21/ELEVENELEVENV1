@@ -450,8 +450,14 @@ const PostDecision = () => {
   useEffect(() => {
     if (!linkedUrl || linkedStarted.current || authLoading) return;
     if (!user) {
-      const here = `/post?url=${encodeURIComponent(linkedUrl)}${linkedImg ? `&img=${encodeURIComponent(linkedImg)}` : ""}`;
-      navigate(`/signin?next=${encodeURIComponent(here)}`, { replace: true });
+      // Keep everything the link carried (the extension's name, brand and price too),
+      // encoded so SignIn's next check accepts it. From the extension she's usually
+      // new, so open on Create account.
+      const fromExtension = searchParams.get("src") === "extension";
+      const query = [...searchParams.entries()]
+        .map(([k, v]) => `${k}=${encodeURIComponent(v).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16)}`)}`)
+        .join("&");
+      navigate(`/signin?${fromExtension ? "mode=signup&" : ""}next=${encodeURIComponent(`/post?${query}`)}`, { replace: true });
       return;
     }
     linkedStarted.current = true;

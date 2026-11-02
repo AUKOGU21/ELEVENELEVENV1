@@ -148,6 +148,13 @@ const Onboarding = () => {
   const backfill = searchParams.get("details") === "true";
   const detailsOnly = !resuming && (backfill || skipAccount);
   const [step, setStep] = useState(0);
+  // Set by SignIn when she signed up on the way to something. Only our own paths.
+  const [afterOnboarding] = useState<string | null>(() => {
+    try {
+      const v = localStorage.getItem("ee_after_onboarding");
+      return v && v.startsWith("/") && !v.startsWith("//") ? v : null;
+    } catch { return null; }
+  });
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName]   = useState("");
   const [email, setEmail]         = useState("");
@@ -417,8 +424,10 @@ const Onboarding = () => {
         const res = await ensureReferral(user.id);
         if (res?.inviterName) { setCircleInviter(res.inviterName); return; }
       }
-      // She lands on her own profile, where a small nudge asks for photos.
-      navigate("/profile?welcome=1");
+      // She lands on her own profile, where a small nudge asks for photos, unless
+      // she was mid-way through something when she signed up: back to that.
+      navigate(afterOnboarding ?? "/profile?welcome=1");
+      localStorage.removeItem("ee_after_onboarding");
     }
   };
 
@@ -466,8 +475,8 @@ const Onboarding = () => {
               Your take now helps {circleInviter} (and every woman like you) shop with more confidence.
             </p>
             <div style={{ ...hairline(), margin: isMobile ? "28px 0" : "36px 0" }} />
-            <button onClick={() => navigate("/profile?welcome=1")} style={primaryBtn(true)}>
-              See my profile <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
+            <button onClick={() => { navigate(afterOnboarding ?? "/profile?welcome=1"); localStorage.removeItem("ee_after_onboarding"); }} style={primaryBtn(true)}>
+              {afterOnboarding ? "Back to your post" : "See my profile"} <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
             </button>
           </motion.div>
         </main>
@@ -816,7 +825,7 @@ const Onboarding = () => {
 
               {/* CTA */}
               <button onClick={next} style={primaryBtn(true)}>
-                See my profile
+                {afterOnboarding ? "Back to your post" : "See my profile"}
                 <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
               </button>
 

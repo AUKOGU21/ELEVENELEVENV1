@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -123,9 +123,11 @@ const SignIn = () => {
   const nextRaw = searchParams.get("next") ?? "";
   const next = /^\/[A-Za-z0-9\-._~/?=&%]*$/.test(nextRaw) && !nextRaw.startsWith("//") ? nextRaw : null;
 
-  // Already signed in? Don't make her type it again.
+  // Already signed in? Don't make her type it again. Not while she's creating an
+  // account, though: handleSignUp sends her to onboarding, and next waits until the end.
+  const signingUp = useRef(false);
   useEffect(() => {
-    if (!authLoading && user) navigate(next ?? "/feed", { replace: true });
+    if (!authLoading && user && !signingUp.current) navigate(next ?? "/feed", { replace: true });
   }, [authLoading, user, navigate, next]);
 
   const inFrame = typeof window !== "undefined" && window.self !== window.top;
@@ -178,6 +180,7 @@ const SignIn = () => {
     }
     setLoading(true);
     setError(null);
+    signingUp.current = true;
 
     // Clear any stale data from previous sessions BEFORE signUp fires SIGNED_IN
     localStorage.removeItem("eleven_decisions");
@@ -205,9 +208,13 @@ const SignIn = () => {
     }
     if (!signupError) {
       capture("signed_up", { method: "password" });
+      // Where she was headed (a product from the extension, a shared decision):
+      // onboarding sends her there when it finishes.
+      if (next) localStorage.setItem("ee_after_onboarding", next);
       navigate("/onboarding?fromSignup=true");
       return;
     }
+    signingUp.current = false;
 
     const err = signupError as { message?: string; status?: number };
     const alreadyThere = /already registered|already exists/i.test(err.message ?? "");

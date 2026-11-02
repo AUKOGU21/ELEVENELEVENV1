@@ -51,11 +51,11 @@ export default function ChromeLink() {
   };
 
   return (
-    <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: `#8c8c8c url(/chrome/chrome-still.jpg) ${phone ? "10% 0" : "center"} / cover no-repeat`, fontFamily: SANS, display: "flex", alignItems: phone ? "flex-end" : "center", justifyContent: "center", boxSizing: "border-box", padding: phone ? "32px 22px 44px" : "32px 22px" }}>
+    <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: `#8c8c8c url(${phone ? "/chrome/chrome-still-vertical.jpg" : "/chrome/chrome-still.jpg"}) center / cover no-repeat`, fontFamily: SANS, display: "flex", alignItems: phone ? "flex-end" : "center", justifyContent: "center", boxSizing: "border-box", padding: phone ? "32px 22px 44px" : "32px 22px" }}>
       <video
-        ref={video} src="/chrome/chrome-loop.mp4" poster="/chrome/chrome-still.jpg" muted loop playsInline autoPlay preload="auto" aria-hidden
+        ref={video} src={phone ? "/chrome/chrome-loop-vertical.mp4" : "/chrome/chrome-loop.mp4"} poster={phone ? "/chrome/chrome-still-vertical.jpg" : "/chrome/chrome-still.jpg"} muted loop playsInline autoPlay preload="auto" aria-hidden
         onPlaying={() => setPlaying(true)}
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: phone ? "10% 0" : "center", opacity: playing ? 1 : 0, transition: "opacity .4s ease" }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: playing ? 1 : 0, transition: "opacity .4s ease" }}
       />
       {/* A soft light behind the words, so oxblood holds up against the metal. */}
       <div aria-hidden style={{ position: "absolute", inset: 0, background: phone

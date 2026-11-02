@@ -47,7 +47,7 @@ table,td{border-collapse:collapse!important;}
 body,td,div,p,a,span{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;}
 @media only screen and (max-width:620px){.container{width:100%!important;}.px{padding-left:26px!important;padding-right:26px!important;}.h1{font-size:27px!important;}}
 </style></head><body style="margin:0;padding:0;background:#EFEFED;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;height:0;width:0;">Open this on your laptop to add ELEVENELEVEN to Chrome.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;height:0;width:0;">Your ELEVENELEVEN for Chrome link.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EFEFED;">
 <tr><td align="center" style="padding:40px 14px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="width:600px;max-width:600px;background:#FFFFFF;">
@@ -56,10 +56,9 @@ body,td,div,p,a,span{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;}
 </td></tr>
 <tr><td align="center" class="px" style="padding:44px 52px 0;">
   <div class="h1" style="font-size:30px;line-height:1.14;font-weight:700;letter-spacing:-0.5px;color:#0A0A0A;">Here's your link.</div>
-  <div style="font-size:14.5px;line-height:1.6;color:#3A3A36;padding-top:14px;">Open this email on your laptop, click below, and add ELEVENELEVEN to Chrome. Then post anything you're shopping for without leaving the page.</div>
 </td></tr>
 <tr><td align="center" style="padding:30px 48px 52px;">
-  <a href="${STORE_URL}" target="_blank" style="font-size:12px;font-weight:700;letter-spacing:2.4px;color:#0A0A0A;text-transform:uppercase;text-decoration:underline;">Add to Chrome&nbsp;&rarr;</a>
+  <a href="${STORE_URL}" target="_blank"><img src="https://geteleveneleven.com/email/add-to-chrome-button-v3.jpg" width="300" height="60" alt="ADD TO CHROME" style="display:block;margin:0 auto;border:0;width:300px;max-width:100%;height:auto;font-size:13px;font-weight:700;letter-spacing:2px;color:#0A0A0A;"></a>
 </td></tr>
 <tr><td style="border-top:1px solid #ECECE8;font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td align="center" class="px" style="padding:22px 48px 30px;font-size:10px;line-height:1.9;letter-spacing:0.8px;color:#9A9A94;text-transform:uppercase;">

@@ -66,7 +66,7 @@ export default function ChromeLink() {
         <h1 style={{ fontFamily: DISPLAY, fontWeight: 400, textTransform: "uppercase", color: C.burgundy, fontSize: phone ? "clamp(42px, 12.5vw, 56px)" : "clamp(52px, 11vw, 96px)", lineHeight: 1.02, margin: 0 }}>
           Take ELEVENELEVEN shopping with you.
         </h1>
-        <p style={{ ...body(phone ? 16 : 18, C.ink), maxWidth: 480, margin: "18px auto 0" }}>
+        <p style={{ ...body(phone ? 16 : 18, C.burgundy), fontWeight: 500, maxWidth: 480, margin: "18px auto 0" }}>
           {phone ? "Chrome runs on desktop. We'll email you a link to download." : "Post anything you're shopping for and get real, relevant input before you buy."}
         </p>
 

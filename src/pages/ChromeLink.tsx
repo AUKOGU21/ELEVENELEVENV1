@@ -72,7 +72,8 @@ export default function ChromeLink() {
 
         {!phone && (
           <div style={{ marginTop: 28 }}>
-            <a href={STORE_URL} onClick={() => track("chrome_store_click")} style={button}><ChromeMark size={24} /> Add to Chrome</a>
+            {/* A new tab, so this page stays open long enough for the click to be recorded. */}
+            <a href={STORE_URL} target="_blank" rel="noopener noreferrer" onClick={() => track("chrome_store_click")} style={button}><ChromeMark size={24} /> Add to Chrome</a>
           </div>
         )}
 

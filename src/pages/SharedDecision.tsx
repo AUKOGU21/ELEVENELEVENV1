@@ -327,7 +327,7 @@ export default function SharedDecision() {
 
         {d.product_image_url && (
           <div style={{ background: C.well, aspectRatio: "4 / 5", marginTop: 22, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <img src={d.product_image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
+            <img src={d.product_image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />
           </div>
         )}
 

@@ -161,7 +161,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
             const inner = hasImage ? (
               <>
                 <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  <img src={rec.product_image_url ?? ""} alt="" loading="lazy" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
+                  <img src={rec.product_image_url ?? ""} alt="" loading="lazy" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />
                 </div>
                 {details}
               </>
@@ -371,7 +371,7 @@ export default function LookingForView({
         {!pulling && pulled && (
           <div style={{ display: "grid", gridTemplateColumns: "56px 1fr", gap: 12, alignItems: "center", marginTop: 12 }}>
             <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-              {pulled.image_url && <img src={pulled.image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />}
+              {pulled.image_url && <img src={pulled.image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />}
             </div>
             <div style={{ minWidth: 0 }}>
               {pulled.brand && <p style={{ ...strong(13), textTransform: "uppercase", letterSpacing: "0.04em" }}>{pulled.brand}</p>}
@@ -522,7 +522,7 @@ export default function LookingForView({
         <div style={{ display: "grid", gridTemplateColumns: outcome?.alt_product_image_url ? (isMobile ? "104px 1fr" : "140px 1fr") : "1fr", gap: 18, alignItems: "center", marginTop: 20 }}>
           {outcome?.alt_product_image_url && (
             <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-              <img src={outcome.alt_product_image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain", mixBlendMode: "multiply" }} />
+              <img src={outcome.alt_product_image_url} alt="" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />
             </div>
           )}
           <div style={{ minWidth: 0 }}>
@@ -573,7 +573,7 @@ export default function LookingForView({
       <>
         <div style={{ position: "relative", background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {rec.product_image_url
-            ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain", mixBlendMode: "multiply" }} />
+            ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain"}} className="e11-blend" />
             : (
               // A brand has no product shot. Rather than an empty square saying
               // "no image", the name becomes the tile.

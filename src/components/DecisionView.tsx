@@ -905,7 +905,7 @@ export default function DecisionView(props: Props) {
               style={{ display: "block", textAlign: "left", background: "none", border: "none", padding: isMobile ? "14px 0" : 0, borderBottom: isMobile ? `1px solid ${C.rule}` : "none", cursor: "pointer" }}>
               <div style={{ display: isMobile ? "grid" : "block", gridTemplateColumns: "88px 1fr", gap: 14, alignItems: "center" }}>
                 <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  {img ? <img src={img} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain", mixBlendMode: "multiply" }} />
+                  {img ? <img src={img} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain"}} className="e11-blend" />
                     : <p style={{ ...display(18), padding: 10, textAlign: "center" }}>{s.lf_title ?? ""}</p>}
                 </div>
                 <div style={{ marginTop: isMobile ? 0 : 10 }}>

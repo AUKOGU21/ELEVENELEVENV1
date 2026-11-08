@@ -24,6 +24,9 @@
 @layer base {
   html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    /* The pages scroll inside their own containers. The document itself must
+       not rubber-band, or it steals the swipe and the feed sticks on iOS. */
+    overscroll-behavior: none;
   }
 
   :root {
@@ -122,6 +125,12 @@
     font-family: 'Cormorant Garamond', serif;
     @apply tracking-tight;
   }
+}
+
+/* Product shots arrive on white; multiply sets them on the paper. Desktop only:
+   on a phone, blending every photo in the feed made scrolling freeze. */
+@media (hover: hover) and (pointer: fine) {
+  .e11-blend { mix-blend-mode: multiply; }
 }
 
 /* Hide scrollbars while keeping scroll functionality (feed, drawers). */

@@ -105,9 +105,8 @@ const productImg: React.CSSProperties = {
   maxWidth: "100%",
   maxHeight: "100%",
   objectFit: "contain",
-  // Product shots arrive on white. Multiply lets them sit on the paper instead
-  // of in a white rectangle.
-  mixBlendMode: "multiply",
+  // Product shots arrive on white. The e11-blend class multiplies them onto the
+  // paper on desktop only: on a phone, fifty blended photos made scrolling freeze.
 };
 
 const ADVANCE_MS = 2200;
@@ -124,12 +123,24 @@ function TileCarousel({ images, alt }: { images: string[]; alt: string }) {
   const swiped = useRef(false);
   const n = images.length;
 
+  // Only the carousels on screen slide. Fifty of them moving at once, most of
+  // them out of sight, is work the phone does in the middle of a scroll.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [onScreen, setOnScreen] = useState(false);
   useEffect(() => {
-    if (paused || n < 2) return;
+    const el = rootRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") { setOnScreen(true); return; }
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.6 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (paused || !onScreen || n < 2) return;
     if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const t = setInterval(() => setI((x) => (x + 1) % n), ADVANCE_MS);
     return () => clearInterval(t);
-  }, [paused, n]);
+  }, [paused, onScreen, n]);
 
   const step = (e: React.MouseEvent, dir: number) => {
     e.stopPropagation();
@@ -143,6 +154,7 @@ function TileCarousel({ images, alt }: { images: string[]; alt: string }) {
 
   return (
     <div
+      ref={rootRef}
       className="e11-carousel"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -163,7 +175,7 @@ function TileCarousel({ images, alt }: { images: string[]; alt: string }) {
       <div style={{ display: "flex", height: "100%", transform: `translateX(-${i * 100}%)`, transition: "transform .6s cubic-bezier(.2,.7,.2,1)" }}>
         {images.map((src) => (
           <div key={src} style={{ flex: "0 0 100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <img src={src} alt={alt} loading="lazy" style={productImg} />
+            <img src={src} alt={alt} loading="lazy" decoding="async" className="e11-blend" style={productImg} />
           </div>
         ))}
       </div>
@@ -266,7 +278,7 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
         {images.length >= 2 ? (
           <TileCarousel images={images} alt={alt} />
         ) : images.length === 1 ? (
-          <img src={images[0]} alt={alt} loading="lazy" style={productImg} />
+          <img src={images[0]} alt={alt} loading="lazy" decoding="async" className="e11-blend" style={productImg} />
         ) : isLF ? (
           // No photograph yet: the ask itself is the image.
           <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 14 }}>

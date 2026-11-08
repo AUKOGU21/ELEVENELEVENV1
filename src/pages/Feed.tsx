@@ -1740,6 +1740,11 @@ const Feed = () => {
         className="w-full max-w-[1320px] no-scrollbar feed-scroll"
         style={{
           overflowY: "scroll",
+          // Keep the swipe inside the feed at its top and bottom. Without this iOS
+          // hands the gesture to the page behind, which cannot move, and the
+          // scroll sticks until the finger lifts.
+          overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
           // Clear the fixed header exactly, plus one deliberate gap. The first
           // card's own top margin is zeroed in CSS so the two don't stack.
           paddingTop: headerH + (isMobile ? 14 : 20),

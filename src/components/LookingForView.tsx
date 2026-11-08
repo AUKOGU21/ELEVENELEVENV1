@@ -89,6 +89,16 @@ const fieldStyle: React.CSSProperties = {
   resize: "none",
 };
 
+// A saved product photo can die later (the retailer moves it or refuses the
+// link). Remember the ones that failed so the card falls back to the brand name
+// instead of showing a broken image.
+const deadImages = new Set<string>();
+function useLiveImage(url: string | null | undefined): [string | null, () => void] {
+  const [, bump] = useState(0);
+  const live = url && !deadImages.has(url) ? url : null;
+  return [live, () => { if (url) { deadImages.add(url); bump((n) => n + 1); } }];
+}
+
 function Ticks({ value }: { value: number }) {
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }} aria-hidden>
@@ -119,6 +129,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
   isMobile: boolean;
   innerRef: (el: HTMLDivElement | null) => void;
 }) {
+  const [recImg, killRecImg] = useLiveImage(rec.product_image_url);
   const price = money(rec.price_note);
   // Who sent it. A guest stands behind her pick with her own name.
   const recGuest = rec.guests ?? null;
@@ -145,7 +156,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{rec.reasoning}</p>
 
           {(rec.product_url || rec.brand_name || rec.product_name) && (() => {
-            const hasImage = !!rec.product_image_url;
+            const hasImage = !!recImg;
             const details = (
               <div style={{ minWidth: 0 }}>
                 {rec.brand_name && <p style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.04em" }}>{rec.brand_name}</p>}
@@ -161,7 +172,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
             const inner = hasImage ? (
               <>
                 <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  <img src={rec.product_image_url ?? ""} alt="" loading="lazy" style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />
+                  <img src={recImg ?? ""} alt="" loading="lazy" onError={killRecImg} style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />
                 </div>
                 {details}
               </>
@@ -239,6 +250,7 @@ export default function LookingForView({
   const [step, setStep] = useState<FoundStep>("idle");
   const [picked, setPicked] = useState<RecommendationData | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
+  const [, bumpImages] = useState(0);
   const [pulled, setPulled] = useState<PulledProduct | null>(null);
   const [pulling, setPulling] = useState(false);
   const [pullFailed, setPullFailed] = useState(false);
@@ -572,8 +584,8 @@ export default function LookingForView({
     const inner = (
       <>
         <div style={{ position: "relative", background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-          {rec.product_image_url
-            ? <img src={rec.product_image_url} alt="" loading="lazy" style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain"}} className="e11-blend" />
+          {rec.product_image_url && !deadImages.has(rec.product_image_url)
+            ? <img src={rec.product_image_url} alt="" loading="lazy" onError={() => { deadImages.add(rec.product_image_url!); bumpImages((n) => n + 1); }} style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain"}} className="e11-blend" />
             : (
               // A brand has no product shot. Rather than an empty square saying
               // "no image", the name becomes the tile.

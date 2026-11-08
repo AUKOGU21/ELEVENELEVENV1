@@ -256,7 +256,9 @@ Do not include any explanation, just the JSON.`,
       // made absolute; Zara CDN last resort. isRealImg rejects lazy-load placeholder
       // pixels from ANY source (incl. the Jina-merged ld/og fields), so we never
       // surface a blank data: gif.
-      const imageUrl = absolutize([f.ldImage, f.ogImage, f.image].find(isRealImg) || "", origin) || zaraFallback(body.url);
+      // No guessed URLs: Zara's CDN refuses a reconstructed link, and a broken image
+      // is worse than none, because the card then reads as a failed link.
+      const imageUrl = absolutize([f.ldImage, f.ogImage, f.image].find(isRealImg) || "", origin);
 
       // Price: JSON-LD → meta. Parse to a number and round to 2 decimals to kill
       // float artifacts (e.g. "22921.800001" → "22921.8").
@@ -463,6 +465,7 @@ function decodeEntities(s: string): string {
   return (s || "")
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
     .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
+    .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
 }
@@ -496,16 +499,4 @@ function absolutize(u: string | null, base: string): string | null {
   if (/^https?:\/\//i.test(t)) return t;
   if (t.startsWith("//")) return "https:" + t;
   try { return new URL(t, base).href; } catch { return t; }
-}
-
-// Zara renders images in JS; reconstruct the CDN URL from the product ID.
-function zaraFallback(url: string): string | null {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("zara.com")) {
-      const idMatch = u.pathname.match(/p(\d{7,})/i);
-      if (idMatch) return `https://static.zara.net/assets/public/product/p${idMatch[1]}/image/main.jpg?ts=1&dpr=1`;
-    }
-  } catch { /* ignore */ }
-  return null;
 }

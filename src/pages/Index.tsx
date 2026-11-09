@@ -295,9 +295,11 @@ const Index = () => {
       <style>{PAGE_CSS}</style>
 
       {/* ═══ 01 HERO ════════════════════════════════════════════════════════ */}
-      <section style={{ position: "relative", background: C.paper, overflow: "hidden" }}>
+      {/* The hero is the whole first screen on every device: the nav takes what it
+          needs and the wordmark fills the rest, so The problem waits for a scroll. */}
+      <section style={{ position: "relative", background: C.paper, overflow: "hidden", minHeight: "100svh", display: "flex", flexDirection: "column" }}>
         <div style={{
-          position: "relative", zIndex: 2,
+          position: "relative", zIndex: 2, width: "100%",
           maxWidth: MAX, margin: "0 auto", boxSizing: "border-box",
           padding: isMobile ? "16px 18px 0" : "26px 40px 0",
           display: "flex", alignItems: "center", justifyContent: "flex-end", gap: isMobile ? 12 : 22,
@@ -339,12 +341,12 @@ const Index = () => {
             JavaScript: it is the first thing she sees. */}
         <div style={{
           position: "relative",
-          // On a computer the hero is the whole first screen; the next section waits for a scroll.
-          height: isMobile ? "min(62svh, 520px)" : "max(calc(100svh - 77px), 520px)",
+          flex: 1,
+          minHeight: isMobile ? 460 : 520,
           marginTop: isMobile ? 18 : 10,
         }}>
           <h1 ref={wordRef} aria-label="ElevenEleven" style={{
-            position: "absolute", left: 0, right: 0, top: isMobile ? "16%" : "10%",
+            position: "absolute", left: 0, right: 0, top: isMobile ? "30%" : "10%",
             margin: 0, textAlign: "center", whiteSpace: "nowrap", pointerEvents: "none",
             ...display(isMobile ? "19.9vw" : "19.8vw", C.ink),
             letterSpacing: "-0.02em",
@@ -367,7 +369,7 @@ const Index = () => {
                   alt={i === 0 ? "Women walking" : ""}
                   aria-hidden={i === 1}
                   style={{
-                    height: isMobile ? "min(44svh, 380px)" : "min(66svh, 760px)",
+                    height: isMobile ? "min(74svh, 680px)" : "min(66svh, 760px)",
                     width: "auto", maxWidth: "none", display: "block", flexShrink: 0,
                   }}
                 />

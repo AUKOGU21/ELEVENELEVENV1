@@ -172,6 +172,9 @@ const timeAgo = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
+const firstNameOnly = (displayName: string | null | undefined) =>
+  (displayName ?? "").trim().split(/\s+/)[0] || "She";
+
 const formatName = (displayName: string | null) => {
   if (!displayName) return "Anonymous";
   const parts = displayName.trim().split(" ");
@@ -1693,6 +1696,18 @@ const Feed = () => {
   const renderActivationCard = () => {
     const t = activationTarget!;
     const m = t.matchScore != null ? Math.round(t.matchScore) : null;
+    // What she is stuck on: the first concern she wrote about, in her words
+    // (context_note is "Concern: detail · Concern: detail"), else the concerns she ticked.
+    const ask = (() => {
+      const tags = (t.uncertainty_text ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      for (const n of (t.context_note ?? "").split(" · ")) {
+        const i = n.indexOf(": ");
+        if (i < 0) continue;
+        const label = n.slice(0, i).trim(), text = n.slice(i + 2).trim();
+        if (text && tags.some((tag) => tag.toLowerCase() === label.toLowerCase())) return { label, text, quoted: true };
+      }
+      return tags.length ? { label: null, text: tags.join(" · "), quoted: false } : null;
+    })();
     return (
       <div style={{ position: "relative", borderTop: `1px solid ${E11.ink}`, borderBottom: `1px solid ${E11.rule}`, padding: isMobile ? "18px 0 20px" : "22px 0 24px", marginBottom: isMobile ? 18 : 24 }}>
         <button
@@ -1702,12 +1717,15 @@ const Feed = () => {
         >
           <X style={{ width: 18, height: 18 }} strokeWidth={1.75} />
         </button>
-        <p style={e11Meta(10.5, E11.burgundy)}>For you</p>
-        <p style={{ ...e11Display(isMobile ? 34 : 42), marginTop: 10 }}>Break the ice.</p>
+        <p style={{ ...e11Display(isMobile ? 34 : 42) }}>For you.</p>
         <p style={{ ...e11Body(isMobile ? 13.5 : 14.5, E11.inkSoft), marginTop: 10, maxWidth: "46ch" }}>
           Here's a decision from someone in your circle. Weigh in, and we'll start learning your taste.
         </p>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16 }}>
+        {/* The thing, and what she is stuck on, so the dilemma is clear before the tap. */}
+        <button
+          onClick={() => openDecision(t.id)}
+          style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+        >
           <div style={{ width: 54, height: 68, background: E11.well, flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ProductImage url={t.product_image_url} fallback={<Camera className="w-5 h-5" style={{ color: E11.faint }} />} />
           </div>
@@ -1716,9 +1734,20 @@ const Feed = () => {
             <span style={{ ...e11Body(12.5, E11.inkSoft), display: "block", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.product_name ?? "A decision"}</span>
           </div>
           {m != null && <MatchSeal score={m} size={34} withLabel labelSize={9} />}
-        </div>
-        <button onClick={() => startWeighIn(t.id)} style={{ ...e11Meta(11.5, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: E11.burgundy, border: "none", borderRadius: 2, padding: "15px 0", marginTop: 18, cursor: "pointer" }}>
-          Weigh in <ArrowRight style={{ width: 15, height: 15 }} strokeWidth={2} />
+        </button>
+        {ask && (
+          <div style={{ marginTop: 14, borderLeft: `2px solid ${E11.burgundy}`, paddingLeft: 12 }}>
+            {ask.label && <p style={{ ...e11Meta(10, E11.burgundy), fontWeight: 700, marginBottom: 4 }}>{ask.label}</p>}
+            <p style={{ ...e11Body(isMobile ? 14 : 15, E11.ink), fontStyle: ask.quoted ? "italic" : "normal", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {ask.quoted ? `\u201C${ask.text}\u201D` : ask.text}
+            </p>
+            <p style={{ ...e11Meta(10, E11.muted), marginTop: 6 }}>
+              {firstNameOnly(t.profiles?.display_name)} is {t.confidence_score}/10 sure
+            </p>
+          </div>
+        )}
+        <button onClick={() => openDecision(t.id)} style={{ ...e11Meta(11.5, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: E11.burgundy, border: "none", borderRadius: 2, padding: "15px 0", marginTop: 18, cursor: "pointer" }}>
+          Break the ice <ArrowRight style={{ width: 15, height: 15 }} strokeWidth={2} />
         </button>
       </div>
     );

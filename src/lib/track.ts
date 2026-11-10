@@ -13,6 +13,7 @@ export type EventKind =
   | "weigh_in_start"   // tapped Weigh in
   | "profile_open"     // opened someone's profile
   | "post_start"       // started the create-decision flow
+  | "ice_dismiss"      // closed the "For you" Break the ice card with the X
   // ── The external share funnel ───────────────────────────────────────────────
   // A decision leaves the app through a message and comes back as a response.
   // Each step is recorded so the drop-off between them can be read: opens per

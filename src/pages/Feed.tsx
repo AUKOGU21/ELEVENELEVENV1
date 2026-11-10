@@ -358,6 +358,9 @@ function useIsMobile() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// A "For you" pick she hasn't touched in this many days rotates out.
+const ICE_STALE_DAYS = 3;
+
 const Feed = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -513,6 +516,22 @@ const Feed = () => {
   // ── Save / hide state
   const [savedDecisionIds, setSavedDecisionIds] = useState<Set<string>>(new Set());
   const [hiddenDecisionIds, setHiddenDecisionIds] = useState<Set<string>>(new Set());
+  // "For you" posts she closed or let go stale, remembered on this device.
+  const [iceSkipped, setIceSkipped] = useState<Set<string>>(new Set());
+  // Closed for this visit: the next pick waits for her next visit, not the next second.
+  const [iceClosed, setIceClosed] = useState(false);
+  useEffect(() => {
+    if (!user) { setIceSkipped(new Set()); return; }
+    try { setIceSkipped(new Set(JSON.parse(localStorage.getItem(`e11_ice_skip_${user.id}`) || "[]"))); }
+    catch { setIceSkipped(new Set()); }
+  }, [user?.id]);
+  const skipIce = (id: string, why: "closed" | "stale") => {
+    if (!user) return;
+    const next = new Set(iceSkipped); next.add(id);
+    setIceSkipped(next);
+    try { localStorage.setItem(`e11_ice_skip_${user.id}`, JSON.stringify([...next].slice(-200))); } catch { /* ignore */ }
+    if (why === "closed") { setIceClosed(true); track("ice_dismiss", { decisionId: id, userId: user.id }); }
+  };
   const [undoHiddenId, setUndoHiddenId] = useState<string | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const weighInCompletedRef = useRef(false);
@@ -1602,17 +1621,49 @@ const Feed = () => {
   // ── "For you": the single highest-match open decision she didn't post, hasn't
   // weighed in on and hasn't hidden. Every member, every visit; once she answers
   // it, the next best match takes its place, so the feed always opens on one.
+  //
+  // It favours what is new: the last 14 days first, then 30, then anything, so a
+  // fresh post waiting on its first answer beats a months-old one. Within that,
+  // no answers yet counts for more than a few, then match. She can close it with
+  // the X, and a pick that sits untouched for ICE_STALE_DAYS rotates out on its own.
+  // Skips live on this device (per member); the post itself stays in the feed.
   const activationTarget = (() => {
     const open = decisions.filter(d =>
       d.user_id !== user?.id
       && (!d.status || d.status === "open")
       && (d.post_type ?? "decision") !== "looking_for"
       && !hiddenDecisionIds.has(d.id)
+      && !iceSkipped.has(d.id)
       && !(d.responses ?? []).some((r: { user_id?: string | null }) => r.user_id === user?.id));
-    open.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
-    return open[0] ?? null;
+    const ageDays = (d: DecisionRow) => (Date.now() - new Date(d.created_at).getTime()) / 86400000;
+    const pool = [14, 30, Infinity].map((days) => open.filter((d) => ageDays(d) <= days)).find((p) => p.length) ?? [];
+    const score = (d: DecisionRow) => {
+      const n = (d.responses ?? []).length;
+      const age = ageDays(d);
+      return (d.matchScore ?? 0) + (n === 0 ? 15 : n <= 2 ? 5 : 0) + (age <= 3 ? 10 : age <= 7 ? 5 : 0);
+    };
+    pool.sort((a, b) => score(b) - score(a) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return pool[0] ?? null;
   })();
-  const showActivation = !!user && activeTab === "feed" && !!activationTarget;
+  const showActivation = !!user && activeTab === "feed" && !!activationTarget && !iceClosed;
+
+  // Rotate a pick she keeps scrolling past: note when each one was first shown.
+  // Only a pick that stays up counts: while match scores load, the top spot can
+  // flash another post first, and that flash must not start its clock.
+  useEffect(() => {
+    if (!user || !activationTarget || !showActivation) return;
+    const id = activationTarget.id;
+    const t = setTimeout(() => {
+      const key = `e11_ice_seen_${user.id}`;
+      try {
+        const seen = JSON.parse(localStorage.getItem(key) || "{}") as Record<string, number>;
+        const first = seen[id];
+        if (!first) { seen[id] = Date.now(); localStorage.setItem(key, JSON.stringify(seen)); return; }
+        if (Date.now() - first > ICE_STALE_DAYS * 86400000) skipIce(id, "stale");
+      } catch { /* storage blocked: the card just won't rotate on its own */ }
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [user?.id, activationTarget?.id, showActivation]);
 
   // Purchases still owed their received-it log — drives the top-of-feed banner.
   const followupPending = myDecisions.filter((d) => {
@@ -1643,7 +1694,14 @@ const Feed = () => {
     const t = activationTarget!;
     const m = t.matchScore != null ? Math.round(t.matchScore) : null;
     return (
-      <div style={{ borderTop: `1px solid ${E11.ink}`, borderBottom: `1px solid ${E11.rule}`, padding: isMobile ? "18px 0 20px" : "22px 0 24px", marginBottom: isMobile ? 18 : 24 }}>
+      <div style={{ position: "relative", borderTop: `1px solid ${E11.ink}`, borderBottom: `1px solid ${E11.rule}`, padding: isMobile ? "18px 0 20px" : "22px 0 24px", marginBottom: isMobile ? 18 : 24 }}>
+        <button
+          onClick={() => skipIce(t.id, "closed")}
+          aria-label="Not this one"
+          style={{ position: "absolute", top: isMobile ? 10 : 14, right: -8, background: "none", border: "none", padding: 8, cursor: "pointer", color: E11.muted, lineHeight: 0 }}
+        >
+          <X style={{ width: 18, height: 18 }} strokeWidth={1.75} />
+        </button>
         <p style={e11Meta(10.5, E11.burgundy)}>For you</p>
         <p style={{ ...e11Display(isMobile ? 34 : 42), marginTop: 10 }}>Break the ice.</p>
         <p style={{ ...e11Body(isMobile ? 13.5 : 14.5, E11.inkSoft), marginTop: 10, maxWidth: "46ch" }}>

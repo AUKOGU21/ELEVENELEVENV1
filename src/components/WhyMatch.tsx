@@ -1,5 +1,5 @@
 // ── Why her? ──────────────────────────────────────────────────────────────────
-// The match % on a take, rec or feed card is a button. Tapping it opens a short panel of
+// The match % on a take, rec or feed card is a button. Tapping it opens a short list of
 // what you have in common (see lib/whyMatch.ts for the wording). The first time
 // someone sees one, a small dark tip points at it once.
 import { useEffect, useRef, useState } from "react";
@@ -29,20 +29,18 @@ export function SealButton({ score, size, labelSize, open, onToggle, enabled, se
   );
 }
 
-export function WhyPanel({ name, lines }: { name: string | null; lines: WhyLine[] }) {
-  const first = (name ?? "").trim().split(/\s+/)[0] || "her";
+export function WhyPanel({ lines }: { lines: WhyLine[] }) {
+  // Just the details: no "Why her?" heading, so it reads as what you two share,
+  // not a verdict on her.
   return (
-    <div style={{ marginTop: 12, background: "#F1EDE7", borderRadius: 12, padding: "14px 16px 8px" }}>
-      <p style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: C.ink, paddingBottom: 11, borderBottom: `1px solid ${C.rule}` }}>
-        Why {first}?
-      </p>
+    <div style={{ marginTop: 12, background: "#F1EDE7", borderRadius: 12, padding: "8px 16px 6px" }}>
       {!lines.some((l) => !l.diff) && (
-        <p style={{ fontFamily: SANS, fontSize: 13.5, lineHeight: 1.4, color: C.muted, padding: lines.length ? "10px 0 0" : "10px 0 8px" }}>
+        <p style={{ fontFamily: SANS, fontSize: 13.5, lineHeight: 1.4, color: C.muted, padding: lines.length ? "8px 0 0" : "8px 0 6px" }}>
           Not much in common on file yet.
         </p>
       )}
       {lines.length > 0 && (
-        <ul style={{ listStyle: "none", padding: "6px 0 2px", margin: 0 }}>
+        <ul style={{ listStyle: "none", padding: "2px 0", margin: 0 }}>
           {lines.map((l) => (
             <li key={l.text} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "6px 0", fontFamily: SANS, fontSize: 14, lineHeight: 1.35, fontWeight: l.diff ? 500 : 600, color: l.diff ? C.inkSoft : C.ink }}>
               {l.diff

@@ -318,7 +318,7 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
 
       {/* Why her: under the name, never opening the card. */}
       {tip && why && !whyOpen && !forYou && <WhyTip sealEl={sealEl} align="right" onDismiss={() => { track("why_tip_dismissed"); onTipDone?.(); }} />}
-      {whyOpen && why && <div onClick={(e) => e.stopPropagation()} style={{ cursor: "default" }}><WhyPanel name={d.profiles?.display_name ?? null} lines={why} /></div>}
+      {whyOpen && why && <div onClick={(e) => e.stopPropagation()} style={{ cursor: "default" }}><WhyPanel lines={why} /></div>}
 
       {/* The thing */}
       <div style={{

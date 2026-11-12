@@ -813,7 +813,7 @@ const Feed = () => {
           ...d,
           matchScore: d.user_id === user?.id || !d.profiles
             ? null
-            : computeMatchScore(myProfileData, d.profiles as any, { category: d.product_category, text: d.product_name ?? d.lf_title }).total,
+            : computeMatchScore(myProfileData, d.profiles as any).total,
         }));
         rows.sort((a, b) => {
           const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -1194,7 +1194,7 @@ const Feed = () => {
       ]);
 
       if (responderProfile && posterProfile) {
-        const result = computeMatchScore(posterProfile, responderProfile, { category: decision.product_category, text: decision.product_name });
+        const result = computeMatchScore(posterProfile, responderProfile);
         matchScore = result.total;
         matchBreakdown = result;
       }
@@ -1472,7 +1472,7 @@ const Feed = () => {
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("profiles").select("*").eq("id", target.user_id).single(),
       ]);
-      if (recProfile && posterProfile) matchScore = computeMatchScore(posterProfile, recProfile, { text: [draft.product_name, target.lf_title].filter(Boolean).join(" ") }).total;
+      if (recProfile && posterProfile) matchScore = computeMatchScore(posterProfile, recProfile).total;
     }
     try {
       await supabase.from("recommendations").insert({

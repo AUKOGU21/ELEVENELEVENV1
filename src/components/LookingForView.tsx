@@ -180,7 +180,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
           )}
 
           {tip && why && !whyOpen && <WhyTip sealEl={sealEl} onDismiss={() => { track("why_tip_dismissed"); onTipDone?.(); }} />}
-          {whyOpen && why && <WhyPanel name={recAuthor} lines={why} />}
+          {whyOpen && why && <WhyPanel lines={why} />}
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{rec.reasoning}</p>
 

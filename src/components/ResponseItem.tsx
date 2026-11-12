@@ -209,7 +209,7 @@ export default function ResponseItem({
           )}
 
           {tip && why && !whyOpen && <WhyTip sealEl={sealEl} onDismiss={() => { track("why_tip_dismissed"); onTipDone?.(); }} />}
-          {whyOpen && why && <WhyPanel name={authorName} lines={why} />}
+          {whyOpen && why && <WhyPanel lines={why} />}
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{resp.reasoning}</p>
 

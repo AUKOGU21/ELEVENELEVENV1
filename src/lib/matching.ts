@@ -14,6 +14,11 @@ import { Profile } from "./supabase";
 //      of the body in detail: mostly taste, with overall shape and size as a
 //      lighter read on "someone like you".
 // Silhouette still leads for clothes; size labels still only support.
+//
+// The app shows ONE match per pair of women, the same on every post (Alexis,
+// Nov 2026: a % that moves from post to post reads as random). So every caller
+// scores the whole profile, without an item. Item weighting is kept here for
+// later; what matters for a given item shows as the details under the %.
 
 export interface MatchBreakdown {
   silhouette: number;

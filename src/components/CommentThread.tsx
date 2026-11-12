@@ -11,6 +11,7 @@ import { MoreHorizontal } from "lucide-react";
 import { C, RADIUS, SANS, body, meta, strong } from "@/lib/design";
 import { timeAgo } from "@/lib/format";
 import { Avatar, BadgeLabel } from "./DecisionTile";
+import { badgeOf } from "@/lib/tiers";
 import { PersonName } from "./PersonLink";
 
 export interface CommentData {
@@ -128,7 +129,6 @@ export default function CommentThread({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 12, rowGap: 4 }}>
                 <PersonName userId={c.user_id} name={c.profiles?.display_name} />
-                <BadgeLabel tier={c.profiles?.badge_tier} />
                 {isPoster && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>Original poster</span>}
                 <span style={body(12, C.muted)}>{timeAgo(c.created_at)}{edited ? "  ·  edited" : ""}</span>
                 {isMine && !editing && (
@@ -145,6 +145,7 @@ export default function CommentThread({
                   </div>
                 )}
               </div>
+              {badgeOf(c.profiles?.badge_tier) && <p style={{ lineHeight: 1.2, marginTop: 4 }}><BadgeLabel tier={c.profiles?.badge_tier} /></p>}
               {editing ? (
                 <div style={{ marginTop: 8 }}>
                   <textarea autoFocus rows={2} maxLength={2000} value={editDraft} onChange={(e) => setEditDraft(e.target.value)} style={field} />

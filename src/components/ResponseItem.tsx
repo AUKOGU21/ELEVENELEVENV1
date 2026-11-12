@@ -11,6 +11,7 @@ import { Check, ExternalLink, MoreHorizontal, ThumbsUp } from "lucide-react";
 import { C, RADIUS, SANS, body, meta, strong } from "@/lib/design";
 import { experienceLabel, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { Avatar, BadgeLabel } from "./DecisionTile";
+import { badgeOf } from "@/lib/tiers";
 import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
 import type { ReplyData } from "./ResponseCard";
@@ -150,6 +151,13 @@ export default function ResponseItem({
     ? [guest.first_name, guest.last_initial ? `${guest.last_initial}.` : null].filter(Boolean).join(" ")
     : resp.profiles?.display_name ?? null;
 
+  const verdict = (
+    <>
+      {resp.match_score != null && <MatchSeal score={resp.match_score} size={isMobile ? 28 : 30} />}
+      {facts.map((f) => <span key={f} style={meta(10, C.muted)}>{f}</span>)}
+      <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(resp.recommendation)}</span>
+    </>
+  );
   return (
     <div
       ref={wrapRef}
@@ -167,19 +175,21 @@ export default function ResponseItem({
       <div style={{ display: "flex", gap: isMobile ? 12 : 16 }}>
         <Avatar url={guest ? null : resp.profiles?.avatar_url ?? null} name={authorName} tier={guest ? null : resp.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={resp.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
-              {/* A guest has no profile to open, so her name is not a link. */}
-              <PersonName userId={resp.user_id} name={authorName} />
-              {!guest && <BadgeLabel tier={resp.profiles?.badge_tier} />}
-              {/* Quiet: it explains the account, it does not rank the take. */}
-              {guest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
-              {resp.match_score != null && <MatchSeal score={resp.match_score} size={isMobile ? 28 : 30} />}
-              {facts.map((f) => <span key={f} style={meta(10, C.muted)}>{f}</span>)}
-              <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(resp.recommendation)}</span>
+          {/* Phones: name with her badge under it, time on the right, then the verdict on its own line. */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0, minHeight: isMobile ? undefined : 30 }}>
+                {/* A guest has no profile to open, so her name is not a link. */}
+                <PersonName userId={resp.user_id} name={authorName} />
+                {/* Quiet: it explains the account, it does not rank the take. */}
+                {guest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
+                {!isMobile && verdict}
+              </div>
+              {!guest && badgeOf(resp.profiles?.badge_tier) && <p style={{ lineHeight: 1.2, marginTop: 4 }}><BadgeLabel tier={resp.profiles?.badge_tier} /></p>}
             </div>
-            <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(resp.created_at)}</span>
+            <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0, lineHeight: isMobile ? 1.6 : "30px" }}>{timeAgo(resp.created_at)}</span>
           </div>
+          {isMobile && <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, marginTop: 8 }}>{verdict}</div>}
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{resp.reasoning}</p>
 
@@ -225,9 +235,9 @@ export default function ResponseItem({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                         <span style={{ ...strong(11.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(rp.profiles?.display_name)}</span>
-                        <BadgeLabel tier={rp.profiles?.badge_tier} size={9} />
                         <span style={body(11.5, C.muted)}>{timeAgo(rp.created_at)}</span>
                       </div>
+                      {badgeOf(rp.profiles?.badge_tier) && <p style={{ lineHeight: 1.2, marginTop: 4 }}><BadgeLabel tier={rp.profiles?.badge_tier} size={9} /></p>}
                       {editing ? (
                         <div style={{ marginTop: 6 }}>
                           <textarea autoFocus rows={2} maxLength={MAXLEN} value={editText} onChange={(e) => setEditText(e.target.value)} style={field} />

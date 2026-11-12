@@ -12,6 +12,7 @@ import { C, RADIUS, SANS, STATE_WORD, body, display, meta, strong } from "@/lib/
 import { formatBudget, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { pullProduct, type PulledProduct } from "@/lib/productPull";
 import { Avatar, BadgeLabel, isResolved } from "./DecisionTile";
+import { badgeOf } from "@/lib/tiers";
 import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
 import type { RecommendationData, LookingForDecision, LookingForFoundPayload } from "@/lib/lookingFor";
@@ -136,23 +137,32 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
   const recAuthor = recGuest
     ? [recGuest.first_name, recGuest.last_initial ? `${recGuest.last_initial}.` : null].filter(Boolean).join(" ")
     : rec.profiles?.display_name ?? null;
+  const verdict = (
+    <>
+      {rec.match_score != null && <MatchSeal score={rec.match_score} size={isMobile ? 28 : 30} />}
+      <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
+      {isWinner && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>She bought this</span>}
+    </>
+  );
   return (
     <div ref={innerRef} style={{ paddingTop: isMobile ? 20 : 24, paddingBottom: isMobile ? 20 : 24, borderBottom: `1px solid ${C.rule}`, scrollMarginTop: 96 }}>
       <div style={{ display: "flex", gap: isMobile ? 12 : 16 }}>
         <Avatar url={recGuest ? null : rec.profiles?.avatar_url ?? null} name={recAuthor} tier={recGuest ? null : rec.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={rec.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
-              {/* A guest has no profile to open, so her name is not a link. */}
-              <PersonName userId={rec.user_id} name={recAuthor} />
-              {!recGuest && <BadgeLabel tier={rec.profiles?.badge_tier} />}
-              {recGuest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
-              {rec.match_score != null && <MatchSeal score={rec.match_score} size={isMobile ? 28 : 30} />}
-              <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
-              {isWinner && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>She bought this</span>}
+          {/* Phones: name with her badge under it, time on the right, then the verdict on its own line. */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0, minHeight: isMobile ? undefined : 30 }}>
+                {/* A guest has no profile to open, so her name is not a link. */}
+                <PersonName userId={rec.user_id} name={recAuthor} />
+                {recGuest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
+                {!isMobile && verdict}
+              </div>
+              {!recGuest && badgeOf(rec.profiles?.badge_tier) && <p style={{ lineHeight: 1.2, marginTop: 4 }}><BadgeLabel tier={rec.profiles?.badge_tier} /></p>}
             </div>
-            <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(rec.created_at)}</span>
+            <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0, lineHeight: isMobile ? 1.6 : "30px" }}>{timeAgo(rec.created_at)}</span>
           </div>
+          {isMobile && <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, marginTop: 8 }}>{verdict}</div>}
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{rec.reasoning}</p>
 

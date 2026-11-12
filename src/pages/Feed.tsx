@@ -27,6 +27,7 @@ import NotificationBell from "@/components/NotificationBell";
 import { type LookingForFoundPayload } from "@/lib/lookingFor";
 import RecommendationModal, { RecommendationDraft } from "@/components/RecommendationModal";
 import AskMeAboutPrompt from "@/components/AskMeAboutPrompt";
+import BottomNav, { BOTTOM_NAV_H, BOTTOM_NAV_PAD } from "@/components/BottomNav";
 import LoopPrompt, { pickLoopCandidate, markLoopShown, markLoopNotNow, type LoopAnswer } from "@/components/LoopPrompt";
 import ReferralPopup from "@/components/ReferralPopup";
 import { ensureInviteCode, ensureReferral } from "@/lib/referral";
@@ -1804,7 +1805,7 @@ const Feed = () => {
 
       {/* ── Header: type, not pills ───────────────────────────────────────────── */}
       <header ref={headerRef} className="fixed top-0 left-0 right-0 z-50" style={{ background: E11.paper, borderBottom: `1px solid ${E11.rule}` }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "12px 16px" : "20px 40px" }}>
+        <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "12px 16px" : "20px 40px" }}>
           <button
             onClick={() => navigate("/", { state: { home: true } })}
             className="select-none"
@@ -1814,7 +1815,8 @@ const Feed = () => {
             <span style={{ fontWeight: 300 }}>ELEVEN</span>
           </button>
 
-          <nav style={{ display: "flex", gap: isMobile ? 20 : 56 }}>
+          {/* Phones: Feed / Mine / Profile live in the bottom bar instead. */}
+          <nav style={{ display: isMobile ? "none" : "flex", gap: 56 }}>
             {(["feed", "mine"] as const).map((t) => (
               <button
                 key={t}
@@ -1834,7 +1836,7 @@ const Feed = () => {
                 onOpenDecision={(id, responseId) => openDecision(id, responseId ?? null)}
               />
             )}
-            {user ? (
+            {isMobile && user ? null : user ? (
               <button
                 onClick={() => navigate("/profile")}
                 aria-label="Your profile"
@@ -1866,7 +1868,7 @@ const Feed = () => {
           // Clear the fixed header exactly, plus one deliberate gap. The first
           // card's own top margin is zeroed in CSS so the two don't stack.
           paddingTop: headerH + (isMobile ? 14 : 20),
-          paddingBottom: 40,
+          paddingBottom: isMobile ? `calc(40px + ${BOTTOM_NAV_PAD})` : 40,
           paddingLeft: isMobile ? 16 : 40,
           paddingRight: isMobile ? 16 : 40,
         }}
@@ -2236,7 +2238,7 @@ const Feed = () => {
         <button
           onClick={() => navigate("/post")}
           aria-label="Post a decision"
-          style={{ position: "fixed", right: isMobile ? 16 : 28, bottom: isMobile ? 20 : 28, zIndex: 40, width: 52, height: 52, borderRadius: 2, border: "none", background: E11.burgundy, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 10px 28px rgba(20,18,16,0.26)" }}
+          style={{ position: "fixed", right: isMobile ? 16 : 28, bottom: isMobile ? `calc(${BOTTOM_NAV_H + 16}px + env(safe-area-inset-bottom))` : 28, zIndex: 40, width: 52, height: 52, borderRadius: 2, border: "none", background: E11.burgundy, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 10px 28px rgba(20,18,16,0.26)" }}
         >
           <Plus style={{ width: 22, height: 22 }} />
         </button>
@@ -2244,6 +2246,17 @@ const Feed = () => {
 
       <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} only={missingFit} auto />
 
+      {isMobile && (
+        <BottomNav
+          active={activeTab}
+          onFeed={() => { if (activeTab === "feed") scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); else setActiveTab("feed"); }}
+          onMine={() => setActiveTab("mine")}
+          mineCount={myDecisions.length}
+          avatarUrl={myProfile?.avatar_url ?? null}
+          displayName={myProfile?.display_name ?? null}
+          badgeTier={myProfile?.badge_tier}
+        />
+      )}
       <LoopPrompt decision={loopDecision} isMobile={isMobile} onAnswer={answerLoop} onNotNow={loopNotNow} />
       {user && <NotificationPrompt userId={user.id} isMobile={isMobile} hold={loopHold} />}
       {user && <AskMeAboutPrompt userId={user.id} hold={showFitModal || showReferral || loopHold} />}

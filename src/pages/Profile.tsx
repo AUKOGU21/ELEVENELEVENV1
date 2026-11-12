@@ -15,6 +15,7 @@ import DecisionTile, { type TileDecision } from "@/components/DecisionTile";
 import MatchSeal from "@/components/MatchSeal";
 import { getInitials } from "@/lib/format";
 import AskAboutEditor, { ASK_MAX, useAskPool } from "@/components/AskAboutEditor";
+import BottomNav, { BOTTOM_NAV_PAD } from "@/components/BottomNav";
 import { FavoriteBrandPicker, FavoriteBrandTiles, readBrands, type FavBrand } from "@/components/FavoriteBrands";
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -214,7 +215,7 @@ function Wordmark({ size, spacing = "0.32em" }: { size: number; spacing?: string
 }
 
 /** The feed's header: wordmark, FEED / MINE, and whatever the page needs on the right. */
-export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: React.ReactNode }) {
+export function ProfileHeader({ isMobile, right, own }: { isMobile: boolean; right: React.ReactNode; /** Her own profile: Profile is lit in the bottom bar. */ own?: { avatarUrl?: string | null; displayName?: string | null; badgeTier?: string | null } }) {
   const navigate = useNavigate();
   const headerRef = useRef<HTMLElement>(null);
   const [headerH, setHeaderH] = useState(isMobile ? 46 : 70);
@@ -240,7 +241,7 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
   return (
     <>
       <header ref={headerRef} style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 40, background: C.paper, borderBottom: `1px solid ${C.rule}` }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "12px 16px" : "20px 40px" }}>
+      <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr auto" : "1fr auto 1fr", alignItems: "center", gap: 8, padding: isMobile ? "12px 16px" : "20px 40px" }}>
         <button
           onClick={() => navigate("/", { state: { home: true } })}
           aria-label="ElevenEleven home"
@@ -248,7 +249,7 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
         >
           <Wordmark size={isMobile ? 10.5 : 15} spacing={isMobile ? "0.12em" : "0.32em"} />
         </button>
-        <nav style={{ display: "flex", gap: isMobile ? 20 : 56 }}>
+        <nav style={{ display: isMobile ? "none" : "flex", gap: 56 }}>
           <button onClick={() => navigate("/feed")} style={tab}>Feed</button>
           <button onClick={() => navigate("/feed", { state: { tab: "mine" } })} style={tab}>Mine</button>
         </nav>
@@ -257,6 +258,11 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
       </header>
       {/* The fixed header's own height, so the page starts under it. */}
       <div aria-hidden style={{ height: headerH }} />
+      {isMobile && (
+        <>
+          <BottomNav active={own ? "profile" : null} avatarUrl={own?.avatarUrl} displayName={own?.displayName} badgeTier={own?.badgeTier} />
+        </>
+      )}
     </>
   );
 }
@@ -264,7 +270,7 @@ export function ProfileHeader({ isMobile, right }: { isMobile: boolean; right: R
 export function ProfileFooter({ isMobile }: { isMobile: boolean }) {
   return (
     <footer style={{
-      borderTop: `1px solid ${C.rule}`, marginTop: isMobile ? 56 : 88, padding: isMobile ? "18px 0 36px" : "24px 0 48px",
+      borderTop: `1px solid ${C.rule}`, marginTop: isMobile ? 56 : 88, padding: isMobile ? `18px 0 calc(36px + ${BOTTOM_NAV_PAD})` : "24px 0 48px",
       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap",
     }}>
       <p style={{ ...meta(isMobile ? 9.5 : 10.5, C.ink), letterSpacing: "0.3em", fontWeight: 500 }}>Real women. Real decisions.</p>
@@ -1837,6 +1843,7 @@ const Profile = () => {
       <div className="w-full max-w-[1320px] no-scrollbar" style={{ overflowY: "scroll", overscrollBehavior: "contain" }}>
       <ProfileHeader
         isMobile={isMobile}
+        own={{ avatarUrl: profile?.avatar_url ?? null, displayName: profile?.display_name ?? null, badgeTier: profile?.badge_tier ?? null }}
         right={
           <button onClick={handleSignOut} style={{ ...textLink(C.ink), fontSize: isMobile ? 10.5 : 12, whiteSpace: "nowrap" }}>
             <LogOut style={{ width: 13, height: 13 }} strokeWidth={1.75} />

@@ -616,6 +616,14 @@ const PostDecision = () => {
       });
     }
 
+    // Write the short question for her feed card. Runs on its own: the card
+    // shows "WEIGH IN." until it lands, so posting never waits on it.
+    if (inserted?.id) {
+      supabase.functions
+        .invoke("summarize-question", { body: { decision_id: inserted.id } })
+        .catch((e) => console.warn("question summary failed:", e));
+    }
+
     // Tell anyone following her that she posted. In-app only.
     if (inserted?.id) {
       supabase.functions

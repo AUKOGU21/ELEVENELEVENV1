@@ -116,6 +116,9 @@ interface DecisionRow {
   context_note: string | null;
   confidence_score: number;
   uncertainty_text: string | null;
+  // The short AI question on the feed card ("Are these worth $325?").
+  question_summary?: string | null;
+  question_summary_edited?: boolean | null;
   status: string;
   // When she decided. Comments after this are follow-ups.
   resolved_at?: string | null;
@@ -488,7 +491,7 @@ const Feed = () => {
         .from("decisions")
         .select(`
           id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_name_2, brand_name_2, price_note_2, product_category,
-          price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, resolved_at, user_id, created_at,
+          price_note, sizes_note, context_note, confidence_score, uncertainty_text, question_summary, question_summary_edited, status, resolved_at, user_id, created_at,
           post_type, lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
           profiles ( display_name, avatar_url, badge_tier, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
           responses ( id, recommendation, reasoning, photo_url, product_url, match_score, personal_experience, helpfulness_votes, user_id, guest_id, created_at, profiles ( display_name, avatar_url, badge_tier ), guests ( first_name, last_initial ) ),
@@ -713,7 +716,7 @@ const Feed = () => {
     // PostgREST FK detection issues causing the join to silently return null.
     const query = `
       id, product_name, brand_name, product_image_url, product_image_url_2, product_url, product_url_2, product_name_2, brand_name_2, price_note_2, product_category,
-      price_note, sizes_note, context_note, confidence_score, uncertainty_text, status, resolved_at, user_id, created_at,
+      price_note, sizes_note, context_note, confidence_score, uncertainty_text, question_summary, question_summary_edited, status, resolved_at, user_id, created_at,
       post_type, lf_title, lf_budget, lf_occasion, lf_priorities, lf_context,
       profiles ( display_name, avatar_url, badge_tier, height_range, silhouette_preference, style_aesthetics, top_size, bottom_size, fit_preference, fit_details, age, city ),
       responses (
@@ -1501,14 +1504,27 @@ const Feed = () => {
   // Owner edits their own post — details / confidence / price / sizes.
   const saveDecisionEdit = async (
     id: string,
-    patch: { context_note: string | null; confidence_score: number; price_note: string | null; sizes_note: string | null },
+    patch: { context_note: string | null; confidence_score: number; price_note: string | null; sizes_note: string | null; question_summary?: string | null },
   ) => {
     if (!user) return;
-    const merge = (d: DecisionRow): DecisionRow => (d.id === id ? { ...d, ...patch } : d);
+    const before = [...decisions, ...myDecisions].find((d) => d.id === id);
+    // Her own wording for the card question sticks: the AI never rewrites it after this.
+    const full = "question_summary" in patch ? { ...patch, question_summary_edited: true } : patch;
+    const merge = (d: DecisionRow): DecisionRow => (d.id === id ? { ...d, ...full } : d);
     setDecisions(prev => prev.map(merge));
     setMyDecisions(prev => prev.map(merge));
     try {
-      await supabase.from("decisions").update(patch).eq("id", id);
+      await supabase.from("decisions").update(full).eq("id", id);
+      // She changed what she wrote but not the question: write a fresh one.
+      if (!("question_summary" in patch) && !before?.question_summary_edited && before?.context_note !== patch.context_note) {
+        const { data } = await supabase.functions.invoke("summarize-question", { body: { decision_id: id, force: true } });
+        const q = (data as { question?: string | null } | null)?.question;
+        if (q) {
+          const withQ = (d: DecisionRow): DecisionRow => (d.id === id ? { ...d, question_summary: q } : d);
+          setDecisions(prev => prev.map(withQ));
+          setMyDecisions(prev => prev.map(withQ));
+        }
+      }
     } catch (e) {
       console.error("decision edit failed:", e);
     }
@@ -1640,8 +1656,9 @@ const Feed = () => {
     .filter(d => !hiddenDecisionIds.has(d.id));
 
   // ── "For you": the single highest-match open decision she didn't post, hasn't
-  // weighed in on and hasn't hidden. Every member, every visit; once she answers
-  // it, the next best match takes its place, so the feed always opens on one.
+  // weighed in on and hasn't hidden. It stays where it falls in the feed and
+  // wears a "For you" label in place of its match %. Once she answers it, the
+  // next best match takes the label.
   //
   // It favours what is new: the last 14 days first, then 30, then anything, so a
   // fresh post waiting on its first answer beats a months-old one. Within that,
@@ -1709,67 +1726,6 @@ const Feed = () => {
     avatarUrl
       ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
       : <span>{getInitials(displayName)}</span>;
-
-  // "For you" card, pinned above the feed: her best-matched decision still waiting on her.
-  const renderActivationCard = () => {
-    const t = activationTarget!;
-    const m = t.matchScore != null ? Math.round(t.matchScore) : null;
-    // What she is stuck on: the first concern she wrote about, in her words
-    // (context_note is "Concern: detail · Concern: detail"), else the concerns she ticked.
-    const ask = (() => {
-      const tags = (t.uncertainty_text ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-      for (const n of (t.context_note ?? "").split(" · ")) {
-        const i = n.indexOf(": ");
-        if (i < 0) continue;
-        const label = n.slice(0, i).trim(), text = n.slice(i + 2).trim();
-        if (text && tags.some((tag) => tag.toLowerCase() === label.toLowerCase())) return { label, text, quoted: true };
-      }
-      return tags.length ? { label: null, text: tags.join(" · "), quoted: false } : null;
-    })();
-    return (
-      <div style={{ position: "relative", borderTop: `1px solid ${E11.ink}`, borderBottom: `1px solid ${E11.rule}`, padding: isMobile ? "18px 0 20px" : "22px 0 24px", marginBottom: isMobile ? 18 : 24 }}>
-        <button
-          onClick={() => skipIce(t.id, "closed")}
-          aria-label="Not this one"
-          style={{ position: "absolute", top: isMobile ? 10 : 14, right: -8, background: "none", border: "none", padding: 8, cursor: "pointer", color: E11.muted, lineHeight: 0 }}
-        >
-          <X style={{ width: 18, height: 18 }} strokeWidth={1.75} />
-        </button>
-        <p style={{ ...e11Display(isMobile ? 34 : 42) }}>For you.</p>
-        <p style={{ ...e11Body(isMobile ? 13.5 : 14.5, E11.inkSoft), marginTop: 10, maxWidth: "46ch" }}>
-          Here's a decision from someone in your circle. Weigh in, and we'll start learning your taste.
-        </p>
-        {/* The thing, and what she is stuck on, so the dilemma is clear before the tap. */}
-        <button
-          onClick={() => openDecision(t.id)}
-          style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
-        >
-          <div style={{ width: 54, height: 68, background: E11.well, flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ProductImage url={t.product_image_url} fallback={<Camera className="w-5 h-5" style={{ color: E11.faint }} />} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {t.brand_name && <span style={{ ...e11Strong(12), display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t.brand_name}</span>}
-            <span style={{ ...e11Body(12.5, E11.inkSoft), display: "block", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.product_name ?? "A decision"}</span>
-          </div>
-          {m != null && <MatchSeal score={m} size={34} withLabel labelSize={9} />}
-        </button>
-        {ask && (
-          <div style={{ marginTop: 14, borderLeft: `2px solid ${E11.burgundy}`, paddingLeft: 12 }}>
-            {ask.label && <p style={{ ...e11Meta(10, E11.burgundy), fontWeight: 700, marginBottom: 4 }}>{ask.label}</p>}
-            <p style={{ ...e11Body(isMobile ? 14 : 15, E11.ink), fontStyle: ask.quoted ? "italic" : "normal", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-              {ask.quoted ? `\u201C${ask.text}\u201D` : ask.text}
-            </p>
-            <p style={{ ...e11Meta(10, E11.muted), marginTop: 6 }}>
-              {firstNameOnly(t.profiles?.display_name)} is {t.confidence_score}/10 sure
-            </p>
-          </div>
-        )}
-        <button onClick={() => openDecision(t.id)} style={{ ...e11Meta(11.5, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.16em", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: E11.burgundy, border: "none", borderRadius: 2, padding: "15px 0", marginTop: 18, cursor: "pointer" }}>
-          Break the ice <ArrowRight style={{ width: 15, height: 15 }} strokeWidth={2} />
-        </button>
-      </div>
-    );
-  };
 
   // The fixed header's height drives the feed's top padding.
   const headerRef = useRef<HTMLElement>(null);
@@ -1977,13 +1933,12 @@ const Feed = () => {
                 <span style={{ fontSize: 11, fontWeight: 600, color: "#8A6620", whiteSpace: "nowrap" }}>Review &rarr;</span>
               </button>
             )}
-            {showActivation && renderActivationCard()}
             {/* The feed: decision tiles on an editorial grid. The concerns and the
                 conversation live in the decision view, one tap in. */}
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(262px, 1fr))", gap: isMobile ? 14 : 18 }}>
               {displayList.map((decision) => (
                 <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80, display: "grid" }}>
-                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} />
+                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} forYou={showActivation && decision.id === activationTarget?.id} />
                 </div>
               ))}
             </div>

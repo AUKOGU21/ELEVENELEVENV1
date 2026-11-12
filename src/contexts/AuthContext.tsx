@@ -118,7 +118,11 @@ async function syncLocalDecisionsToDb(userId: string) {
       uncertainty_text: d.uncertainties?.join(', ') ?? null,
       is_public: true,
     }))
-    await supabase.from('decisions').insert(rows)
+    const { data: saved } = await supabase.from('decisions').insert(rows).select('id')
+    // Each gets its short feed-card question, same as a post made in the app.
+    for (const r of saved ?? []) {
+      supabase.functions.invoke('summarize-question', { body: { decision_id: r.id } }).catch(() => {})
+    }
   }
 
   // Always clear local decisions and session marker after sign-in

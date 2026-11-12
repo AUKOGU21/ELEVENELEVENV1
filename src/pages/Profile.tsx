@@ -111,7 +111,7 @@ export type ProfileTile = TileDecision & { sortAt: string };
 
 /** What DecisionTile needs. Outcomes are fetched on their own: see withTileExtras. */
 export const TILE_FIELDS: string = `
-  id, user_id, created_at, status, post_type, product_name, brand_name,
+  id, user_id, created_at, status, post_type, product_name, brand_name, question_summary,
   product_image_url, product_image_url_2, lf_title, lf_budget, lf_occasion,
   responses ( id ),
   profiles ( display_name, avatar_url, badge_tier, city )

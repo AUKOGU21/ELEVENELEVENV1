@@ -1,11 +1,15 @@
 // ── FeedBanner ────────────────────────────────────────────────────────────────
 // The top of the feed: what you can do here, set as a page rather than a widget.
+const CROC = "/home/croc-burgundy.webp";
+const CREAM = "#F2EDE6";
 // An oversized question on the left, the two ways in on a grid beside it,
 // separated by rules instead of boxes. No icons and no background photograph:
 // the decisions underneath supply the imagery.
 //
-// On a phone the whole thing compresses to the question and two actions on one
-// line, so the feed itself starts within the first screen.
+// On a phone the whole thing compresses to the question on two lines and two
+// actions, so the feed itself starts within the first screen. The invite rides
+// above it as a thin croc-leather banner rather than a line competing with the
+// actions.
 import { ArrowRight } from "lucide-react";
 import { C, RADIUS, body, display, meta } from "@/lib/design";
 
@@ -53,12 +57,28 @@ function Way({ n, eyebrow, title, blurb, action, onClick, isMobile }: {
 
 export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobile }: Props) {
   if (isMobile) {
+    const bannerType: React.CSSProperties = { ...meta(10, CREAM), fontWeight: 700, letterSpacing: "0.06em", whiteSpace: "nowrap" };
     return (
-      <section style={{ position: "relative", zIndex: 1, marginTop: 16 }}>
-        <h1 style={{ ...display("clamp(38px, 12vw, 50px)"), maxWidth: "12ch" }}>
-          What are you deciding on today?
+      <section style={{ position: "relative", zIndex: 1 }}>
+        {onInvite && (
+          // Edge to edge, tucked right under the nav: the feed's own padding is
+          // 16px each side and 14px on top, so the banner reaches past it.
+          <button onClick={onInvite} style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 14,
+            width: "calc(100% + 32px)", margin: "-14px -16px 0", padding: "13px 12px",
+            background: `#3A0A0C url(${CROC}) center / cover no-repeat`, border: "none", cursor: "pointer",
+          }}>
+            <span style={bannerType}>Good taste is meant to be shared.</span>
+            <span style={{ ...bannerType, borderBottom: "1px solid rgba(242,237,230,0.7)", paddingBottom: 2 }}>
+              Invite a friend &rarr;
+            </span>
+          </button>
+        )}
+        <h1 style={{ ...display("clamp(26px, 8.8vw, 36px)"), lineHeight: 0.95, marginTop: 16 }}>
+          <span style={{ display: "block", whiteSpace: "nowrap" }}>What are you deciding</span>
+          <span style={{ display: "block", whiteSpace: "nowrap" }}>on today?</span>
         </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 14 }}>
           <button onClick={onDecision} style={{
             ...meta(11.5, "#FFFFFF"), fontWeight: 700, letterSpacing: "0.14em",
             display: "inline-flex", alignItems: "center", gap: 8,
@@ -70,19 +90,7 @@ export default function FeedBanner({ onDecision, onLookingFor, onInvite, isMobil
             Ask for recs <ArrowRight style={{ width: 15, height: 15 }} strokeWidth={2} />
           </button>
         </div>
-        {onInvite && (
-          <button onClick={onInvite} style={{
-            ...meta(11, C.ink), fontWeight: 700, letterSpacing: "0.14em",
-            display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 10, rowGap: 6,
-            background: "none", border: "none", padding: 0, marginTop: 18, cursor: "pointer", textAlign: "left",
-          }}>
-            Know someone with good taste?
-            <span style={{ ...meta(11, C.burgundy), fontWeight: 700, letterSpacing: "0.14em", display: "inline-flex", alignItems: "center", gap: 7 }}>
-              Send an invite <ArrowRight style={{ width: 14, height: 14 }} strokeWidth={2} />
-            </span>
-          </button>
-        )}
-        <div style={{ borderBottom: "1px solid rgba(20,18,16,0.32)", marginTop: 20 }} />
+        <div style={{ borderBottom: "1px solid rgba(20,18,16,0.32)", marginTop: 18 }} />
       </section>
     );
   }

@@ -27,6 +27,8 @@ export interface TileDecision {
   lf_occasion?: string | null;
   lf_priorities?: string[] | null;
   matchScore?: number | null;
+  // The short question she's asking, written by AI from her post.
+  question_summary?: string | null;
   responses?: unknown[] | null;
   recommendations?: unknown[] | null;
   outcomes?: {
@@ -202,9 +204,20 @@ interface Props {
   following?: boolean;
   onToggleFollow?: (targetUserId: string, following: boolean) => void;
   onSignIn?: () => void;
+  /** The one decision picked for this viewer: "For you" in place of the match %. */
+  forYou?: boolean;
 }
 
-export default function DecisionTile({ d, viewerId, onOpen, isMobile, following = false, onToggleFollow, onSignIn }: Props) {
+/** The label on the decision picked for her, set like the meta type with a soft pink behind it. */
+function ForYou() {
+  return (
+    <span style={{ ...meta(10.5, C.ink), fontWeight: 700, letterSpacing: "0.14em", background: "#F1DCE4", padding: "4px 7px 3px", whiteSpace: "nowrap" }}>
+      For you
+    </span>
+  );
+}
+
+export default function DecisionTile({ d, viewerId, onOpen, isMobile, following = false, onToggleFollow, onSignIn, forYou = false }: Props) {
   const state = decisionState(d, viewerId);
   const isLF = d.post_type === "looking_for";
   // Her first priority says what kind of jeans: "Jeans / Tall friendly".
@@ -213,6 +226,10 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
   const match = d.matchScore != null ? Math.round(d.matchScore) : null;
   const colour = stateColor(state);
   const alt = isLF ? (d.lf_title ?? "") : [d.brand_name, d.product_name].filter(Boolean).join(" ");
+  // An open decision you can weigh in on asks its question in the big type
+  // instead of "WEIGH IN.", with a small "Weigh in" under it. Every other state,
+  // and any post still waiting on its question, keeps the one word.
+  const question = state === "weigh_in" && !isLF ? d.question_summary?.trim() || null : null;
 
   const images = isLF
     ? [d.outcomes?.[0]?.alt_product_image_url].filter(Boolean) as string[]
@@ -266,7 +283,7 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
           <p style={{ ...body(11.5, C.muted), lineHeight: 1.35 }}>{timeAgo(d.created_at)}</p>
-          {match != null && <MatchSeal score={match} size={isMobile ? 32 : 34} withLabel labelSize={9} />}
+          {forYou ? <ForYou /> : match != null && <MatchSeal score={match} size={isMobile ? 32 : 34} withLabel labelSize={9} />}
         </div>
       </header>
 
@@ -309,7 +326,24 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
         </div>
       ) : null}
 
-      {/* Where it stands */}
+      {/* Where it stands: her question when there is one, else the one word. */}
+      {question ? (
+        <footer style={{ marginTop: "auto", paddingTop: 12 }}>
+          <p style={{
+            ...display(isMobile ? 24 : "clamp(20px, 1.75vw, 24px)", colour), lineHeight: 0.98,
+            // One line is the aim; two is the most a card ever gets.
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+          }}>
+            {question}
+          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
+            <span style={{ ...meta(11, colour), fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Weigh in <ArrowRight style={{ width: 14, height: 14 }} strokeWidth={2} />
+            </span>
+            <span style={{ ...body(12, C.muted), whiteSpace: "nowrap" }}>{footnote(d, state)}</span>
+          </div>
+        </footer>
+      ) : (
       <footer style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginTop: "auto", paddingTop: 10 }}>
         <span style={{ ...display(isMobile ? 34 : "clamp(30px, 2.7vw, 42px)", colour), lineHeight: 0.85, whiteSpace: "nowrap" }}>
           {STATE_WORD[state]}
@@ -319,6 +353,7 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
           <span style={{ ...body(12, C.muted), whiteSpace: "nowrap" }}>{footnote(d, state)}</span>
         </span>
       </footer>
+      )}
     </article>
   );
 }

@@ -66,6 +66,7 @@ export interface ViewDecision extends TileDecision {
   context_note: string | null;
   confidence_score: number;
   uncertainty_text: string | null;
+  question_summary?: string | null;
   resolved_at?: string | null;
   responses: ResponseItemData[];
   decision_comments?: CommentData[];
@@ -118,7 +119,7 @@ interface Props {
   onLogOutcome: (initial: "bought_it" | "didnt_buy" | null, chosen?: "first" | "second" | "both" | null) => void;
   onStillDeciding: () => void;
   onDelete: () => void;
-  onSaveEdit: (patch: { context_note: string | null; confidence_score: number; price_note: string | null; sizes_note: string | null }) => void;
+  onSaveEdit: (patch: { context_note: string | null; confidence_score: number; price_note: string | null; sizes_note: string | null; question_summary?: string | null }) => void;
   updateOutcome: (patch: Record<string, unknown>) => void;
   submitReceived: (data: ReceivedData) => void;
   submitReturned: (data: { note: string | null; photoFile: File | null }) => void;
@@ -325,6 +326,7 @@ export default function DecisionView(props: Props) {
   const [editConf, setEditConf] = useState(confidence);
   const [editPrice, setEditPrice] = useState("");
   const [editSizes, setEditSizes] = useState("");
+  const [editQuestion, setEditQuestion] = useState("");
   const openEdit = () => {
     const details: Record<string, string> = {};
     concerns.forEach((c) => { details[c.label] = c.detail ?? ""; });
@@ -332,6 +334,7 @@ export default function DecisionView(props: Props) {
     setEditConf(confidence);
     setEditPrice((d.price_note ?? "").replace(/^\$/, ""));
     setEditSizes(d.sizes_note ?? "");
+    setEditQuestion(d.question_summary ?? "");
     setEditing(true);
   };
   const saveEdit = () => {
@@ -344,6 +347,8 @@ export default function DecisionView(props: Props) {
       confidence_score: editConf,
       price_note: editPrice.trim() ? `$${editPrice.trim().replace(/^\$/, "")}` : null,
       sizes_note: editSizes.trim() || null,
+      // Only sent when she changed it, so saving other edits never pins the AI's version.
+      ...(editQuestion.trim() !== (d.question_summary ?? "").trim() ? { question_summary: editQuestion.trim() || null } : {}),
     });
     setEditing(false);
   };
@@ -494,6 +499,12 @@ export default function DecisionView(props: Props) {
   const concernsBlock = editing ? (
     <div>
       <p style={{ ...meta(11, C.ink), marginBottom: 16 }}>Edit your post</p>
+      {/* The question on her feed card. Written by AI from her post; hers to change. */}
+      <div style={{ marginBottom: 18 }}>
+        <p style={{ ...meta(10, C.muted), marginBottom: 6 }}>The question on your card</p>
+        <input value={editQuestion} maxLength={50} onChange={(e) => setEditQuestion(e.target.value)} placeholder="e.g. Are these worth the price?" style={fieldStyle} />
+        <p style={{ ...body(12, C.muted), marginTop: 6 }}>Keep it short. Under 30 characters fits on one line.</p>
+      </div>
       {concerns.map((c) => (
         <div key={c.label} style={{ marginBottom: 14 }}>
           <p style={{ ...strong(13), textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>{c.label}</p>

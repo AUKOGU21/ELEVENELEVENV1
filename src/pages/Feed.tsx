@@ -1591,7 +1591,11 @@ const Feed = () => {
           bags: ["bag", "purse", "handbag", "tote", "clutch", "backpack", "crossbody"],
           accessories: ["accessory", "belt", "scarf", "hat", "jewelry", "earring", "necklace", "bracelet", "ring"],
         };
-        return (synonyms[target] ?? [target]).some(s => cat.includes(s) || name.includes(s));
+        // A post with a category is filed by that category alone. The name only
+        // stands in when there's no category: "Maxi Intrecciato" tote was
+        // matching Dresses on the word "maxi".
+        if (cat) return (synonyms[target] ?? [target]).some(s => cat.includes(s));
+        return (synonyms[target] ?? [target]).some(s => name.includes(s));
       });
     }
 

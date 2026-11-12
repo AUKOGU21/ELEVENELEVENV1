@@ -652,7 +652,7 @@ const Feed = () => {
         if (recUserIds.length > 0) {
           const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url, badge_tier").in("id", recUserIds);
           const profMap: Record<string, any> = {};
-          (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url }; });
+          (profs ?? []).forEach((p: any) => { profMap[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url, badge_tier: p.badge_tier }; });
           recs.forEach((r: any) => { r.profiles = profMap[r.user_id] ?? null; });
         }
         // Guests the same way: only the display columns are readable, which is

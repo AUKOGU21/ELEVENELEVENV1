@@ -225,6 +225,7 @@ export default function ResponseItem({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                         <span style={{ ...strong(11.5), textTransform: "uppercase", letterSpacing: "0.05em" }}>{formatName(rp.profiles?.display_name)}</span>
+                        <BadgeLabel tier={rp.profiles?.badge_tier} size={9} />
                         <span style={body(11.5, C.muted)}>{timeAgo(rp.created_at)}</span>
                       </div>
                       {editing ? (

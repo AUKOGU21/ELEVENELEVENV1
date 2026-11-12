@@ -11,7 +11,7 @@ import { ArrowRight, Check, ExternalLink, ThumbsUp } from "lucide-react";
 import { C, RADIUS, SANS, STATE_WORD, body, display, meta, strong } from "@/lib/design";
 import { formatBudget, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
 import { pullProduct, type PulledProduct } from "@/lib/productPull";
-import { Avatar, isResolved } from "./DecisionTile";
+import { Avatar, BadgeLabel, isResolved } from "./DecisionTile";
 import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
 import type { RecommendationData, LookingForDecision, LookingForFoundPayload } from "@/lib/lookingFor";
@@ -145,6 +145,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
               {/* A guest has no profile to open, so her name is not a link. */}
               <PersonName userId={rec.user_id} name={recAuthor} />
+              {!recGuest && <BadgeLabel tier={rec.profiles?.badge_tier} />}
               {recGuest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
               {rec.match_score != null && <MatchSeal score={rec.match_score} size={isMobile ? 28 : 30} />}
               <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>

@@ -175,21 +175,24 @@ export default function ResponseItem({
       <div style={{ display: "flex", gap: isMobile ? 12 : 16 }}>
         <Avatar url={guest ? null : resp.profiles?.avatar_url ?? null} name={authorName} tier={guest ? null : resp.profiles?.badge_tier} size={isMobile ? 36 : 42} userId={resp.user_id} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Phones: name with her badge under it, time on the right, then the verdict on its own line. */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0, minHeight: isMobile ? undefined : 30 }}>
-                {/* A guest has no profile to open, so her name is not a link. */}
-                <PersonName userId={resp.user_id} name={authorName} />
-                {/* Quiet: it explains the account, it does not rank the take. */}
-                {guest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
-                {!isMobile && verdict}
-              </div>
-              {!guest && badgeOf(resp.profiles?.badge_tier) && <p style={{ lineHeight: 1.2, marginTop: 4 }}><BadgeLabel tier={resp.profiles?.badge_tier} /></p>}
+          {/* Name, match and verdict on one line; her badge underneath, the way the cards do it.
+              On phones the time drops to that second line so the first one has room. */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: isMobile ? 10 : 12, rowGap: 6, minWidth: 0 }}>
+              {/* A guest has no profile to open, so her name is not a link. */}
+              <PersonName userId={resp.user_id} name={authorName} />
+              {/* Quiet: it explains the account, it does not rank the take. */}
+              {guest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
+              {verdict}
             </div>
-            <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0, lineHeight: isMobile ? 1.6 : "30px" }}>{timeAgo(resp.created_at)}</span>
+            {!isMobile && <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(resp.created_at)}</span>}
           </div>
-          {isMobile && <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, marginTop: 8 }}>{verdict}</div>}
+          {(!guest && badgeOf(resp.profiles?.badge_tier) || isMobile) && (
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginTop: 4 }}>
+              {!guest && badgeOf(resp.profiles?.badge_tier) ? <BadgeLabel tier={resp.profiles?.badge_tier} /> : <span />}
+              {isMobile && <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(resp.created_at)}</span>}
+            </div>
+          )}
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{resp.reasoning}</p>
 

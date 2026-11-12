@@ -20,6 +20,8 @@ import { getInitials } from "@/lib/format";
 import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
 import logoSymbol from "@/assets/logo-symbol.png";
 import ChromeMark from "@/components/ChromeMark";
+import { HowTo } from "@/components/NotificationBanner";
+import { canInstall, promptInstall, isStandalone } from "@/lib/push";
 
 // WebP: the same photographs at a fraction of the weight (7.3 MB of PNG was
 // keeping phones on a blank hero long enough for the walk to start empty).
@@ -280,6 +282,23 @@ const Index = () => {
     };
   }, [isMobile]);
 
+  // Getting the app before an account. A friend sends the link, and the first
+  // thing she wants is the icon on her phone. Android gets Chrome's one-tap
+  // install when it's offered; iPhone gets the Share steps.
+  const [installable, setInstallable] = useState(() => canInstall());
+  const [howTo, setHowTo] = useState(false);
+  useEffect(() => {
+    const on = () => setInstallable(canInstall());
+    window.addEventListener("ee-installable", on);
+    window.addEventListener("appinstalled", on);
+    return () => { window.removeEventListener("ee-installable", on); window.removeEventListener("appinstalled", on); };
+  }, []);
+  const showGetApp = isMobile && !user && !isStandalone();
+  const getApp = async () => {
+    if (installable && await promptInstall()) { setInstallable(canInstall()); return; }
+    setHowTo(true);
+  };
+
   const leather = (src: string): React.CSSProperties => ({
     backgroundImage: `url(${src})`,
     backgroundSize: "cover",
@@ -313,6 +332,11 @@ const Index = () => {
               <ChromeMark size={18} /> Add to Chrome
             </button>
           )}
+          {showGetApp && (
+            <button onClick={getApp} className="e11-link" style={{ ...navLink(C.ink), marginRight: "auto" }}>
+              Get the app
+            </button>
+          )}
           <button onClick={() => navigate("/feed")} className="e11-link" style={navLink(C.ink)}>
             Feed <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />
           </button>
@@ -328,7 +352,8 @@ const Index = () => {
                   display: "inline-flex", alignItems: "center", gap: 7,
                 }}
               >
-                Join <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />
+                {/* On phones Join drops its arrow, so Get the app has room on the left. */}
+                Join {!showGetApp && <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />}
               </button>
               <button onClick={() => navigate("/signin")} className="e11-link" style={navLink(C.ink)}>
                 Sign in <ArrowUpRight style={{ width: 14, height: 14 }} strokeWidth={2} />
@@ -522,6 +547,13 @@ const Index = () => {
             >
               Sign up <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
             </button>
+            {showGetApp && (
+              <p style={{ marginTop: 18 }}>
+                <button onClick={getApp} className="e11-link" style={{ ...strong(13, C.inkSoft), background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>
+                  Or add it to your home screen first
+                </button>
+              </p>
+            )}
           </motion.div>
 
           {/* The footer sits on the same leather, kept to what it always was. */}
@@ -556,6 +588,7 @@ const Index = () => {
           </div>
         </div>
       </section>
+      {howTo && <HowTo isMobile={isMobile} beforeSignup onClose={() => setHowTo(false)} />}
     </div>
   );
 };

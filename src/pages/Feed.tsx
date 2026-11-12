@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { isStandalone } from "@/lib/push";
 import { useNavigate, useLocation } from "react-router-dom";
 import DecisionTile, { isResolved } from "@/components/DecisionTile";
 import MatchSeal from "@/components/MatchSeal";
@@ -372,6 +373,19 @@ const Feed = () => {
   // Follow-up banner: jump to Mine and scroll straight to that card.
   const [scrollTargetId, setScrollTargetId] = useState<string | null>(null);
   const isMobile = useIsMobile();
+
+  // The home screen icon opens /feed. Someone who added it before making an
+  // account would land on the guest feed with only "Sign in" in sight, so the
+  // first signed-out launch goes to sign up. Once a session, so "Feed" from
+  // the sign-up page still lets her look around.
+  useEffect(() => {
+    if (authLoading || user || location.search || !isStandalone()) return;
+    try {
+      if (sessionStorage.getItem("ee_app_join_shown")) return;
+      sessionStorage.setItem("ee_app_join_shown", "1");
+    } catch { /* private mode: still send her once */ }
+    navigate("/signin?mode=signup", { replace: true });
+  }, [authLoading, user, location.search, navigate]);
 
   // ── Data state
   const [decisions, setDecisions] = useState<DecisionRow[]>([]);

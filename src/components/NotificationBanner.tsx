@@ -65,16 +65,28 @@ type Step = { label: string; title: React.ReactNode; note?: string; items: React
  * agent, so the install path has to be read off the browser itself. Safari and
  * Chrome both can do it, by different routes; Firefox and Edge cannot at all.
  */
-type IosBrowser = "safari" | "chrome" | "other";
+type IosBrowser = "safari" | "chrome" | "other" | "android";
 
 function iosBrowser(): IosBrowser {
   const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  // Android reaches here only when Chrome hasn't offered its one-tap install.
+  if (/android/i.test(ua)) return "android";
   if (/CriOS/i.test(ua)) return "chrome";
   if (/FxiOS|EdgiOS|OPiOS|YaBrowser/i.test(ua)) return "other";
   return "safari";
 }
 
 function stepOne(browser: IosBrowser): Step {
+  if (browser === "android") {
+    return {
+      label: "Step one",
+      title: <>Add <Mark>ElevenEleven</Mark> to your home screen</>,
+      items: [
+        <>Tap the <DotsGlyph /> menu at the top right of Chrome.</>,
+        <>Tap <b>Add to Home screen</b> or <b>Install app</b>, then <b>Install</b>.</>,
+      ],
+    };
+  }
   if (browser === "chrome") {
     return {
       label: "Step one",
@@ -153,7 +165,19 @@ const STEP_TWO: Step = {
   ],
 };
 
-export function HowTo({ isMobile, onClose, desktop = false }: { isMobile: boolean; onClose: () => void; desktop?: boolean }) {
+// Before she has an account, step two is signing up from the icon, not
+// notifications: those wait until she's inside.
+const STEP_TWO_JOIN: Step = {
+  label: "Step two",
+  title: <>Open it and join</>,
+  note: "Sign up from the icon, not from your browser, so you stay signed in there.",
+  items: [
+    <>Open <Mark>ElevenEleven</Mark> from your <b>home screen</b>.</>,
+    <>Make your account. It takes a minute.</>,
+  ],
+};
+
+export function HowTo({ isMobile, onClose, desktop = false, beforeSignup = false }: { isMobile: boolean; onClose: () => void; desktop?: boolean; beforeSignup?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -162,7 +186,7 @@ export function HowTo({ isMobile, onClose, desktop = false }: { isMobile: boolea
 
   const steps = desktop
     ? [...DESKTOP_STEPS, { ...STEP_TWO, label: "Step three" }]
-    : [stepOne(iosBrowser()), STEP_TWO];
+    : [stepOne(iosBrowser()), beforeSignup ? STEP_TWO_JOIN : STEP_TWO];
 
   return createPortal(
     <div
@@ -196,10 +220,10 @@ export function HowTo({ isMobile, onClose, desktop = false }: { isMobile: boolea
           </span>
         </p>
         <h2 style={{ ...body(isMobile ? 26 : 30, C.ink), fontWeight: 700, lineHeight: 1.16, letterSpacing: "-0.01em", textAlign: "center", margin: "22px auto 0", maxWidth: "26ch" }}>
-          Never miss a weigh-in.
+          {beforeSignup ? "Keep it on your phone." : "Never miss a weigh-in."}
         </h2>
         <p style={{ ...body(14.5, C.inkSoft), textAlign: "center", marginTop: 10 }}>
-          Two minutes, and we can reach you.
+          {beforeSignup ? "It opens like an app. No app store." : "Two minutes, and we can reach you."}
         </p>
 
         {steps.map((s) => (

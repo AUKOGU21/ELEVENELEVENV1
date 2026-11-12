@@ -96,12 +96,12 @@ export const EVENTS: Record<string, Event> = {
   },
   tier: {
     hero: LEGS,
-    subject: "New tier: {tier}",
-    head: "You're now a {tier}.",
-    sub: "Keep sharing what you know.",
+    subject: "You're a {tier}",
+    head: "You're a {tier}.",
+    sub: "Your takes are some of the most helpful on ELEVENELEVEN. Keep sharing what you know.",
     cta: "See your profile", path: "/profile",
     foot: "You're receiving this because women found your takes helpful",
-    push: "You're now a {tier}. Keep sharing what you know.",
+    push: "You're a {tier}. Your takes are some of the most helpful on E11.",
   },
   weigh_in: {
     subject: "{name} weighed in",
@@ -309,7 +309,7 @@ Deno.serve(async (req) => {
     const v: Record<string, string> = {
       name: resolved ?? data.name ?? data.actor_name ?? "Someone",
       item: trim(data.item ?? "your decision"),
-      tier: data.tier ?? "Contributor",
+      tier: data.tier ?? "Top Contributor",
       actor_id: data.actor_id ?? "",
       // "bought" or "passed on", so the loop-closing email says which way it went
       verdict: data.verdict ?? "decided on",

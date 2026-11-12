@@ -8,13 +8,14 @@ import { computeMatchScore } from "@/lib/matching";
 import FollowButton from "@/components/FollowButton";
 import MatchSeal from "@/components/MatchSeal";
 import { Avatar } from "@/components/DecisionTile";
-import { tierFor } from "@/lib/tiers";
+import { badgeOf } from "@/lib/tiers";
+import { FavoriteBrandTiles, readBrands } from "@/components/FavoriteBrands";
 import { track } from "@/lib/track";
 import { C, body, meta } from "@/lib/design";
 // The layout and read-only sections are shared with her own profile page.
 import {
   AskMeAbout, DecisionsBlock, EmptyNote, FitSummary, IrlPhotos, Lightbox, Portrait,
-  ProfileFooter, ProfileHeader, ProfileTabs, ProfileTop, StatsRow, TierStatus, StyleRow, TILE_FIELDS, fitPhotosFor, helpfulStats,
+  Experience, ProfileFooter, headerLabel, ProfileHeader, ProfileTabs, ProfileTop, StatsRow, TierStatus, StyleRow, TILE_FIELDS, fitPhotosFor, helpfulStats,
   nameParts, silhouetteFor, squareBtn, textLink, useViewport, withTileExtras, wrap, type ProfileTile,
 } from "./Profile";
 
@@ -118,10 +119,11 @@ const PublicProfile = () => {
 
   const name      = profile.display_name?.trim() || "Anonymous";
   const first     = nameParts(name)[0] ?? name;
-  const tier      = tierFor(stats.helpfulVotes)?.label ?? profile.badge_tier ?? null;
+  const tier      = badgeOf(profile.badge_tier);
   const sil       = silhouetteFor(profile);
   const fitPhotos = fitPhotosFor(profile);
   const styles: string[] = profile.style_aesthetics ?? [];
+  const favBrands = readBrands(profile.favorite_brands);
   const isOwner   = !!user && user.id === userId;
 
   // Follow (or Edit, on her own) in the top right corner.
@@ -183,7 +185,12 @@ const PublicProfile = () => {
             portrait={<Portrait url={profile.avatar_url ?? null} name={name} tier={tier} />}
             actions={actions}
             irl={fitPhotos.length > 0 ? <IrlPhotos label={`${first}, IRL`} photos={fitPhotos} onOpen={setLightboxIdx} /> : null}
-            askAbout={askItems.length > 0 ? <AskMeAbout items={askItems} isMobile={isMobile} /> : null}
+            askAbout={askItems.length > 0 || (profile.is_expert && profile.expert_experience) ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {askItems.length > 0 && <AskMeAbout items={askItems} isMobile={isMobile} />}
+                {profile.is_expert && <Experience text={profile.expert_experience} />}
+              </div>
+            ) : null}
           />
         </div>
 
@@ -199,7 +206,12 @@ const PublicProfile = () => {
             {
               key: "style",
               label: "Style",
-              content: styles.length > 0 ? <StyleRow labels={styles} isMobile={isMobile} /> : <EmptyNote text={`${first} hasn't picked her aesthetic yet.`} />,
+              content: styles.length > 0 || favBrands.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 28 : 36 }}>
+                  {styles.length > 0 && <StyleRow labels={styles} isMobile={isMobile} />}
+                  <FavoriteBrandTiles brands={favBrands} isMobile={isMobile} heading={headerLabel} />
+                </div>
+              ) : <EmptyNote text={`${first} hasn't picked her aesthetic yet.`} />,
             },
             {
               key: "decisions",

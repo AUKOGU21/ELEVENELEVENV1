@@ -13,10 +13,13 @@ import { Bell } from "lucide-react";
 import { pushState, enablePush, isStandalone, type PushState } from "@/lib/push";
 import { C, RADIUS, body as bodyText, display, meta } from "@/lib/design";
 
-const SNOOZE_DAYS = 14;      // "Not now"
+const SNOOZE_DAYS = 7;       // "Not now"
 const BLOCKED_DAYS = 60;     // she said no to the browser prompt, so back well off
 
-export default function NotificationPrompt({ userId, isMobile }: { userId: string; isMobile: boolean }) {
+/** `hold`: another prompt goes first ("Did you decide?"); this waits until it's done. */
+export default function NotificationPrompt({ userId, isMobile, hold = false }: { userId: string; isMobile: boolean; hold?: boolean }) {
+  const holdRef = useRef(hold);
+  holdRef.current = hold;
   const snoozeKey = `ee_push_modal_snoozed_${userId}`;
   const bannerKey = `ee_push_prompt_dismissed_${userId}`;
 
@@ -45,7 +48,13 @@ export default function NotificationPrompt({ userId, isMobile }: { userId: strin
       if (Number.isFinite(until) && until > Date.now()) return;
     } catch { /* private mode: just show it */ }
     // Let the feed paint first so this reads as a prompt, not a page load.
-    const t = setTimeout(() => { setState(current); setOpen(true); }, 1200);
+    // Wait while another prompt is pending or up, then ask.
+    let t: ReturnType<typeof setTimeout>;
+    const fire = () => {
+      if (holdRef.current || document.querySelector('[role="dialog"]')) { t = setTimeout(fire, 4000); return; }
+      setState(current); setOpen(true);
+    };
+    t = setTimeout(fire, 1200);
     return () => clearTimeout(t);
   }, [snoozeKey]);
 

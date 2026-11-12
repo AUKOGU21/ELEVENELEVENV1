@@ -21,6 +21,8 @@ interface OutcomeModalProps {
   // For a two-option "deciding between" decision: which she chose ('first' |
   // 'second' | 'both'), recorded on the outcome so the card reflects the winner.
   initialChosenOption?: string | null;
+  // From the "Bought something else" answer: the swap question starts on Yes.
+  initialBoughtAlternative?: boolean;
 }
 
 type OutcomeType = "bought_it" | "didnt_buy" | "still_deciding";
@@ -474,7 +476,7 @@ function OptionRow({ label, selected, onClick }: { label: string; selected: bool
   );
 }
 
-const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, initialChosenOption }: OutcomeModalProps) => {
+const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, initialChosenOption, initialBoughtAlternative }: OutcomeModalProps) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
 
@@ -567,7 +569,7 @@ const OutcomeModal = ({ open, onClose, decision, onComplete, initialOutcome, ini
         size_recommendation: null,
         outcome_detail: null,
         outcome_detail_other: "",
-        bought_alternative: null,
+        bought_alternative: seeded === "didnt_buy" && initialBoughtAlternative ? true : null,
         alt_product_url: "",
         alt_product_name: "",
         alt_reason: "",

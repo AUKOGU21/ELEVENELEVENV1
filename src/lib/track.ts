@@ -26,6 +26,11 @@ export type EventKind =
   | "guest_signup_completed"   // that guest became a member
   // A one-tap answer from a check-in email or push (bought / passed / deciding).
   | "checkin_answer"
+  // "Did you decide?" on opening the app: shown, answered (bought / passed /
+  // bought_else / deciding), or put off with Not now.
+  | "loop_prompt_shown"
+  | "loop_prompt_answer"
+  | "loop_prompt_not_now"
   // The returning-member prompt to fill in Ask me about.
   | "ask_prompt_shown"
   | "ask_prompt_saved"

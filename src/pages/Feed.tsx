@@ -27,6 +27,7 @@ import NotificationBell from "@/components/NotificationBell";
 import { type LookingForFoundPayload } from "@/lib/lookingFor";
 import RecommendationModal, { RecommendationDraft } from "@/components/RecommendationModal";
 import AskMeAboutPrompt from "@/components/AskMeAboutPrompt";
+import LoopPrompt, { pickLoopCandidate, markLoopShown, markLoopNotNow, type LoopAnswer } from "@/components/LoopPrompt";
 import ReferralPopup from "@/components/ReferralPopup";
 import { ensureInviteCode, ensureReferral } from "@/lib/referral";
 import { toast } from "sonner";
@@ -88,6 +89,7 @@ interface OutcomeRow {
   received_at: string | null;
   photo_url: string | null;
   chosen_option?: string | null;
+  still_deciding_at?: string | null;
   // "Passed" flow: she skipped this item but bought something else instead.
   bought_alternative?: boolean | null;
   alt_product_url?: string | null;
@@ -440,6 +442,7 @@ const Feed = () => {
   const [outcomeInitial, setOutcomeInitial] = useState<"bought_it" | "didnt_buy" | null>(null);
   // For two-option decisions: which option she chose when logging the outcome.
   const [outcomeChosen, setOutcomeChosen] = useState<"first" | "second" | "both" | null>(null);
+  const [outcomeBoughtElse, setOutcomeBoughtElse] = useState(false);
   const [loggedOutcomeIds, setLoggedOutcomeIds] = useState<Set<string>>(new Set());
   const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -785,7 +788,7 @@ const Feed = () => {
       if (allDecisionIds.length > 0) {
         const { data: outcomesData } = await supabase
           .from("outcomes")
-          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id")
+          .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id, still_deciding_at")
           .in("decision_id", allDecisionIds)
           .order("created_at", { ascending: false });
 
@@ -864,7 +867,7 @@ const Feed = () => {
         if (myDecisionIds.length > 0) {
           const { data: myOutcomesData } = await supabase
             .from("outcomes")
-            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id")
+            .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id, still_deciding_at")
             .in("decision_id", myDecisionIds)
             .order("created_at", { ascending: false });
 
@@ -1406,6 +1409,8 @@ const Feed = () => {
     if (!user || !myProfile || fitPromptShownRef.current) return;
     if (!mayAskAboutFit) return;
     const t = setTimeout(() => {
+      // "Did you decide?" goes first; the fit ask waits for another visit.
+      if (loopHoldRef.current) return;
       fitPromptShownRef.current = true;
       setFitModalVariant("weigh_in");
       setShowFitModal(true);
@@ -1703,6 +1708,58 @@ const Feed = () => {
     return () => clearTimeout(t);
   }, [user?.id, activationTarget?.id, showActivation]);
 
+  // ── "Did you decide?" ─────────────────────────────────────────────────────
+  // Once the feed has her own posts, ask about one open decision (rules in
+  // LoopPrompt). It goes first: the notifications, Ask me about, fit and invite
+  // prompts all wait while it is pending or open. Every answer runs the same
+  // flow as the card buttons and the check-in links, so the data is identical.
+  const [loopDecision, setLoopDecision] = useState<DecisionRow | null>(null);
+  const [loopChecked, setLoopChecked] = useState(false);
+  const loopCheckedRef = useRef(false);
+  const loopHold = !!user && (!loopChecked || !!loopDecision);
+  const loopHoldRef = useRef(loopHold);
+  loopHoldRef.current = loopHold;
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { setLoopChecked(true); return; }
+    if (loading || loopCheckedRef.current) return;
+    const t = setTimeout(() => {
+      loopCheckedRef.current = true;
+      // Arrived from a check-in link or another page with a post to open: that
+      // already asks, so don't stack a second question on top.
+      const arrivedWithPost = new URLSearchParams(window.location.search).get("open") || (location.state as any)?.openDecisionId;
+      const c = arrivedWithPost ? null : pickLoopCandidate(myDecisions, user.id);
+      if (c) {
+        markLoopShown(user.id);
+        setLoopDecision(c);
+        track("loop_prompt_shown", { decisionId: c.id, userId: user.id });
+      }
+      setLoopChecked(true);
+    }, 900);
+    return () => clearTimeout(t);
+  }, [user, authLoading, loading, myDecisions]);
+
+  const answerLoop = (answer: LoopAnswer) => {
+    const d = loopDecision;
+    setLoopDecision(null);
+    if (!d || !user) return;
+    track("loop_prompt_answer", { decisionId: d.id, userId: user.id, meta: { answer } });
+    if (answer === "deciding") { quickStillDeciding(d.id); toast("Got it. We'll check back next week."); return; }
+    // Deciding between two: she says which one in the post itself.
+    if (answer === "bought" && d.product_name_2) { openDecision(d.id); return; }
+    setOutcomeInitial(answer === "bought" ? "bought_it" : "didnt_buy");
+    setOutcomeChosen(null);
+    setOutcomeBoughtElse(answer === "bought_else");
+    setTrackingId(d.id);
+  };
+  const loopNotNow = () => {
+    const d = loopDecision;
+    setLoopDecision(null);
+    if (!d || !user) return;
+    markLoopNotNow(user.id, d.id);
+    track("loop_prompt_not_now", { decisionId: d.id, userId: user.id });
+  };
+
   // Purchases still owed their received-it log — drives the top-of-feed banner.
   const followupPending = myDecisions.filter((d) => {
     const o = d.outcomes?.[0];
@@ -1979,7 +2036,8 @@ const Feed = () => {
         open={trackingId !== null}
         initialOutcome={outcomeInitial}
         initialChosenOption={outcomeChosen}
-        onClose={() => { setTrackingId(null); setOutcomeInitial(null); setOutcomeChosen(null); }}
+        initialBoughtAlternative={outcomeBoughtElse}
+        onClose={() => { setTrackingId(null); setOutcomeInitial(null); setOutcomeChosen(null); setOutcomeBoughtElse(false); }}
         decision={decisions.find(d => d.id === trackingId) ?? myDecisions.find(d => d.id === trackingId) ?? { id: trackingId ?? '', uncertainty_text: null }}
         onComplete={(outcome) => {
           if (outcome !== "still_deciding" && trackingId) {
@@ -2005,7 +2063,7 @@ const Feed = () => {
                 // if there are multiple rows for the same decision_id.
                 const { data: rows } = await supabase
                   .from("outcomes")
-                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id")
+                  .select("decision_id, did_purchase, outcome_type, primary_uncertainty, tipping_factor, tipping_factor_other, size_bought, fit_result, fit_result_note, size_recommendation, outcome_detail, outcome_detail_other, kept, recommend, confidence_after, take, followed_up_at, created_at, arrival_status, next_prompt_at, received_at, photo_url, chosen_option, bought_alternative, alt_product_url, alt_product_name, alt_product_image_url, alt_brand_name, alt_price_note, alt_reason, chosen_recommendation_id, still_deciding_at")
                   .eq("decision_id", id)
                   .order("created_at", { ascending: false })
                   .limit(1);
@@ -2186,8 +2244,9 @@ const Feed = () => {
 
       <DialInFitModal open={showFitModal} onClose={() => setShowFitModal(false)} variant={fitModalVariant} only={missingFit} auto />
 
-      {user && <NotificationPrompt userId={user.id} isMobile={isMobile} />}
-      {user && <AskMeAboutPrompt userId={user.id} hold={showFitModal || showReferral} />}
+      <LoopPrompt decision={loopDecision} isMobile={isMobile} onAnswer={answerLoop} onNotNow={loopNotNow} />
+      {user && <NotificationPrompt userId={user.id} isMobile={isMobile} hold={loopHold} />}
+      {user && <AskMeAboutPrompt userId={user.id} hold={showFitModal || showReferral || loopHold} />}
     </div>
   );
 };

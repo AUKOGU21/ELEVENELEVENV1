@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { C, RADIUS, STATE_WORD, body, display, meta, stateColor, strong, type DecisionState } from "@/lib/design";
-import { ringStyle } from "@/lib/tiers";
+import { BADGES, badgeOf, ringStyle } from "@/lib/tiers";
 import { formatBudget, formatName, getInitials, timeAgo } from "@/lib/format";
 import FollowButton from "./FollowButton";
 import MatchSeal from "./MatchSeal";
@@ -76,6 +76,20 @@ function footnote(d: TileDecision, state: DecisionState): string {
   }
   const n = d.responses?.length ?? 0;
   return n === 0 ? (state === "weigh_in" ? "Be the first" : "No responses yet") : `${n} ${n === 1 ? "response" : "responses"}`;
+}
+
+/**
+ * Her badge, as a small all-caps label: TOP CONTRIBUTOR or EXPERT. No box, no
+ * icon, no credential: what an expert knows lives on her profile, in her words.
+ */
+export function BadgeLabel({ tier, size = 9.5 }: { tier?: string | null; size?: number }) {
+  const b = badgeOf(tier);
+  if (!b) return null;
+  return (
+    <span style={{ ...meta(size, BADGES[b].ink), fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+      {b}
+    </span>
+  );
 }
 
 export function Avatar({ url, name, tier, size, userId }: { url: string | null; name: string | null; tier?: string | null; size: number; userId?: string | null }) {
@@ -279,6 +293,7 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
               />
             )}
           </div>
+          {badgeOf(d.profiles?.badge_tier) && <p style={{ lineHeight: 1.2, marginTop: 3 }}><BadgeLabel tier={d.profiles?.badge_tier} /></p>}
           {city && <p style={{ ...body(12, C.muted), lineHeight: 1.35, marginTop: 2 }}>{city}</p>}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>

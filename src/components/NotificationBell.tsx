@@ -44,7 +44,7 @@ function messageFor(n: NotificationRow): string {
     case "reply": return `${who} replied to your take on ${item}`;
     case "relevant": return `${who} needs your take on ${item}`;
     case "follow": return `${who} followed you`;
-    case "tier": return `You're now a ${d.tier || "Contributor"}`;
+    case "tier": return `You're a ${d.tier || "Top Contributor"}`;
     case "follow_post": return `${who} posted ${item}`;
     case "comment": return `${who} commented on ${item}`;
     case "comment_thread": return `${who} also commented on ${item}`;

@@ -40,6 +40,8 @@ export const ASK_TOPICS = [
   "Resale", "Workwear", "Wedding guest", "Swimwear", "Activewear", "Bra sizing", "Wide feet", "Sneakers", "Heels",
   "Denim", "Tailoring", "Knitwear", "Outerwear", "Capsule wardrobe", "Quality vs. price", "Sizing across brands",
   "Skincare", "Makeup", "Haircare", "Fragrance", "Jewelry", "Maternity",
+  "Mid-range luxury", "Textures and quality", "Fabric quality", "Craftsmanship", "Investment pieces",
+  "What holds its value", "Leather goods", "Quiet luxury",
 ];
 
 /**
@@ -47,7 +49,8 @@ export const ASK_TOPICS = [
  * where they don't. What she picks reads as underlined words with an x, the way
  * the size picker marks a choice: no pills.
  */
-export default function AskAboutEditor({ value, onChange, pool, bare, placeholder = "e.g. Tall-girl denim" }: {
+export default function AskAboutEditor({ value, onChange, pool, bare, placeholder = "e.g. Tall-girl denim", max = ASK_MAX,
+  question = "What should people ask you about?", helper = "Brands, luxury bags, fit problems, or anything you know really well.", id = "profile-ask" }: {
   value: string[];
   onChange: (v: string[]) => void;
   pool: string[];
@@ -55,10 +58,15 @@ export default function AskAboutEditor({ value, onChange, pool, bare, placeholde
   bare?: boolean;
   /** The example in the empty field. */
   placeholder?: string;
+  /** How many she can add. */
+  max?: number;
+  question?: string;
+  helper?: string;
+  id?: string;
 }) {
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(-1);
-  const full = value.length >= ASK_MAX;
+  const full = value.length >= max;
   const has = (t: string) => value.some((v) => v.toLowerCase() === t.toLowerCase());
   const needle = q.trim().toLowerCase();
   const matches = needle ? pool.filter((p) => p.toLowerCase().includes(needle) && !has(p)).slice(0, 6) : [];
@@ -83,10 +91,10 @@ export default function AskAboutEditor({ value, onChange, pool, bare, placeholde
       {!bare && (
         <>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-            <label htmlFor="profile-ask" style={strong(14)}>What should people ask you about?</label>
-            <span style={meta(10.5, full ? C.burgundy : C.muted)}>{value.length}/{ASK_MAX}</span>
+            <label htmlFor={id} style={strong(14)}>{question}</label>
+            <span style={meta(10.5, full ? C.burgundy : C.muted)}>{value.length}/{max}</span>
           </div>
-          <p style={{ ...body(13, C.muted), marginTop: 4 }}>Brands, luxury bags, fit problems, or anything you know really well.</p>
+          <p style={{ ...body(13, C.muted), marginTop: 4 }}>{helper}</p>
         </>
       )}
 
@@ -106,7 +114,7 @@ export default function AskAboutEditor({ value, onChange, pool, bare, placeholde
       {!full && (
         <div style={{ position: "relative", marginTop: bare ? 0 : 12 }}>
           <input
-            id="profile-ask"
+            id={id}
             value={q}
             maxLength={ASK_LEN}
             onChange={(e) => { setQ(e.target.value); setHi(-1); }}
@@ -115,15 +123,15 @@ export default function AskAboutEditor({ value, onChange, pool, bare, placeholde
             autoComplete="off"
             role="combobox"
             aria-expanded={matches.length > 0}
-            aria-controls="profile-ask-list"
-            aria-label={bare ? "What should people ask you about?" : undefined}
+            aria-controls={`${id}-list`}
+            aria-label={bare ? question : undefined}
             style={{ ...fieldStyle, paddingRight: q.trim() ? 64 : 13 }}
           />
           {q.trim() && (
             <button onClick={() => add(q)} style={{ ...textLink(C.burgundy), position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)" }}>Add</button>
           )}
           {matches.length > 0 && (
-            <div id="profile-ask-list" role="listbox" style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#FFFFFF", border: `1px solid ${C.rule}`, borderRadius: RADIUS, overflow: "hidden", zIndex: 10 }}>
+            <div id={`${id}-list`} role="listbox" style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#FFFFFF", border: `1px solid ${C.rule}`, borderRadius: RADIUS, overflow: "hidden", zIndex: 10 }}>
               {matches.map((m, i) => (
                 <button key={m} role="option" aria-selected={i === hi} onMouseDown={(e) => e.preventDefault()} onClick={() => add(m)}
                   style={{ ...body(14, C.ink), width: "100%", textAlign: "left", padding: "10px 13px", background: i === hi ? C.well : "none", border: "none", borderTop: i ? `1px solid ${C.rule}` : "none", cursor: "pointer" }}>
@@ -169,3 +177,4 @@ export function useAskPool(enabled: boolean): string[] {
   }, [enabled]);
   return pool;
 }
+

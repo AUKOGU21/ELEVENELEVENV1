@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ExternalLink, MoreHorizontal, ThumbsUp } from "lucide-react";
 import { C, RADIUS, SANS, body, meta, strong } from "@/lib/design";
 import { experienceLabel, formatName, prettyHost, recommendationLabel, timeAgo } from "@/lib/format";
-import { Avatar } from "./DecisionTile";
+import { Avatar, BadgeLabel } from "./DecisionTile";
 import { PersonName } from "./PersonLink";
 import MatchSeal from "./MatchSeal";
 import type { ReplyData } from "./ResponseCard";
@@ -171,6 +171,7 @@ export default function ResponseItem({
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 6, minWidth: 0 }}>
               {/* A guest has no profile to open, so her name is not a link. */}
               <PersonName userId={resp.user_id} name={authorName} />
+              {!guest && <BadgeLabel tier={resp.profiles?.badge_tier} />}
               {/* Quiet: it explains the account, it does not rank the take. */}
               {guest && <span style={{ ...meta(9.5, C.faint), letterSpacing: "0.16em" }}>Guest</span>}
               {resp.match_score != null && <MatchSeal score={resp.match_score} size={isMobile ? 28 : 30} />}

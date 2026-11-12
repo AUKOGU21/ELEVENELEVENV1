@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SILHOUETTE_OPTIONS, STYLE_OPTIONS, HEIGHT_OPTIONS, SIZE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { DialInFitModal } from "@/components/DialInFitModal";
-import { tierFor, nextTier, TIERS } from "@/lib/tiers";
+import { badgeInk, badgeOf, ringFor } from "@/lib/tiers";
 import { computeMatchScore } from "@/lib/matching";
 import { imageToJpeg } from "@/lib/image";
 import { C, RADIUS, SANS, body, display, meta, strong } from "@/lib/design";
@@ -15,6 +15,7 @@ import DecisionTile, { type TileDecision } from "@/components/DecisionTile";
 import MatchSeal from "@/components/MatchSeal";
 import { getInitials } from "@/lib/format";
 import AskAboutEditor, { ASK_MAX, useAskPool } from "@/components/AskAboutEditor";
+import { FavoriteBrandPicker, FavoriteBrandTiles, readBrands, type FavBrand } from "@/components/FavoriteBrands";
 
 // ════════════════════════════════════════════════════════════════════════════
 // Shared with PublicProfile.tsx
@@ -353,18 +354,41 @@ export function ProfileTop({ isMobile, isWide, name, facts, since, bio, portrait
   );
 }
 
-/** A tier's own colour: the same one as the ring round her photo. */
+/** A badge's own colour: the same one as the ring round her photo. */
 export function tierColour(tier: string | null | undefined): string | null {
-  return TIERS.find((t) => t.label === tier)?.ring ?? null;
+  return badgeOf(tier) ? ringFor(tier) : null;
 }
 
-/** Her tier, in its colour, beside her photo. Public: this is how others read her standing. */
+/** Her badge beside her photo. Public: this is how others read her standing. */
 export function TierStatus({ tier, children }: { tier: string | null; children?: React.ReactNode }) {
-  if (!tier && !children) return null;
+  const b = badgeOf(tier);
+  if (!b && !children) return null;
   return (
     <div>
-      {tier && <p style={{ ...headerLabel, color: tierColour(tier) ?? C.burgundy }}>{tier}</p>}
-      {children && <div style={{ marginTop: tier ? 12 : 0 }}>{children}</div>}
+      {b && <p style={{ ...headerLabel, color: badgeInk(b) ?? C.burgundy }}>{b}</p>}
+      {children && <div style={{ marginTop: b ? 12 : 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 14 }}>{children}</div>}
+    </div>
+  );
+}
+
+export const EXPERIENCE_MAX = 280;
+
+/**
+ * An Expert's experience, in her own words. Closed by default: "See experience"
+ * opens it. Profile only; the feed shows just the label. Her own view gets a
+ * way in while it's empty.
+ */
+export function Experience({ text, onAdd }: { text?: string | null; onAdd?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const t = text?.trim();
+  if (!t) return onAdd ? <button onClick={onAdd} style={textLink(C.burgundy)}>Add your experience {arrow}</button> : null;
+  return (
+    <div>
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} style={{ ...textLink(C.ink), display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {open ? "Hide experience" : "See experience"}
+        <ChevronDown style={{ width: 14, height: 14, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }} strokeWidth={2} />
+      </button>
+      {open && <p style={{ ...body(14), marginTop: 10, whiteSpace: "pre-line", maxWidth: "42ch" }}>{t}</p>}
     </div>
   );
 }
@@ -587,14 +611,10 @@ export function Lightbox({ photos, index, onIndex, onClose }: {
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
 /**
- * Three numbers on a plain row. With `progress` (her own profile only) a thin
- * bar underneath shows how far she is from the next tier.
+ * Three numbers on a plain row. With `progress` (her own profile only) and no
+ * badge yet, one quiet line says how Top Contributor is earned.
  */
-export function StatsRow({ decisions, takes, helpful, isMobile, progress }: { decisions: number; takes: number; helpful: number; isMobile: boolean; progress?: boolean }) {
-  const next = nextTier(helpful);
-  const threshold = next?.min ?? helpful;
-  const pct = next ? Math.min(100, Math.round((helpful / Math.max(1, threshold)) * 100)) : 100;
-
+export function StatsRow({ decisions, takes, helpful, isMobile, progress, tier }: { decisions: number; takes: number; helpful: number; isMobile: boolean; progress?: boolean; tier?: string | null }) {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: isMobile ? 12 : 28 }}>
@@ -610,25 +630,10 @@ export function StatsRow({ decisions, takes, helpful, isMobile, progress }: { de
         ))}
       </div>
 
-      {progress && (
-        <div style={{ marginTop: isMobile ? 22 : 28, maxWidth: 520 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-            <p style={{ ...meta(10.5, C.ink), fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
-              {next ? <>Next <ArrowRight style={{ width: 13, height: 13 }} strokeWidth={2} /> {next.label}</> : "Highest tier"}
-            </p>
-            {next && <p style={meta(10.5)}>{helpful} / {threshold} helpful</p>}
-          </div>
-          <div
-            role="progressbar"
-            aria-label="Progress to the next tier"
-            aria-valuemin={0}
-            aria-valuemax={threshold}
-            aria-valuenow={Math.min(helpful, threshold)}
-            style={{ height: 4, background: "rgba(20,18,16,0.10)", marginTop: 10 }}
-          >
-            <div style={{ width: `${pct}%`, height: "100%", background: C.burgundy, transition: "width .6s ease" }} />
-          </div>
-        </div>
+      {progress && !badgeOf(tier) && (
+        <p style={{ ...body(13, C.muted), marginTop: isMobile ? 18 : 22, maxWidth: 520 }}>
+          The most helpful 15% of members are Top Contributors. Every take marked helpful counts.
+        </p>
       )}
     </div>
   );
@@ -1158,6 +1163,7 @@ const Profile = () => {
 
   // Edit modes
   const [editMode, setEditMode]           = useState<null | "silhouette" | "style" | "sizes">(null);
+  const [editBrands, setEditBrands]       = useState<FavBrand[]>([]);
   const [showFitModal, setShowFitModal]   = useState(false);
   const [editHeight, setEditHeight]       = useState<string | null>(null);
   const [editTop, setEditTop]             = useState<string | null>(null);
@@ -1173,6 +1179,7 @@ const Profile = () => {
   const [editCity, setEditCity]           = useState("");
   const [editBio, setEditBio]             = useState("");
   const [editAsk, setEditAsk]             = useState<string[]>([]);
+  const [editExperience, setEditExperience] = useState("");
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const cityTyped                         = useRef(false);
   const [saving, setSaving]               = useState(false);
@@ -1301,6 +1308,7 @@ const Profile = () => {
       setEditCity(data.city ?? "");
       setEditBio(data.bio ?? "");
       setEditAsk(Array.isArray(data.ask_me_about) ? data.ask_me_about : []);
+      setEditExperience(data.expert_experience ?? "");
       setFitPhotos(fitPhotosFor(data));
     }
     setLoading(false);
@@ -1354,6 +1362,10 @@ const Profile = () => {
       city: editCity || null,
       bio: editBio.trim().slice(0, BIO_MAX) || null,
       ask_me_about: editAsk.length ? editAsk.slice(0, ASK_MAX) : null,
+      // Only an Expert has these to fill in.
+      ...(profile?.is_expert ? {
+        expert_experience: editExperience.trim().slice(0, EXPERIENCE_MAX) || null,
+      } : {}),
     }).eq("id", user!.id);
     setSaving(false);
     if (error) { alert("Could not save: " + error.message); return; }
@@ -1368,6 +1380,7 @@ const Profile = () => {
     setEditCity(profile?.city ?? "");
     setEditBio(profile?.bio ?? "");
     setEditAsk(Array.isArray(profile?.ask_me_about) ? profile.ask_me_about : []);
+    setEditExperience(profile?.expert_experience ?? "");
     setCitySuggestions([]);
   };
 
@@ -1480,12 +1493,14 @@ const Profile = () => {
     setFitPhotos(updated);
   };
 
-  const openStyleEdit = () => { setEditStyle(profile?.style_aesthetics ?? []); setEditMode("style"); };
+  const openStyleEdit = () => { setEditStyle(profile?.style_aesthetics ?? []); setEditBrands(readBrands(profile?.favorite_brands)); setEditMode("style"); };
   const toggleStyle   = (l: string) => setEditStyle(p => p.includes(l) ? p.filter(s => s !== l) : p.length < 3 ? [...p, l] : p);
   const saveStyle     = async () => {
-    if (!editStyle.length) return; setSavingProfile(true);
-    await supabase.from("profiles").update({ style_aesthetics: editStyle }).eq("id", user!.id);
-    setProfile((p: any) => ({ ...p, style_aesthetics: editStyle }));
+    if (!editStyle.length && !editBrands.length) return; setSavingProfile(true);
+    const patch: Record<string, unknown> = { favorite_brands: editBrands.length ? editBrands : null };
+    if (editStyle.length) patch.style_aesthetics = editStyle;
+    await supabase.from("profiles").update(patch).eq("id", user!.id);
+    setProfile((p: any) => ({ ...p, ...patch }));
     setSavingProfile(false); setEditMode(null);
   };
 
@@ -1493,8 +1508,9 @@ const Profile = () => {
   const displayName = profile?.display_name?.trim() || user?.email?.split("@")[0] || "You";
   const firstName   = nameParts(displayName)[0] ?? "You";
   const sil         = silhouetteFor(profile);
-  const tier        = tierFor(stats.helpfulVotes)?.label ?? profile?.badge_tier ?? null;
+  const tier        = badgeOf(profile?.badge_tier);
   const styles: string[] = profile?.style_aesthetics ?? [];
+  const favBrands = readBrands(profile?.favorite_brands);
   const pickerCols  = isMobile ? 3 : 5;
   const remaining   = 3 - fitPhotos.length;
 
@@ -1564,6 +1580,17 @@ const Profile = () => {
       <div style={{ marginTop: 22 }}>
         <AskAboutEditor value={editAsk} onChange={setEditAsk} pool={askPool} />
       </div>
+      {profile?.is_expert && (
+        <div style={{ marginTop: 26 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+            <label htmlFor="profile-experience" style={strong(14)}>Your experience</label>
+            <span style={meta(10.5, editExperience.length >= EXPERIENCE_MAX ? C.burgundy : C.muted)}>{editExperience.length}/{EXPERIENCE_MAX}</span>
+          </div>
+          <p style={{ ...body(13, C.muted), marginTop: 4 }}>You're an E11 Expert. This sits on your profile, behind See experience.</p>
+          <textarea id="profile-experience" value={editExperience} onChange={(e) => setEditExperience(e.target.value.slice(0, EXPERIENCE_MAX))}
+            maxLength={EXPERIENCE_MAX} rows={4} placeholder="What you've done and what you know, in your own words." style={{ ...fieldStyle, marginTop: 12 }} />
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, marginTop: 22 }}>
         <button onClick={saveBasicInfo} disabled={saving || !editName.trim()}
           style={{ ...squareBtn(true, C.burgundy), opacity: saving || !editName.trim() ? 0.5 : 1 }}>
@@ -1672,7 +1699,10 @@ const Profile = () => {
           );
         })}
       </div>
-      <SaveRow onSave={saveStyle} onCancel={() => setEditMode(null)} disabled={!editStyle.length || savingProfile} saving={savingProfile} />
+      <div style={{ marginTop: isMobile ? 26 : 34, maxWidth: 520 }}>
+        <FavoriteBrandPicker value={editBrands} onChange={setEditBrands} />
+      </div>
+      <SaveRow onSave={saveStyle} onCancel={() => setEditMode(null)} disabled={(!editStyle.length && !editBrands.length) || savingProfile} saving={savingProfile} />
     </div>
   );
 
@@ -1831,7 +1861,12 @@ const Profile = () => {
               status={<TierStatus tier={tier} />}
               actions={actions}
               irl={irl}
-              askAbout={<AskMeAbout items={profile?.ask_me_about ?? []} isMobile={isMobile} onAdd={() => setEditing(true)} />}
+              askAbout={
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <AskMeAbout items={profile?.ask_me_about ?? []} isMobile={isMobile} onAdd={() => setEditing(true)} />
+                  {profile?.is_expert && <Experience text={profile?.expert_experience} onAdd={() => setEditing(true)} />}
+                </div>
+              }
             />
           )}
         </div>
@@ -1872,13 +1907,18 @@ const Profile = () => {
                   {editMode !== "style" && (
                     <PanelNote
                       isMobile={isMobile}
-                      action={styles.length > 0 ? <button onClick={openStyleEdit} style={textLink(C.burgundy)}>Edit</button> : undefined}
+                      action={styles.length > 0 || favBrands.length > 0 ? <button onClick={openStyleEdit} style={textLink(C.burgundy)}>Edit</button> : undefined}
                     />
                   )}
-                  {editMode === "style" ? stylePicker : styles.length > 0 ? (
-                    <StyleRow labels={styles} isMobile={isMobile} />
+                  {editMode === "style" ? stylePicker : styles.length > 0 || favBrands.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 28 : 36 }}>
+                      {styles.length > 0 && <StyleRow labels={styles} isMobile={isMobile} />}
+                      {favBrands.length > 0
+                        ? <FavoriteBrandTiles brands={favBrands} isMobile={isMobile} heading={headerLabel} />
+                        : <button onClick={openStyleEdit} style={{ ...textLink(C.burgundy), alignSelf: "flex-start" }}>Add your favorite brands {arrow}</button>}
+                    </div>
                   ) : (
-                    <EmptyNote text="Pick up to three aesthetics that sound like you." action="Set your aesthetic" onAction={openStyleEdit} />
+                    <EmptyNote text="Pick up to three aesthetics that sound like you, and the brands you love." action="Set your style" onAction={openStyleEdit} />
                   )}
                 </>
               ),
@@ -1903,7 +1943,7 @@ const Profile = () => {
               label: "Decisions",
               content: (
                 <>
-                  <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} progress />
+                  <StatsRow decisions={decisions?.length ?? 0} takes={stats.takes} helpful={stats.helpfulVotes} isMobile={isMobile} progress tier={tier} />
                   <div style={{ marginTop: isMobile ? 26 : 36 }}>
                     <DecisionsBlock
                       bare

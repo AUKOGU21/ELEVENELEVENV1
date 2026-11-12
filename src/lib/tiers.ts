@@ -1,44 +1,40 @@
 import type React from "react";
 
-// ── Tiers ─────────────────────────────────────────────────────────────────────
-// Earned on helpful votes. The ladder lives here and nowhere else: the profile
-// pages, the ring around an avatar, and the promotion trigger in Postgres all
-// read the same thresholds and the same names.
+// ── Badges ────────────────────────────────────────────────────────────────────
+// Two, and only two (2026-11-12, replacing the four-tier ladder):
 //
-// If you change a threshold or a name here, change announce_tier_promotion() in
-// the database to match, and migrate any stored profiles.badge_tier values.
+//   Top Contributor  earned: the top 15% of people who weigh in, by helpful votes.
+//   Expert           given by E11 by hand (is_expert). She writes her own
+//                    categories and experience; they show on her profile only.
+//
+// The database decides who holds which (refresh_badges() in Postgres) and stores
+// it in profiles.badge_tier. The app only reads that field: never work a badge
+// out from vote counts here, or the two would disagree.
 
-export interface Tier {
-  label: string;
-  min: number;
-  /** The ring around her avatar. Null for the default, which is a hairline. */
-  ring: string | null;
-}
+export type Badge = "Expert" | "Top Contributor";
 
-export const TIERS: Tier[] = [
-  { label: "E11 Insider",   min: 100, ring: "#C49E64" },  // brand gold, richest
-  { label: "Expert",        min: 50,  ring: "#DAC08A" },  // soft gold
-  { label: "Trusted Voice", min: 25,  ring: "#6B1F2A" },  // deep maroon
-  { label: "Contributor",   min: 5,   ring: "#E3A9AF" },  // warm pink
-];
+export const BADGES: Record<Badge, { ring: string; ink: string }> = {
+  Expert:            { ring: "#C49E64", ink: "#8A6620" }, // brand gold; darker gold for type
+  "Top Contributor": { ring: "#9AABBF", ink: "#4F647D" }, // soft slate blue; deeper slate for type
+};
 
 const DEFAULT_RING = "rgba(28,23,18,0.14)";
 
-/** The tier a given number of helpful votes earns, or null below the first rung. */
-export function tierFor(helpfulVotes: number): Tier | null {
-  return TIERS.find((t) => helpfulVotes >= t.min) ?? null;
+/** The badge a stored badge_tier holds, or null for anything else (including old ladder names). */
+export function badgeOf(badgeTier: string | null | undefined): Badge | null {
+  return badgeTier === "Expert" || badgeTier === "Top Contributor" ? badgeTier : null;
 }
 
-/** The next rung up, for "3 more to Trusted Voice" style copy. */
-export function nextTier(helpfulVotes: number): Tier | null {
-  const above = TIERS.filter((t) => helpfulVotes < t.min);
-  return above.length ? above[above.length - 1] : null;
-}
-
-/** Ring colour for a stored badge_tier string. Unknown or absent reads default. */
+/** Ring colour for a stored badge_tier string. No badge reads as the default hairline. */
 export function ringFor(badgeTier: string | null | undefined): string {
-  if (!badgeTier) return DEFAULT_RING;
-  return TIERS.find((t) => t.label === badgeTier)?.ring ?? DEFAULT_RING;
+  const b = badgeOf(badgeTier);
+  return b ? BADGES[b].ring : DEFAULT_RING;
+}
+
+/** The colour for a badge's label, or null with no badge. */
+export function badgeInk(badgeTier: string | null | undefined): string | null {
+  const b = badgeOf(badgeTier);
+  return b ? BADGES[b].ink : null;
 }
 
 /**

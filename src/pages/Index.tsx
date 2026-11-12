@@ -293,7 +293,8 @@ const Index = () => {
     window.addEventListener("appinstalled", on);
     return () => { window.removeEventListener("ee-installable", on); window.removeEventListener("appinstalled", on); };
   }, []);
-  const showGetApp = isMobile && !user && !isStandalone();
+  // Signed in or not: anyone on a phone browser can still want the icon.
+  const showGetApp = isMobile && !isStandalone();
   const getApp = async () => {
     if (installable && await promptInstall()) { setInstallable(canInstall()); return; }
     setHowTo(true);
@@ -547,7 +548,7 @@ const Index = () => {
             >
               Sign up <ArrowRight style={{ width: 16, height: 16 }} strokeWidth={2} />
             </button>
-            {showGetApp && (
+            {showGetApp && !user && (
               <p style={{ marginTop: 18 }}>
                 <button onClick={getApp} className="e11-link" style={{ ...strong(13, C.inkSoft), background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>
                   Or add it to your home screen first
@@ -588,7 +589,7 @@ const Index = () => {
           </div>
         </div>
       </section>
-      {howTo && <HowTo isMobile={isMobile} beforeSignup onClose={() => setHowTo(false)} />}
+      {howTo && <HowTo isMobile={isMobile} beforeSignup={!user} onClose={() => setHowTo(false)} />}
     </div>
   );
 };

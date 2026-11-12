@@ -20,6 +20,7 @@ import { Avatar, BadgeLabel, decisionState, isResolved, type TileDecision } from
 import { badgeOf } from "@/lib/tiers";
 import { PersonName } from "./PersonLink";
 import ResponseItem, { type ResponseItemData } from "./ResponseItem";
+import { useWhy, whyBoost, whyLines, whyTipSeen, markWhyTipSeen } from "@/lib/whyMatch";
 import CommentThread, { type CommentData } from "./CommentThread";
 import {
   FIT_RESULT_OPTIONS,
@@ -297,6 +298,16 @@ export default function DecisionView(props: Props) {
   const before = decidedAt ? comments.filter((c) => new Date(c.created_at) <= new Date(decidedAt)) : comments;
   const after = decidedAt ? comments.filter((c) => new Date(c.created_at) > new Date(decidedAt)) : [];
   const [tab, setTab] = useState<"responses" | "followups">(resolved && initialTab === "followups" ? "followups" : "responses");
+  // Why her? Tapping a take's match % shows what she has in common with the
+  // poster. The same facts nudge the "match" order: owning it, knowing the brand,
+  // having been trusted before, a track record.
+  const why = useWhy(d.id, !!viewer, d.responses?.length ?? 0);
+  const linesFor = (r: ResponseItemData) =>
+    why && r.user_id && !r.guests && why.people?.[r.user_id]
+      ? whyLines(why, r.user_id, { itemText: d.product_name, posterName: d.profiles?.display_name, viewerIsPoster: viewer?.id === d.user_id })
+      : null;
+  const [tipDone, setTipDone] = useState(whyTipSeen);
+  const finishTip = () => { markWhyTipSeen(); setTipDone(true); };
   const [sort, setSort] = useState<"match" | "helpful" | "newest">("match");
   const [verdict, setVerdict] = useState<"all" | "buy" | "do_not_buy" | "need_more_info">("all");
   const helpful = (r: ResponseItemData) => voteCounts[r.id]?.helpful ?? r.helpfulness_votes ?? 0;
@@ -305,7 +316,9 @@ export default function DecisionView(props: Props) {
     .sort((a, b) =>
       sort === "helpful" ? helpful(b) - helpful(a)
         : sort === "newest" ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          : (b.match_score ?? 0) - (a.match_score ?? 0));
+          : ((b.match_score ?? 0) + whyBoost(why, b.user_id)) - ((a.match_score ?? 0) + whyBoost(why, a.user_id)));
+  // The one-time tip sits on the first take she can tap.
+  const tipId = !tipDone && why ? responses.find((r) => r.match_score != null && linesFor(r))?.id ?? null : null;
   const counts = {
     buy: d.responses.filter((r) => r.recommendation === "buy").length,
     do_not_buy: d.responses.filter((r) => r.recommendation === "do_not_buy").length,
@@ -850,6 +863,9 @@ export default function DecisionView(props: Props) {
               onSignIn={onSignIn}
               focused={focusResponseId === r.id}
               isMobile={isMobile}
+              why={linesFor(r)}
+              tip={tipId === r.id}
+              onTipDone={finishTip}
             />
           ))}
 

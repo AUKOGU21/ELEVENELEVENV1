@@ -13,7 +13,9 @@ import { experienceLabel, formatName, prettyHost, recommendationLabel, timeAgo }
 import { Avatar, BadgeLabel } from "./DecisionTile";
 import { badgeOf } from "@/lib/tiers";
 import { PersonName } from "./PersonLink";
-import MatchSeal from "./MatchSeal";
+import { SealButton, WhyPanel, WhyTip } from "./WhyMatch";
+import type { WhyLine } from "@/lib/whyMatch";
+import { track } from "@/lib/track";
 import type { ReplyData } from "./ResponseCard";
 
 export interface ResponseItemData {
@@ -48,6 +50,11 @@ interface Props {
   onSignIn: () => void;
   focused?: boolean;
   isMobile: boolean;
+  /** What she has in common with the poster; null keeps the match % a plain label. */
+  why?: WhyLine[] | null;
+  /** Show the one-time "New!" tip on this take. */
+  tip?: boolean;
+  onTipDone?: () => void;
 }
 
 const MAXLEN = 250;
@@ -80,8 +87,15 @@ const field: React.CSSProperties = {
 
 export default function ResponseItem({
   resp, helpfulCount, myVote, canVote, onHelpful, user,
-  onSubmitReply, onDeleteReply, onEditReply, onSignIn, focused, isMobile,
+  onSubmitReply, onDeleteReply, onEditReply, onSignIn, focused, isMobile, why = null, tip = false, onTipDone,
 }: Props) {
+  const [whyOpen, setWhyOpen] = useState(false);
+  const [sealEl, setSealEl] = useState<HTMLButtonElement | null>(null);
+  const toggleWhy = () => {
+    if (!whyOpen) track("why_match_open", { meta: { kind: "take", response_id: resp.id, lines: why?.length ?? 0 } });
+    setWhyOpen((o) => !o);
+    if (tip) onTipDone?.();
+  };
   const replies = resp.replies ?? [];
   const [composerOpen, setComposerOpen] = useState(false);
   const [text, setText] = useState("");
@@ -153,7 +167,7 @@ export default function ResponseItem({
 
   const verdict = (
     <>
-      {resp.match_score != null && <MatchSeal score={resp.match_score} size={isMobile ? 28 : 30} />}
+      {resp.match_score != null && <SealButton score={resp.match_score} size={isMobile ? 28 : 30} enabled={!!why} open={whyOpen} onToggle={toggleWhy} sealRef={setSealEl} />}
       {facts.map((f) => <span key={f} style={meta(10, C.muted)}>{f}</span>)}
       <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(resp.recommendation)}</span>
     </>
@@ -193,6 +207,9 @@ export default function ResponseItem({
               {isMobile && <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(resp.created_at)}</span>}
             </div>
           )}
+
+          {tip && why && !whyOpen && <WhyTip sealEl={sealEl} onDismiss={() => { track("why_tip_dismissed"); onTipDone?.(); }} />}
+          {whyOpen && why && <WhyPanel name={authorName} lines={why} />}
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{resp.reasoning}</p>
 

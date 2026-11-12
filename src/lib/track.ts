@@ -31,6 +31,9 @@ export type EventKind =
   | "loop_prompt_shown"
   | "loop_prompt_answer"
   | "loop_prompt_not_now"
+  | "why_match_open"
+  | "why_tip_shown"
+  | "why_tip_dismissed"
   // The returning-member prompt to fill in Ask me about.
   | "ask_prompt_shown"
   | "ask_prompt_saved"

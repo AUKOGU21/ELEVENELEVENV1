@@ -1,133 +1,121 @@
 import { Profile } from "./supabase";
 
+// ── Match score ───────────────────────────────────────────────────────────────
+// How much two women have in common for the item at hand, 0 to 100.
+//
+// Two rules, both from looking at real scores (Nov 2026, every take sat between
+// 25% and 66%):
+//   1. Only what BOTH answered counts. Nobody has a fit preference or shopping
+//      habits on file, so those used to hand everyone the same half credit, and
+//      a close mirror could never read above ~89%. Unknowns are now left out and
+//      the rest is scaled to 100.
+//   2. What counts depends on the item. Jeans care about hips, thighs, height
+//      and bottom size; a blazer about bust, torso and top size; a bag about none
+//      of the body in detail: mostly taste, with overall shape and size as a
+//      lighter read on "someone like you".
+// Silhouette still leads for clothes; size labels still only support.
+
 export interface MatchBreakdown {
-  silhouette: number;     // 0-30
-  proportions: number;    // 0-20
-  height: number;         // 0-15
-  fit_preference: number; // 0-15
-  sizing: number;         // 0-10
-  style: number;          // 0-5
-  behavioral: number;     // 0-5
-  total: number;          // 0-100
+  silhouette: number;
+  proportions: number;
+  height: number;
+  fit_preference: number;
+  sizing: number;
+  style: number;
+  behavioral: number;
+  total: number; // 0-100
 }
 
-// -------------------------------------------------------------------
-// HEIGHT (15 pts max)
-// Ordinal buckets — degrades by bucket distance
-// -------------------------------------------------------------------
-const HEIGHT_ORDER = [
-  "Under 5'0\"",
-  "5'0\" – 5'3\"",
-  "5'4\" – 5'6\"",
-  "5'7\" – 5'9\"",
-  "5'10\" – 6'0\"",
-  "Over 6'0\"",
-];
+/** What part of the body an item is about. */
+export type ItemGroup = "lower" | "upper" | "full" | "none";
 
-// Profiles store raw heights like 5'11"; map any height (raw or legacy bucket
-// label) to a bucket index so scoring actually works.
-function heightToInches(s: string): number | null {
+/** The item being decided on: its category if posted with one, or any words that name it. */
+export interface MatchItem { category?: string | null; text?: string | null }
+
+const LOWER = /\b(bottoms?|jeans?|denim|pants?|trousers?|skirts?|shorts|leggings?|joggers?|sweatpants)\b/i;
+const UPPER = /\b(tops?|outerwear|blazers?|jackets?|coats?|trench|shirts?|blouses?|tees?|t-shirts?|sweaters?|knit|cardigans?|hoodies?|vests?|bodysuits?|bras?|corsets?)\b/i;
+const FULL = /\b(dress(es)?|gowns?|jumpsuits?|rompers?|swim\w*|bikinis?|one-piece|pajamas?|sets?|lingerie)\b/i;
+const NONE = /\b(shoes?|sneakers?|boots?|heels?|sandals?|loafers?|flats|mules|bags?|totes?|purses?|clutch|accessor(y|ies)|jewelry|jewellery|necklaces?|earrings?|rings?|bracelets?|belts?|hats?|caps?|sunglasses|scarf|scarves|wallets?|watch(es)?|beauty|fragrance|perfume)\b/i;
+
+export function itemGroup(item?: MatchItem | null): ItemGroup {
+  const read = (s?: string | null): ItemGroup | null => {
+    if (!s) return null;
+    if (FULL.test(s)) return "full";
+    if (LOWER.test(s)) return "lower";
+    if (UPPER.test(s)) return "upper";
+    if (NONE.test(s)) return "none";
+    return null;
+  };
+  return read(item?.category) ?? read(item?.text) ?? "full";
+}
+
+// The weights for each kind of item. Same order of importance as CLAUDE.md for
+// clothes; fit preference and shopping habits only count once both have them.
+const WEIGHTS: Record<ItemGroup, Record<keyof Omit<MatchBreakdown, "total">, number>> = {
+  full:  { silhouette: 30, proportions: 20, height: 15, fit_preference: 15, sizing: 10, style: 5,  behavioral: 5 },
+  lower: { silhouette: 25, proportions: 25, height: 20, fit_preference: 15, sizing: 10, style: 5,  behavioral: 5 },
+  upper: { silhouette: 25, proportions: 25, height: 10, fit_preference: 15, sizing: 10, style: 5,  behavioral: 5 },
+  none:  { silhouette: 25, proportions: 0,  height: 10, fit_preference: 0,  sizing: 10, style: 40, behavioral: 15 },
+};
+
+/** Which fit answers matter for which items. */
+export const PROPORTIONS_FOR: Record<ItemGroup, string[]> = {
+  lower: ["Hip fit", "Thigh fit", "Waist definition", "Torso length"],
+  upper: ["Bust fit", "Torso length", "Waist definition"],
+  full: ["Bust fit", "Waist definition", "Hip fit", "Thigh fit", "Torso length"],
+  none: [],
+};
+
+// ── Height ── inches apart, not buckets: 5'3" and 5'4" are the same height to a hem.
+export function heightInches(s: string | null | undefined): number | null {
+  if (!s) return null;
   const m = s.match(/(\d+)\s*'\s*(\d+)?/);
-  if (!m) return null;
-  return parseInt(m[1], 10) * 12 + (m[2] ? parseInt(m[2], 10) : 0);
+  if (m) return parseInt(m[1], 10) * 12 + (m[2] ? parseInt(m[2], 10) : 0);
+  // Old bucket labels: take the middle.
+  const legacy: Record<string, number> = {
+    "Under 5'0\"": 59, "5'0\" – 5'3\"": 62, "5'4\" – 5'6\"": 65, "5'7\" – 5'9\"": 68, "5'10\" – 6'0\"": 71, "Over 6'0\"": 74,
+  };
+  return legacy[s] ?? null;
 }
 
-function heightBucketIndex(s: string | null): number {
-  if (!s) return -1;
-  const direct = HEIGHT_ORDER.indexOf(s); // legacy bucket label
-  if (direct !== -1) return direct;
-  const inches = heightToInches(s);
-  if (inches == null) return -1;
-  if (inches < 60) return 0;
-  if (inches <= 63) return 1;
-  if (inches <= 66) return 2;
-  if (inches <= 69) return 3;
-  if (inches <= 72) return 4;
-  return 5;
+function scoreHeight(a: string | null, b: string | null): number | null {
+  const ai = heightInches(a), bi = heightInches(b);
+  if (ai == null || bi == null) return null;
+  const d = Math.abs(ai - bi);
+  return d <= 1 ? 1 : d === 2 ? 0.75 : d === 3 ? 0.5 : d <= 5 ? 0.25 : 0;
 }
 
-function scoreHeight(a: string | null, b: string | null): number {
-  const ai = heightBucketIndex(a);
-  const bi = heightBucketIndex(b);
-  if (ai === -1 || bi === -1) return 7; // unknown — half credit
-  const delta = Math.abs(ai - bi);
-  if (delta === 0) return 15;
-  if (delta === 1) return 10;
-  if (delta === 2) return 5;
-  return 0;
-}
-
-// -------------------------------------------------------------------
-// SIZING (10 pts max)
-// Split 5 pts top, 5 pts bottom — adjacent size = partial credit
-// -------------------------------------------------------------------
-const SIZE_ORDER = [
-  "XXS (00)",
-  "XS (0–2)",
-  "S (4–6)",
-  "M (8–10)",
-  "L (12–14)",
-  "XL (16–18)",
-  "XXL (20–22)",
-];
-
-// Profiles store sizes as bare letters ("S") or number ranges ("00–0");
-// normalize to a SIZE_ORDER index so scoring actually works.
+// ── Size ── same size full credit, one size off half.
 const LETTER_SIZE: Record<string, number> = { XXS: 0, XS: 1, S: 2, M: 3, L: 4, XL: 5, XXL: 6 };
 
-function sizeIndex(s: string | null): number {
-  if (!s) return -1;
-  const direct = SIZE_ORDER.indexOf(s);
-  if (direct !== -1) return direct;
+export function sizeIndex(s: string | null | undefined): number | null {
+  if (!s) return null;
   const t = s.toUpperCase().replace(/\s/g, "");
   const letter = t.match(/^(XXS|XXL|XS|XL|S|M|L)/);
   if (letter) return LETTER_SIZE[letter[1]];
-  if (t.includes("00")) return 0;
+  if (t.startsWith("00")) return 0;
   const num = t.match(/\d+/);
-  if (num) {
-    const v = parseInt(num[0], 10);
-    if (v <= 2) return 1;
-    if (v <= 6) return 2;
-    if (v <= 10) return 3;
-    if (v <= 14) return 4;
-    if (v <= 18) return 5;
-    return 6;
-  }
-  return -1;
+  if (!num) return null;
+  const v = parseInt(num[0], 10);
+  return v <= 2 ? 1 : v <= 6 ? 2 : v <= 10 ? 3 : v <= 14 ? 4 : v <= 18 ? 5 : 6;
 }
 
-function scoreSingleSize(a: string | null, b: string | null, max: number): number {
-  const ai = sizeIndex(a);
-  const bi = sizeIndex(b);
-  if (ai === -1 || bi === -1) return max * 0.5; // unknown — half credit
-  const delta = Math.abs(ai - bi);
-  if (delta === 0) return max;
-  if (delta === 1) return max * 0.5;
-  return 0;
+function scoreOneSize(a: string | null, b: string | null): number | null {
+  const ai = sizeIndex(a), bi = sizeIndex(b);
+  if (ai == null || bi == null) return null;
+  const d = Math.abs(ai - bi);
+  return d === 0 ? 1 : d === 1 ? 0.5 : 0;
 }
 
-function scoreSizing(a: Profile, b: Profile): number {
-  const top = scoreSingleSize(a.top_size, b.top_size, 5);
-  const bottom = scoreSingleSize(a.bottom_size, b.bottom_size, 5);
-  return top + bottom;
+function scoreSizing(a: Profile, b: Profile, g: ItemGroup): number | null {
+  const parts = (g === "lower" ? [scoreOneSize(a.bottom_size, b.bottom_size)]
+    : g === "upper" ? [scoreOneSize(a.top_size, b.top_size)]
+    : [scoreOneSize(a.top_size, b.top_size), scoreOneSize(a.bottom_size, b.bottom_size)])
+    .filter((x): x is number => x != null);
+  return parts.length ? parts.reduce((s, x) => s + x, 0) / parts.length : null;
 }
 
-// -------------------------------------------------------------------
-// SILHOUETTE MATCH (30 pts max)
-// Jaccard similarity on selected silhouette arrays
-// -------------------------------------------------------------------
-function jaccardSimilarity(a: string[], b: string[]): number {
-  if (a.length === 0 && b.length === 0) return 1;
-  if (a.length === 0 || b.length === 0) return 0;
-  const setA = new Set(a);
-  const setB = new Set(b);
-  const intersection = [...setA].filter((x) => setB.has(x)).length;
-  const union = new Set([...setA, ...setB]).size;
-  return intersection / union;
-}
-
-// Confirmed families + adjacency. Graded credit replaces all-or-nothing:
-// same silhouette = 30, same family = 20, adjacent family = 10, else 0.
+// ── Silhouette ── same 1, same family 2/3, neighboring family 1/3.
 const SILHOUETTE_FAMILY: Record<string, string> = {
   "Lean and elongated": "lean",
   "Slim with subtle shape": "lean",
@@ -146,145 +134,128 @@ const SILHOUETTE_ADJACENT: Record<string, string[]> = {
   curvy: ["soft", "sculpted"],
 };
 
-function scoreSilhouette(a: Profile, b: Profile): number {
+function scoreSilhouette(a: Profile, b: Profile): number | null {
   const sa = (a.silhouette_preference ?? [])[0];
   const sb = (b.silhouette_preference ?? [])[0];
-  if (!sa || !sb) return 15; // missing on either side — neutral, don't penalize
-  if (sa === sb) return 30;
-  const fa = SILHOUETTE_FAMILY[sa];
-  const fb = SILHOUETTE_FAMILY[sb];
+  if (!sa || !sb) return null;
+  if (sa === sb) return 1;
+  const fa = SILHOUETTE_FAMILY[sa], fb = SILHOUETTE_FAMILY[sb];
   if (!fa || !fb) return 0;
-  if (fa === fb) return 20;
-  if (SILHOUETTE_ADJACENT[fa]?.includes(fb)) return 10;
-  return 0;
+  if (fa === fb) return 2 / 3;
+  return SILHOUETTE_ADJACENT[fa]?.includes(fb) ? 1 / 3 : 0;
 }
 
-// -------------------------------------------------------------------
-// BODY PROPORTIONS (20 pts max)
-// Compare each FIT_CATEGORY answer — partial credit per matching dimension
-// Categories: Torso length, Bust fit, Waist definition, Hip fit, Thigh fit
-// -------------------------------------------------------------------
-const PROPORTION_CATEGORIES = [
-  "Torso length",
-  "Bust fit",
-  "Waist definition",
-  "Hip fit",
-  "Thigh fit",
-];
+// ── Proportions ── each answer sits on a scale (smaller / about proportional /
+// fuller), so a neighbor gets half credit rather than none.
+const PROPORTION_SCALE: Record<string, string[]> = {
+  "Bust fit": ["Smaller bust", "About proportional", "Fuller bust"],
+  "Hip fit": ["Narrower hips", "About proportional", "Wider hips"],
+  "Thigh fit": ["Slimmer thighs", "About proportional", "Fuller thighs"],
+  "Torso length": ["Shorter torso", "About average", "Longer torso"],
+  "Waist definition": ["Less defined", "Slightly defined", "Very defined"],
+};
 
-function scoreProportions(a: Profile, b: Profile): number {
-  const detailsA = (a.fit_details ?? {}) as Record<string, string>;
-  const detailsB = (b.fit_details ?? {}) as Record<string, string>;
-
-  // Only score categories BOTH answered, so a sparse match doesn't penalize you.
-  const answered = PROPORTION_CATEGORIES.filter(
-    (cat) => detailsA[cat] && detailsB[cat]
-  );
-
-  if (answered.length === 0) return 10; // no shared answers — neutral, not a penalty
-
-  const matching = answered.filter(
-    (cat) => detailsA[cat] === detailsB[cat]
-  ).length;
-
-  return (matching / answered.length) * 20;
+export function fitAnswer(p: { fit_details?: Record<string, string> | null }, cat: string): string | null {
+  const v = (p.fit_details ?? {})[cat];
+  return typeof v === "string" && v.trim() ? v : null;
 }
 
-// -------------------------------------------------------------------
-// FIT PREFERENCE (15 pts max)
-// Ordinal preference: very_fitted → oversized
-// Stored as free text from fit_details["Overall fit"] or fit_preference field
-// -------------------------------------------------------------------
-const FIT_PREF_ORDER = [
-  "very fitted",
-  "fitted",
-  "slightly fitted",
-  "relaxed",
-  "oversized",
-  "compressive",
-];
-
-function normalizeFitPref(val: string | null): string | null {
-  if (!val) return null;
-  return val.toLowerCase().trim();
+function scoreProportions(a: Profile, b: Profile, g: ItemGroup): number | null {
+  const scores: number[] = [];
+  for (const cat of PROPORTIONS_FOR[g]) {
+    const va = fitAnswer(a, cat), vb = fitAnswer(b, cat);
+    if (!va || !vb) continue;
+    if (va === vb) { scores.push(1); continue; }
+    const scale = PROPORTION_SCALE[cat];
+    const ia = scale?.indexOf(va) ?? -1, ib = scale?.indexOf(vb) ?? -1;
+    scores.push(ia === -1 || ib === -1 ? 0 : Math.abs(ia - ib) === 1 ? 0.5 : 0);
+  }
+  return scores.length ? scores.reduce((s, x) => s + x, 0) / scores.length : null;
 }
 
-function scoreFitPreference(a: Profile, b: Profile): number {
-  const prefA = normalizeFitPref(a.fit_preference);
-  const prefB = normalizeFitPref(b.fit_preference);
+// ── Fit preference ── only once both have one on file.
+const FIT_PREF_ORDER = ["very fitted", "fitted", "slightly fitted", "relaxed", "oversized", "compressive"];
 
-  if (!prefA || !prefB) return 7; // unknown — half credit
-
-  if (prefA === prefB) return 15;
-
-  const ai = FIT_PREF_ORDER.findIndex((p) => prefA.includes(p));
-  const bi = FIT_PREF_ORDER.findIndex((p) => prefB.includes(p));
-
-  if (ai === -1 || bi === -1) return 5;
-
-  const delta = Math.abs(ai - bi);
-  if (delta === 1) return 10;
-  if (delta === 2) return 5;
-  return 0;
+function scoreFitPreference(a: Profile, b: Profile): number | null {
+  const pa = a.fit_preference?.toLowerCase().trim(), pb = b.fit_preference?.toLowerCase().trim();
+  if (!pa || !pb) return null;
+  if (pa === pb) return 1;
+  const ai = FIT_PREF_ORDER.findIndex((p) => pa.includes(p)), bi = FIT_PREF_ORDER.findIndex((p) => pb.includes(p));
+  if (ai === -1 || bi === -1) return 1 / 3;
+  const d = Math.abs(ai - bi);
+  return d === 1 ? 2 / 3 : d === 2 ? 1 / 3 : 0;
 }
 
-// -------------------------------------------------------------------
-// STYLE & AESTHETIC OVERLAP (5 pts max)
-// Jaccard on style_aesthetics arrays
-// -------------------------------------------------------------------
-function scoreStyle(a: Profile, b: Profile): number {
-  const arrA = a.style_aesthetics ?? [];
-  const arrB = b.style_aesthetics ?? [];
-  if (arrA.length === 0 && arrB.length === 0) return 2.5;
-  return jaccardSimilarity(arrA, arrB) * 5;
+// ── Style ── read from the shorter list, so three picks that are all hers too
+// is full overlap even if the other woman picked five. A neighboring style
+// (minimal and classic, sporty and street) gets half credit: exact tags rarely
+// line up, and without this a bag or shoe post could show a single-digit match.
+const STYLE_NEIGHBORS: Record<string, string[]> = {
+  classic: ["minimal", "preppy", "feminine"],
+  minimal: ["classic"],
+  preppy: ["classic"],
+  sporty: ["street"],
+  street: ["sporty", "statement", "trend-driven"],
+  statement: ["trend-driven", "street"],
+  "trend-driven": ["statement", "street"],
+  feminine: ["bohemian", "classic"],
+  bohemian: ["feminine"],
+};
+
+export function styleOverlap(a: string[] | null | undefined, b: string[] | null | undefined): number | null {
+  const sa = new Set((a ?? []).map((x) => x.toLowerCase())), sb = new Set((b ?? []).map((x) => x.toLowerCase()));
+  if (!sa.size || !sb.size) return null;
+  const [small, big] = sa.size <= sb.size ? [sa, sb] : [sb, sa];
+  let s = 0;
+  for (const x of small) s += big.has(x) ? 1 : (STYLE_NEIGHBORS[x] ?? []).some((n) => big.has(n)) ? 0.5 : 0;
+  return s / small.size;
 }
 
-// -------------------------------------------------------------------
-// BEHAVIORAL SIMILARITY (5 pts max)
-// Purchase frequency + risk tolerance
-// -------------------------------------------------------------------
-const FREQUENCY_ORDER = ["rarely", "monthly", "biweekly", "weekly"];
-const RISK_ORDER = ["conservative", "moderate", "adventurous"];
-
-function scoreOrdinal(a: string | null, b: string | null, order: string[], max: number): number {
-  if (!a || !b) return max * 0.5;
-  const ai = order.indexOf(a.toLowerCase());
-  const bi = order.indexOf(b.toLowerCase());
-  if (ai === -1 || bi === -1) return max * 0.5;
-  const delta = Math.abs(ai - bi);
-  if (delta === 0) return max;
-  if (delta === 1) return max * 0.5;
-  return 0;
+/** Exact shared style picks only, for saying "Similar style." out loud. */
+export function sharedStyles(a: string[] | null | undefined, b: string[] | null | undefined): number {
+  const sb = new Set((b ?? []).map((x) => x.toLowerCase()));
+  return (a ?? []).filter((x) => sb.has(x.toLowerCase())).length;
 }
 
-function scoreBehavioral(a: Profile, b: Profile): number {
-  const freq = scoreOrdinal(a.purchase_frequency, b.purchase_frequency, FREQUENCY_ORDER, 2.5);
-  const risk = scoreOrdinal(a.risk_tolerance, b.risk_tolerance, RISK_ORDER, 2.5);
-  return freq + risk;
+// ── Shopping habits ── only once both have them on file.
+function scoreOrdinal(a: string | null, b: string | null, order: string[]): number | null {
+  if (!a || !b) return null;
+  const ai = order.indexOf(a.toLowerCase()), bi = order.indexOf(b.toLowerCase());
+  if (ai === -1 || bi === -1) return null;
+  const d = Math.abs(ai - bi);
+  return d === 0 ? 1 : d === 1 ? 0.5 : 0;
 }
 
-// -------------------------------------------------------------------
-// MAIN FUNCTION
-// -------------------------------------------------------------------
-export function computeMatchScore(poster: Profile, responder: Profile): MatchBreakdown {
-  const silhouette = scoreSilhouette(poster, responder);
-  const proportions = scoreProportions(poster, responder);
-  const height = scoreHeight(poster.height_range, responder.height_range);
-  const fit_preference = scoreFitPreference(poster, responder);
-  const sizing = scoreSizing(poster, responder);
-  const style = scoreStyle(poster, responder);
-  const behavioral = scoreBehavioral(poster, responder);
+function scoreBehavioral(a: Profile, b: Profile): number | null {
+  const parts = [
+    scoreOrdinal(a.purchase_frequency, b.purchase_frequency, ["rarely", "monthly", "biweekly", "weekly"]),
+    scoreOrdinal(a.risk_tolerance, b.risk_tolerance, ["conservative", "moderate", "adventurous"]),
+  ].filter((x): x is number => x != null);
+  return parts.length ? parts.reduce((s, x) => s + x, 0) / parts.length : null;
+}
 
-  const total = silhouette + proportions + height + fit_preference + sizing + style + behavioral;
-
-  return {
-    silhouette: Math.round(silhouette * 10) / 10,
-    proportions: Math.round(proportions * 10) / 10,
-    height: Math.round(height * 10) / 10,
-    fit_preference: Math.round(fit_preference * 10) / 10,
-    sizing: Math.round(sizing * 10) / 10,
-    style: Math.round(style * 10) / 10,
-    behavioral: Math.round(behavioral * 10) / 10,
-    total: Math.round(total * 10) / 10,
+// ── Main ──
+export function computeMatchScore(poster: Profile, responder: Profile, item?: MatchItem | null): MatchBreakdown {
+  const g = itemGroup(item);
+  const w = WEIGHTS[g];
+  const raw: Record<keyof Omit<MatchBreakdown, "total">, number | null> = {
+    silhouette: scoreSilhouette(poster, responder),
+    proportions: scoreProportions(poster, responder, g),
+    height: scoreHeight(poster.height_range, responder.height_range),
+    fit_preference: scoreFitPreference(poster, responder),
+    sizing: scoreSizing(poster, responder, g),
+    style: styleOverlap(poster.style_aesthetics, responder.style_aesthetics),
+    behavioral: scoreBehavioral(poster, responder),
   };
+
+  // Scale to 100 over what both of them actually answered.
+  const keys = Object.keys(raw) as (keyof typeof raw)[];
+  const known = keys.filter((k) => raw[k] != null && w[k] > 0);
+  const possible = known.reduce((s, k) => s + w[k], 0);
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const out = {} as MatchBreakdown;
+  for (const k of keys) out[k] = raw[k] != null && possible > 0 ? r1(((raw[k] as number) * w[k] / possible) * 100) : 0;
+  // Nothing to compare yet: say so with a neutral middle, not a zero.
+  out.total = possible > 0 ? r1(known.reduce((s, k) => s + (raw[k] as number) * w[k], 0) / possible * 100) : 50;
+  return out;
 }

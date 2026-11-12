@@ -14,7 +14,9 @@ import { pullProduct, type PulledProduct } from "@/lib/productPull";
 import { Avatar, BadgeLabel, isResolved } from "./DecisionTile";
 import { badgeOf } from "@/lib/tiers";
 import { PersonName } from "./PersonLink";
-import MatchSeal from "./MatchSeal";
+import { SealButton, WhyPanel, WhyTip } from "./WhyMatch";
+import { useWhy, whyBoost, whyLines, whyTipSeen, markWhyTipSeen, type WhyLine } from "@/lib/whyMatch";
+import { track } from "@/lib/track";
 import type { RecommendationData, LookingForDecision, LookingForFoundPayload } from "@/lib/lookingFor";
 
 type FoundStep = "idle" | "pick" | "same_or_diff" | "link" | "why" | "confidence" | "thanks" | "snoozed";
@@ -120,7 +122,7 @@ function SpecRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 /** One pick, with the woman who sent it and why. No card around it. */
-function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMobile, innerRef }: {
+function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMobile, innerRef, why = null, tip = false, onTipDone }: {
   rec: RecommendationData;
   helpfulCount: number;
   myVote: "helpful" | "not_helpful" | undefined;
@@ -129,7 +131,17 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
   isWinner: boolean;
   isMobile: boolean;
   innerRef: (el: HTMLDivElement | null) => void;
+  why?: WhyLine[] | null;
+  tip?: boolean;
+  onTipDone?: () => void;
 }) {
+  const [whyOpen, setWhyOpen] = useState(false);
+  const [sealEl, setSealEl] = useState<HTMLButtonElement | null>(null);
+  const toggleWhy = () => {
+    if (!whyOpen) track("why_match_open", { meta: { kind: "rec", recommendation_id: rec.id, lines: why?.length ?? 0 } });
+    setWhyOpen((o) => !o);
+    if (tip) onTipDone?.();
+  };
   const [recImg, killRecImg] = useLiveImage(rec.product_image_url);
   const price = money(rec.price_note);
   // Who sent it. A guest stands behind her pick with her own name.
@@ -139,7 +151,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
     : rec.profiles?.display_name ?? null;
   const verdict = (
     <>
-      {rec.match_score != null && <MatchSeal score={rec.match_score} size={isMobile ? 28 : 30} />}
+      {rec.match_score != null && <SealButton score={rec.match_score} size={isMobile ? 28 : 30} enabled={!!why} open={whyOpen} onToggle={toggleWhy} sealRef={setSealEl} />}
       <span style={{ ...meta(10, C.ink), fontWeight: 700 }}>{recommendationLabel(rec.recommendation)}</span>
       {isWinner && <span style={{ ...meta(10, C.burgundy), fontWeight: 700 }}>She bought this</span>}
     </>
@@ -166,6 +178,9 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
               {isMobile && <span style={{ ...body(12, C.muted), whiteSpace: "nowrap", flexShrink: 0 }}>{timeAgo(rec.created_at)}</span>}
             </div>
           )}
+
+          {tip && why && !whyOpen && <WhyTip sealEl={sealEl} onDismiss={() => { track("why_tip_dismissed"); onTipDone?.(); }} />}
+          {whyOpen && why && <WhyPanel name={recAuthor} lines={why} />}
 
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{rec.reasoning}</p>
 
@@ -255,9 +270,21 @@ export default function LookingForView({
     buy: recs.filter((r) => r.recommendation === "buy").length,
     do_not_buy: recs.filter((r) => r.recommendation === "do_not_buy").length,
   };
+  // Why her? Tap a rec's match % to see what she has in common with the poster.
+  // The same facts nudge the order: owning it, knowing the brand, a track record.
+  const why = useWhy(decision.id, !!user, recs.length);
+  const linesFor = (r: RecommendationData): WhyLine[] | null =>
+    why && r.user_id && !r.guests && why.people?.[r.user_id]
+      ? whyLines(why, r.user_id, { itemText: [r.product_name, decision.lf_title].filter(Boolean).join(" "), posterName: decision.profiles?.display_name, viewerIsPoster: user?.id === decision.user_id })
+      : null;
+  const rankOf = (r: RecommendationData) => (r.match_score ?? 0) + whyBoost(why, r.user_id);
   const sorted = [...recs]
     .filter((r) => verdict === "all" || r.recommendation === verdict)
-    .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
+    .sort((a, b) => rankOf(b) - rankOf(a));
+  // The one-time tip sits on the first rec she can tap.
+  const [tipDone, setTipDone] = useState(whyTipSeen);
+  const tipId = !tipDone && why ? sorted.find((r) => r.match_score != null && linesFor(r))?.id ?? null : null;
+  const finishTip = () => { markWhyTipSeen(); setTipDone(true); };
   const helpfulOf = (id: string) => voteCounts[id]?.helpful ?? 0;
 
   // ── "Did you find it?" ───────────────────────────────────────────────────
@@ -761,6 +788,9 @@ export default function LookingForView({
               isWinner={winnerId === rec.id}
               isMobile={isMobile}
               innerRef={(el) => { recRefs.current[rec.id] = el; }}
+              why={linesFor(rec)}
+              tip={tipId === rec.id}
+              onTipDone={finishTip}
             />
           ))}
           {!isOwn && !isClosed && user && (

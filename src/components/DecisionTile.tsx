@@ -10,7 +10,9 @@ import { C, RADIUS, STATE_WORD, body, display, meta, stateColor, strong, type De
 import { BADGES, badgeOf, ringStyle } from "@/lib/tiers";
 import { formatBudget, formatName, getInitials, timeAgo } from "@/lib/format";
 import FollowButton from "./FollowButton";
-import MatchSeal from "./MatchSeal";
+import { SealButton, WhyPanel, WhyTip } from "./WhyMatch";
+import type { WhyLine } from "@/lib/whyMatch";
+import { track } from "@/lib/track";
 
 export interface TileDecision {
   id: string;
@@ -220,6 +222,11 @@ interface Props {
   onSignIn?: () => void;
   /** The one decision picked for this viewer: "For you" in place of the match %. */
   forYou?: boolean;
+  /** What you have in common with her; null keeps the match % a plain label. */
+  why?: WhyLine[] | null;
+  /** Show the one-time "New!" tip on this card. */
+  tip?: boolean;
+  onTipDone?: () => void;
 }
 
 /** The label on the decision picked for her, set like the meta type with a soft pink behind it. */
@@ -231,7 +238,14 @@ function ForYou() {
   );
 }
 
-export default function DecisionTile({ d, viewerId, onOpen, isMobile, following = false, onToggleFollow, onSignIn, forYou = false }: Props) {
+export default function DecisionTile({ d, viewerId, onOpen, isMobile, following = false, onToggleFollow, onSignIn, forYou = false, why = null, tip = false, onTipDone }: Props) {
+  const [whyOpen, setWhyOpen] = useState(false);
+  const [sealEl, setSealEl] = useState<HTMLButtonElement | null>(null);
+  const toggleWhy = () => {
+    if (!whyOpen) track("why_match_open", { decisionId: d.id, meta: { kind: "card", lines: why?.length ?? 0 } });
+    setWhyOpen((o) => !o);
+    if (tip) onTipDone?.();
+  };
   const state = decisionState(d, viewerId);
   const isLF = d.post_type === "looking_for";
   // Her first priority says what kind of jeans: "Jeans / Tall friendly".
@@ -298,9 +312,13 @@ export default function DecisionTile({ d, viewerId, onOpen, isMobile, following 
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
           <p style={{ ...body(11.5, C.muted), lineHeight: 1.35 }}>{timeAgo(d.created_at)}</p>
-          {forYou ? <ForYou /> : match != null && <MatchSeal score={match} size={isMobile ? 32 : 34} withLabel labelSize={9} />}
+          {forYou ? <ForYou /> : match != null && <SealButton score={match} size={isMobile ? 32 : 34} labelSize={9} enabled={!!why} open={whyOpen} onToggle={toggleWhy} sealRef={setSealEl} />}
         </div>
       </header>
+
+      {/* Why her: under the name, never opening the card. */}
+      {tip && why && !whyOpen && !forYou && <WhyTip sealEl={sealEl} align="right" onDismiss={() => { track("why_tip_dismissed"); onTipDone?.(); }} />}
+      {whyOpen && why && <div onClick={(e) => e.stopPropagation()} style={{ cursor: "default" }}><WhyPanel name={d.profiles?.display_name ?? null} lines={why} /></div>}
 
       {/* The thing */}
       <div style={{

@@ -128,52 +128,89 @@ export function whyLines(
   if (!person) return [];
   const g = itemGroup({ category: data.category, text: opts.itemText });
   const you = opts.viewerIsPoster ? "you" : firstName(opts.posterName);
+  const body = a && b ? pairLines(a, b, g, you) : null;
   const out: WhyLine[] = [];
-  let diff: WhyLine | null = null;
+  if (body?.height) out.push(body.height);
+  if (body?.body) out.push(body.body);
 
-  // Height, for anything you wear on the body.
-  if (a && b && g !== "none") {
-    const ha = heightInches(a.height), hb = heightInches(b.height);
-    if (ha != null && hb != null) {
-      const d = hb - ha;
-      if (d === 0 && b.height) out.push({ text: `Same height. ${b.height.replace(/\s/g, "")}.` });
-      else if (Math.abs(d) === 1) out.push({ text: "About the same height." });
-      else if (Math.abs(d) >= 3) diff = { text: `${Math.abs(d)}" ${d > 0 ? "taller" : "shorter"} than ${you}.`, diff: true };
-    }
-  }
-
-  // Body, in the words that matter for this item.
-  let bodyLine = false;
-  if (a && b && g !== "none") {
-    const hit = BODY[g].find((o) => sameAndTelling(a, b, o.cats));
-    if (hit) { out.push({ text: hit.text }); bodyLine = true; }
-  }
-
-  // What she owns.
+  // What she owns and what she's earned.
   if (person.owns_item) out.push({ text: ownsLine(opts.itemText) });
-
   if (person.trusted) out.push({ text: opts.viewerIsPoster ? "You've trusted her advice before." : `${firstName(opts.posterName)} has trusted her advice before.` });
-
   if (!person.owns_item && person.brand) {
     if (person.bought) out.push({ text: `Has bought ${person.brand}.` });
     else if (person.fav) out.push({ text: `Loves ${person.brand}.` });
   }
-
   if (person.calls_n >= 3 && person.calls_right / person.calls_n >= 0.75) out.push({ text: "Usually calls it right." });
 
   // Softer signals, only if there's room.
-  if (a && b) {
-    if (!bodyLine && g !== "none" && a.silhouette && a.silhouette === b.silhouette) out.push({ text: "Similar shape." });
-    if (sharedStyles(a.style, b.style) >= 2) out.push({ text: "Similar style." });
-    if (g !== "none") {
-      const same = (x: string | null, y: string | null) => { const i = sizeIndex(x), j = sizeIndex(y); return i != null && i === j; };
-      const sizeSame = g === "lower" ? same(a.bottom, b.bottom) : g === "upper" ? same(a.top, b.top) : same(a.top, b.top) && same(a.bottom, b.bottom);
-      if (sizeSame) out.push({ text: "Same size." });
-    }
-  }
+  out.push(...(body?.soft ?? []));
+  return finish(out, body?.diff ?? null);
+}
 
+function finish(out: WhyLine[], diff: WhyLine | null): WhyLine[] {
   const kept = out.slice(0, diff ? 3 : 4);
   return diff ? [...kept, diff] : kept;
+}
+
+/**
+ * What two women share, body and taste only. `you` is the first woman; lines
+ * describe the second ("3\" taller than you."). Used for takes (poster vs the
+ * woman who weighed in) and feed cards (you vs the poster).
+ */
+export function pairLines(a: WhyProfile, b: WhyProfile, g: ItemGroup, you: string): { height?: WhyLine; body?: WhyLine; soft: WhyLine[]; diff: WhyLine | null } {
+  const res: { height?: WhyLine; body?: WhyLine; soft: WhyLine[]; diff: WhyLine | null } = { soft: [], diff: null };
+  if (g !== "none") {
+    // Height, for anything you wear on the body.
+    const ha = heightInches(a.height), hb = heightInches(b.height);
+    if (ha != null && hb != null) {
+      const d = hb - ha;
+      if (d === 0 && b.height) res.height = { text: `Same height. ${b.height.replace(/\s/g, "")}.` };
+      else if (Math.abs(d) === 1) res.height = { text: "About the same height." };
+      else if (Math.abs(d) >= 3) res.diff = { text: `${Math.abs(d)}" ${d > 0 ? "taller" : "shorter"} than ${you}.`, diff: true };
+    }
+    // Body, in the words that matter for this item.
+    const hit = BODY[g].find((o) => sameAndTelling(a, b, o.cats));
+    if (hit) res.body = { text: hit.text };
+    if (!hit && a.silhouette && a.silhouette === b.silhouette) res.soft.push({ text: "Similar shape." });
+  }
+  if (sharedStyles(a.style, b.style) >= 2) res.soft.push({ text: "Similar style." });
+  if (g !== "none") {
+    const same = (x: string | null, y: string | null) => { const i = sizeIndex(x), j = sizeIndex(y); return i != null && i === j; };
+    const sizeSame = g === "lower" ? same(a.bottom, b.bottom) : g === "upper" ? same(a.top, b.top) : same(a.top, b.top) && same(a.bottom, b.bottom);
+    if (sizeSame) res.soft.push({ text: "Same size." });
+  }
+  return res;
+}
+
+/** A profiles row (any shape the app loads) as the fields the panel reads. */
+export function toWhyProfile(p: any): WhyProfile | null {
+  if (!p) return null;
+  const fit: Record<string, string> = {};
+  if (p.fit_details && typeof p.fit_details === "object") {
+    for (const [k, v] of Object.entries(p.fit_details)) if (!k.startsWith("_") && typeof v === "string") fit[k] = v;
+  }
+  return {
+    height: p.height_range ?? null,
+    silhouette: (p.silhouette_preference ?? [])[0] ?? null,
+    top: p.top_size ?? null,
+    bottom: p.bottom_size ?? null,
+    fit,
+    style: p.style_aesthetics ?? [],
+    brands: Array.isArray(p.favorite_brands) ? p.favorite_brands : [],
+  };
+}
+
+/** Feed card: what you (the viewer) have in common with the woman who posted. */
+export function cardLines(viewer: WhyProfile | null, poster: any, item: { category?: string | null; text?: string | null }): WhyLine[] | null {
+  const her = toWhyProfile(poster);
+  if (!viewer || !her) return null;
+  const g = itemGroup(item);
+  const r = pairLines(viewer, her, g, "you");
+  const out: WhyLine[] = [];
+  if (r.height) out.push(r.height);
+  if (r.body) out.push(r.body);
+  out.push(...r.soft);
+  return finish(out, r.diff);
 }
 
 /** Nudges the order takes and recs are listed in: what she's earned, on top of the match. */

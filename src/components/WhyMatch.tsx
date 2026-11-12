@@ -1,5 +1,5 @@
 // ── Why her? ──────────────────────────────────────────────────────────────────
-// The match % on a take or rec is a button. Tapping it opens a short panel of
+// The match % on a take, rec or feed card is a button. Tapping it opens a short panel of
 // what you have in common (see lib/whyMatch.ts for the wording). The first time
 // someone sees one, a small dark tip points at it once.
 import { useEffect, useRef, useState } from "react";
@@ -9,20 +9,22 @@ import { track } from "@/lib/track";
 import MatchSeal from "./MatchSeal";
 import type { WhyLine } from "@/lib/whyMatch";
 
-export function SealButton({ score, size, open, onToggle, enabled, sealRef }: {
+export function SealButton({ score, size, labelSize, open, onToggle, enabled, sealRef }: {
   score: number;
   size: number;
+  labelSize?: number;
   open: boolean;
   onToggle: () => void;
   /** No facts to show (signed out, guest): the seal stays a plain label. */
   enabled: boolean;
   sealRef?: React.Ref<HTMLButtonElement>;
 }) {
-  if (!enabled) return <MatchSeal score={score} size={size} />;
+  if (!enabled) return <MatchSeal score={score} size={size} labelSize={labelSize} />;
   return (
-    <button ref={sealRef} onClick={onToggle} aria-expanded={open} aria-label={`${Math.round(score)}% match. See what you have in common`}
+    // Never the click that opens the card it sits on.
+    <button ref={sealRef} onClick={(e) => { e.stopPropagation(); onToggle(); }} onKeyDown={(e) => e.stopPropagation()} aria-expanded={open} aria-label={`${Math.round(score)}% match. See what you have in common`}
       style={{ background: "none", border: "none", padding: 0, margin: 0, cursor: "pointer", display: "inline-flex", WebkitTapHighlightColor: "transparent" }}>
-      <MatchSeal score={score} size={size} />
+      <MatchSeal score={score} size={size} labelSize={labelSize} />
     </button>
   );
 }
@@ -56,13 +58,13 @@ export function WhyPanel({ name, lines }: { name: string | null; lines: WhyLine[
 }
 
 /** The one-time "New!" tip, under the name row, its arrow pointing up at the seal. */
-export function WhyTip({ sealEl, onDismiss }: { sealEl: HTMLElement | null; onDismiss: () => void }) {
+export function WhyTip({ sealEl, onDismiss, align = "left" }: { sealEl: HTMLElement | null; onDismiss: () => void; align?: "left" | "right" }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [arrowLeft, setArrowLeft] = useState(28);
   useEffect(() => {
     track("why_tip_shown");
     const place = () => {
-      const box = boxRef.current?.parentElement;
+      const box = boxRef.current;
       if (!sealEl || !box) return;
       const s = sealEl.getBoundingClientRect(), b = box.getBoundingClientRect();
       setArrowLeft(Math.max(14, Math.min(s.left - b.left + 18, b.width - 28)));
@@ -72,7 +74,7 @@ export function WhyTip({ sealEl, onDismiss }: { sealEl: HTMLElement | null; onDi
     return () => window.removeEventListener("resize", place);
   }, [sealEl]);
   return (
-    <div ref={boxRef} role="note" style={{ position: "relative", marginTop: 12, maxWidth: 300, background: C.ink, color: C.paper, borderRadius: 10, padding: "10px 36px 10px 13px", fontFamily: SANS, fontSize: 13, lineHeight: 1.35, boxShadow: "0 10px 24px rgba(20,18,16,.22)" }}>
+    <div ref={boxRef} role="note" onClick={(e) => e.stopPropagation()} style={{ position: "relative", marginTop: 12, maxWidth: 300, marginLeft: align === "right" ? "auto" : undefined, cursor: "default", background: C.ink, color: C.paper, borderRadius: 10, padding: "10px 36px 10px 13px", fontFamily: SANS, fontSize: 13, lineHeight: 1.35, boxShadow: "0 10px 24px rgba(20,18,16,.22)" }}>
       <span aria-hidden style={{ position: "absolute", top: -5, left: arrowLeft, width: 11, height: 11, background: C.ink, transform: "rotate(45deg)" }} />
       <b style={{ color: "#E3C38E" }}>New!</b> Tap the match % to see what you have in common.
       <button onClick={onDismiss} aria-label="Got it" style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", padding: 4, cursor: "pointer", color: C.faint, lineHeight: 0 }}>

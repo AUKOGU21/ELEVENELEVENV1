@@ -11,6 +11,7 @@ import { Plus, ThumbsUp, Check, ExternalLink, SlidersHorizontal, X, User, Info, 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeMatchScore } from "@/lib/matching";
+import { cardLines, markWhyTipSeen, toWhyProfile, whyTipSeen, type WhyProfile } from "@/lib/whyMatch";
 import { SILHOUETTE_OPTIONS } from "@/components/onboarding/OnboardingData";
 import { DialInFitModal, shouldShowFitPrompt, missingFitCategories } from "@/components/DialInFitModal";
 import { imageToJpeg } from "@/lib/image";
@@ -427,6 +428,9 @@ const Feed = () => {
   // decision would hand her back the take she already sent.
   const [weighInResetKey, setWeighInResetKey] = useState(0);
   const [showFitModal, setShowFitModal] = useState(false);
+  // Your own profile as the "Why her?" panel on feed cards reads it.
+  const [viewerWhy, setViewerWhy] = useState<WhyProfile | null>(null);
+  const [whyTipDone, setWhyTipDone] = useState(whyTipSeen);
   const [fitModalVariant, setFitModalVariant] = useState<"weigh_in" | "post_decision">("weigh_in");
   const [context, setContext] = useState<string | null>(null);
   const [vote, setVote] = useState<"buy" | "do_not_buy" | "need_more_info" | null>(null);
@@ -750,6 +754,7 @@ const Feed = () => {
     ]);
 
     const myProfileData = (profileResult as any).data ?? null;
+    setViewerWhy(toWhyProfile(myProfileData));
     if (myProfileData) setMyProfile({ display_name: myProfileData.display_name, avatar_url: myProfileData.avatar_url, invite_code: myProfileData.invite_code ?? null, referral_prompt_dismissed_at: myProfileData.referral_prompt_dismissed_at ?? null, fit_details: myProfileData.fit_details ?? null, badge_tier: myProfileData.badge_tier ?? null, fit_prompt_dismissed_at: myProfileData.fit_prompt_dismissed_at ?? null });
     // Signed in, never finished onboarding: no name, no fit. Three accounts are in
     // this state and not one of them got past the door. Send her back to finish
@@ -1691,6 +1696,13 @@ const Feed = () => {
   })();
   const showActivation = !!user && activeTab === "feed" && !!activationTarget && !iceClosed;
 
+  // ── Why her? on feed cards: tap the match % to see what you have in common
+  // with the woman who posted. The one-time "New!" tip sits on the first card
+  // with a match, and waits while Did you decide? or another prompt is up.
+  const cardWhy = (d: DecisionRow) =>
+    d.matchScore != null && viewerWhy ? cardLines(viewerWhy, d.profiles, { category: d.product_category, text: d.product_name ?? d.lf_title }) : null;
+  const finishWhyTip = () => { markWhyTipSeen(); setWhyTipDone(true); };
+
   // Rotate a pick she keeps scrolling past: note when each one was first shown.
   // Only a pick that stays up counts: while match scores load, the top spot can
   // flash another post first, and that flash must not start its clock.
@@ -1720,6 +1732,9 @@ const Feed = () => {
   const loopHold = !!user && (!loopChecked || !!loopDecision);
   const loopHoldRef = useRef(loopHold);
   loopHoldRef.current = loopHold;
+  const whyTipCardId = !whyTipDone && user && activeTab === "feed" && !loopHold && !showFitModal && !showReferral
+    ? displayList.find((d) => !(showActivation && d.id === activationTarget?.id) && cardWhy(d))?.id ?? null
+    : null;
   useEffect(() => {
     if (authLoading) return;
     if (!user) { setLoopChecked(true); return; }
@@ -1997,7 +2012,8 @@ const Feed = () => {
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(262px, 1fr))", gap: isMobile ? 14 : 18 }}>
               {displayList.map((decision) => (
                 <div key={decision.id} id={`dec-${decision.id}`} style={{ scrollMarginTop: 80, display: "grid" }}>
-                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} forYou={showActivation && decision.id === activationTarget?.id} />
+                  <DecisionTile d={decision} viewerId={user?.id ?? null} isMobile={isMobile} onOpen={(id) => openDecision(id)} forYou={showActivation && decision.id === activationTarget?.id}
+                    why={cardWhy(decision)} tip={decision.id === whyTipCardId} onTipDone={finishWhyTip} />
                 </div>
               ))}
             </div>

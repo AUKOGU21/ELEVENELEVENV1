@@ -39,9 +39,9 @@ Rules:
 4. Prefer the specific detail over generic phrasing ("Are these worth $325?" beats "Is this worth it?") when she gave it.
 5. If her own question is already short, keep it.
 6. ${ONE_LINE} characters or fewer, counting spaces. Never more than ${MAX_CHARS}. Cut filler words ("actually", "really", "just", "for me"). Drop cents from prices. End with a question mark. No emoji, no quotation marks.
-7. Refer to the item as "this" or "these", or by brand when the question is about the brand. Don't repeat the full product name.
+7. Refer to the item as "this" or "these", or by brand when the question is about the brand's quality or sizing. Never lift descriptive words (colors, prints, materials, styles) out of the product name: the product name is already on the card, and her worry is only what she wrote. If she wrote "Color combo", ask about "this color combo", not the colors in the product name.
 8. Talk about her body only in her own words. Never label a body type she didn't name ("smaller on top" stays "smaller on top", never "hip-heavy" or "pear").
-9. Name a color only if she or the product name states it. Otherwise say "this color".
+9. Name a color or print only if she wrote it herself. Otherwise say "this color" or "this print".
 10. No abbreviations or shopping jargon (write "true to size", never "TTS").
 11. If there isn't enough to know what she's unsure about, return null rather than guessing.
 

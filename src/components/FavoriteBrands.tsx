@@ -30,6 +30,70 @@ export function logoUrl(domain: string, size = 400): string | null {
   return `https://cdn.brandfetch.io/${encodeURIComponent(domain)}/w/${size}/h/${size}/fallback/404/type/logo?c=${BRANDFETCH_CLIENT_ID}`;
 }
 
+// ── A logo for a brand we only know by name ──────────────────────────────────
+// A brand-only rec ("try Vagabond") has no product photo. Find the brand's site
+// (from her link if she gave one, else a Brandfetch search) and show its logo.
+// Only trust a search hit whose name matches what she typed, so a wrong company's
+// logo never stands in for hers. Answers are cached for the session.
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const domainCache = new Map<string, Promise<string | null>>();
+
+function hostOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try { return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "") || null; }
+  catch { return null; }
+}
+
+function findDomain(name: string): Promise<string | null> {
+  const key = norm(name);
+  if (key.length < 2) return Promise.resolve(null);
+  let p = domainCache.get(key);
+  if (!p) {
+    p = fetch(`https://api.brandfetch.io/v2/search/${encodeURIComponent(name.trim())}?c=${BRANDFETCH_CLIENT_ID}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((hits: any[]) => {
+        const hit = (Array.isArray(hits) ? hits : []).find((h) => {
+          if (!h?.domain || !h?.name) return false;
+          const n = norm(h.name);
+          return n === key || n.startsWith(key) || key.startsWith(n);
+        });
+        return hit?.domain ?? null;
+      })
+      .catch(() => null);
+    domainCache.set(key, p);
+  }
+  return p;
+}
+
+/** Logo URL for a brand, or null while looking / when there isn't one. */
+export function useBrandLogo(name: string | null | undefined, siteUrl?: string | null, enabled = true): [string | null, () => void] {
+  const [domain, setDomain] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!enabled || !name) { setDomain(null); return; }
+    const own = hostOf(siteUrl);
+    if (own) { setDomain(own); return; }
+    let live = true;
+    findDomain(name).then((d) => { if (live) setDomain(d); });
+    return () => { live = false; };
+  }, [name, siteUrl, enabled]);
+  const src = domain && !failed ? logoUrl(domain) : null;
+  return [src, () => setFailed(true)];
+}
+
+/** The brand's logo on white, or `fallback` when we can't find one. Fills its parent. */
+export function BrandLogo({ name, siteUrl, fallback, inset = "18%" }: {
+  name: string | null | undefined; siteUrl?: string | null; fallback: React.ReactNode; inset?: string;
+}) {
+  const [src, kill] = useBrandLogo(name, siteUrl);
+  if (!src) return <>{fallback}</>;
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", padding: inset, boxSizing: "border-box" }}>
+      <img src={src} alt={name ?? ""} loading="lazy" onError={kill} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+    </div>
+  );
+}
+
 function Tile({ brand, isMobile }: { brand: FavBrand; isMobile: boolean }) {
   const [failed, setFailed] = useState(false);
   const src = brand.domain && !failed ? logoUrl(brand.domain) : null;

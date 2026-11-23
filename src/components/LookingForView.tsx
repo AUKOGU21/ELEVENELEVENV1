@@ -17,6 +17,7 @@ import { PersonName } from "./PersonLink";
 import { SealButton, WhyPanel, WhyTip } from "./WhyMatch";
 import { useWhy, whyBoost, whyLines, whyTipSeen, markWhyTipSeen, type WhyLine } from "@/lib/whyMatch";
 import { track } from "@/lib/track";
+import { useBrandLogo, BrandLogo } from "./FavoriteBrands";
 import type { RecommendationData, LookingForDecision, LookingForFoundPayload } from "@/lib/lookingFor";
 
 type FoundStep = "idle" | "pick" | "same_or_diff" | "link" | "why" | "confidence" | "thanks" | "snoozed";
@@ -143,6 +144,9 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
     if (tip) onTipDone?.();
   };
   const [recImg, killRecImg] = useLiveImage(rec.product_image_url);
+  // No product shot (a brand-only pick, or a photo that died): show the brand's logo.
+  // Her link is the brand's own site only when she named a brand, not a piece.
+  const [logo, killLogo] = useBrandLogo(rec.brand_name, rec.product_name ? null : rec.product_url, !recImg);
   const price = money(rec.price_note);
   // Who sent it. A guest stands behind her pick with her own name.
   const recGuest = rec.guests ?? null;
@@ -185,7 +189,7 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
           <p style={{ ...body(isMobile ? 14 : 15, C.ink), marginTop: 10 }}>{rec.reasoning}</p>
 
           {(rec.product_url || rec.brand_name || rec.product_name) && (() => {
-            const hasImage = !!recImg;
+            const hasImage = !!recImg || !!logo;
             const details = (
               <div style={{ minWidth: 0 }}>
                 {rec.brand_name && <p style={{ ...strong(12.5), textTransform: "uppercase", letterSpacing: "0.04em" }}>{rec.brand_name}</p>}
@@ -200,9 +204,15 @@ function RecItem({ rec, helpfulCount, myVote, canVote, onHelpful, isWinner, isMo
             // than a name sitting beside an empty grey box.
             const inner = hasImage ? (
               <>
-                <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  <img src={recImg ?? ""} alt="" loading="lazy" onError={killRecImg} style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />
-                </div>
+                {recImg ? (
+                  <div style={{ background: C.well, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    <img src={recImg} alt="" loading="lazy" onError={killRecImg} style={{ maxWidth: "88%", maxHeight: "88%", objectFit: "contain"}} className="e11-blend" />
+                  </div>
+                ) : (
+                  <div style={{ background: "#FFFFFF", border: `1px solid ${C.rule}`, aspectRatio: "4 / 5", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", padding: 8, boxSizing: "border-box" }}>
+                    <img src={logo ?? ""} alt={rec.brand_name ?? ""} loading="lazy" onError={killLogo} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                  </div>
+                )}
                 {details}
               </>
             ) : details;
@@ -628,14 +638,14 @@ export default function LookingForView({
           {rec.product_image_url && !deadImages.has(rec.product_image_url)
             ? <img src={rec.product_image_url} alt="" loading="lazy" onError={() => { deadImages.add(rec.product_image_url!); bumpImages((n) => n + 1); }} style={{ maxWidth: "86%", maxHeight: "86%", objectFit: "contain"}} className="e11-blend" />
             : (
-              // A brand has no product shot. Rather than an empty square saying
-              // "no image", the name becomes the tile.
-              <span style={{
+              // A brand has no product shot. Its logo stands in; failing that,
+              // rather than an empty square saying "no image", the name becomes the tile.
+              <BrandLogo name={rec.brand_name} siteUrl={rec.product_name ? null : rec.product_url} fallback={<span style={{
                 ...display(isMobile ? "clamp(20px, 7vw, 30px)" : 30, C.ink),
                 textAlign: "center", padding: "0 14px", lineHeight: 0.92, overflowWrap: "anywhere",
               }}>
                 {rec.brand_name || rec.product_name || "Recommended"}
-              </span>
+              </span>} />
             )}
           {isWinner && (
             <span style={{ position: "absolute", top: 10, left: 10, ...meta(9.5, "#FFFFFF"), fontWeight: 700, background: C.burgundy, padding: "5px 8px" }}>She bought this</span>
